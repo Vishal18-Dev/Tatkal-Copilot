@@ -30,6 +30,7 @@ const MODEL = process.env.OPENAI_MODEL || "gpt-4o-mini";
 
 interface AgentDecisionRequest {
   observation: {
+    authorizationMode?: "assisted" | "permissioned";
     journeyState: string;
     envEvent?: string;
     secondsRemaining?: number;
@@ -83,37 +84,25 @@ export async function POST(req: Request) {
 Given the passenger's current observation, you MUST DECIDE the single best agent action to take right now.
 
 Allowed actions (pick exactly one):
-1. "none": No immediate action required. Do NOT notify if user is active or no intervention is warranted.
+1. "none": No immediate action required.
 2. "notify_user": Send a targeted reminder or escalation alert to the passenger.
 3. "open_booking_flow": Initiate the booking attempt on the primary strategy.
 4. "evaluate_backup": Assess the backup strategy because primary is unavailable or risky.
 5. "activate_backup": Execute booking on the prepared backup strategy.
 
-Allowed tool names for toolCall:
-- "notifyUser" (arguments: { "channel": "email"|"in-app"|"whatsapp"|"push", "priority": "low"|"medium"|"high", "title": string, "message": string, "notificationKey": string })
-- "openBookingFlow" (arguments: {})
-- "activateBackupStrategy" (arguments: {})
-- "recordEvent" (arguments: { "kind": string, "text": string })
+CRITICAL AUTHORIZATION MODE RULES:
+- authorizationMode = "assisted":
+  * Passenger retains final booking authority.
+  * When Tatkal window opens (windowOpen=true), NEVER pick "open_booking_flow" or "activate_backup". Pick "notify_user" or "none" to ask user to tap "Start booking".
+  * If primary strategy fails, NEVER pick "activate_backup". Pick "notify_user" to advise user to tap "Use backup".
+- authorizationMode = "permissioned":
+  * Passenger granted authorization to execute booking strategy.
+  * When Tatkal window opens (windowOpen=true) and primaryAvailable=true, pick "open_booking_flow".
+  * If primary strategy fails and backup strategy exists, pick "activate_backup".
 
 Rules for intelligent escalation:
-- Evaluate the structured readiness facts in observation.readiness (readyCount, blocking, missing).
-- If userActive is TRUE and readiness.criticalReady is true: choose "none" unless booking requires user action.
-- If userActive is FALSE and secondsRemaining <= 600: pick "notify_user" using channel "email" (if channelPreferences.email is true) or "in-app", with priority "high" and notificationKey "tatkal_warning_10m".
-- If userActive is FALSE and blocking items exist (e.g. "booking_session" missing), pick "notify_user" to alert passenger.
-- If Tatkal window is open (windowOpen=true) and primaryAvailable=true and bookingStatus="none", pick "open_booking_flow".
-- If primaryAvailable=false or bookingStatus="primary_failed":
-  * If backupTrain exists / backup strategy is ready: pick "activate_backup".
-  * If NO backup exists (backup in missing): pick "notify_user" to alert passenger that primary strategy failed and no backup is configured. Do NOT pick activate_backup.
-- If booking is confirmed or no action needed, pick "none".
-- Never invent facts. Output strictly valid JSON matching:
-{
-  "action": "notify_user" | "open_booking_flow" | "evaluate_backup" | "activate_backup" | "none",
-  "reason": "Clear concise 1-2 sentence explanation of your decision",
-  "toolCall": {
-    "name": "notifyUser" | "openBookingFlow" | "activateBackupStrategy" | "recordEvent",
-    "arguments": { ... }
-  }
-}`,
+- If userActive is FALSE and secondsRemaining <= 600: pick "notify_user" using channel "email" or "in-app", with priority "high" and notificationKey "tatkal_warning_10m".
+- Never invent facts. Output strictly valid JSON.`,
           },
           {
             role: "user",
@@ -135,6 +124,10 @@ Rules for intelligent escalation:
       }
 
       if (parsed.action && ["none", "notify_user", "open_booking_flow", "evaluate_backup", "activate_backup"].includes(parsed.action)) {
+        // Enforce mode boundaries
+        if (observation.authorizationMode === "assisted" && (parsed.action === "open_booking_flow" || parsed.action === "activate_backup")) {
+          return NextResponse.json({ ...fallback, source: "gpt" });
+        }
         return NextResponse.json({
           action: parsed.action,
           reason: parsed.reason || fallback.reason,
@@ -150,6 +143,9 @@ Rules for intelligent escalation:
   // 2. Try Gemini fallback if OpenAI failed or key is absent
   const geminiDecision = await callGeminiReasoning(observation);
   if (geminiDecision) {
+    if (observation.authorizationMode === "assisted" && (geminiDecision.action === "open_booking_flow" || geminiDecision.action === "activate_backup")) {
+      return NextResponse.json({ ...fallback, source: "gemini" });
+    }
     return NextResponse.json(geminiDecision);
   }
 
@@ -165,25 +161,18 @@ async function callGeminiReasoning(observation: AgentDecisionRequest["observatio
   const model = process.env.GEMINI_MODEL || "gemini-2.5-flash";
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${geminiKey}`;
 
-  const prompt = `You are the autonomous decision engine for Tatkal Copilot, an Indian railway booking agent.
-
-Given the passenger's current observation, you MUST DECIDE the single best agent action to take right now.
-
+  const prompt = `You are the autonomous decision engine for Tatkal Copilot. Return ONLY valid JSON with keys "action", "reason", "toolCall".
 Allowed actions: "none", "notify_user", "open_booking_flow", "evaluate_backup", "activate_backup".
-Allowed tool names: "notifyUser", "openBookingFlow", "activateBackupStrategy", "recordEvent".
 
-Rules for intelligent escalation:
-- If userActive is TRUE: choose "none" unless booking requires user action.
-- If userActive is FALSE and secondsRemaining <= 600: pick "notify_user" using channel "email" or "in-app", with priority "high" and notificationKey "tatkal_warning_10m".
-- If Tatkal window is open and primaryAvailable=true and bookingStatus="none", pick "open_booking_flow".
-- If primaryAvailable=false, pick "activate_backup".
-
-Output strictly JSON matching:
-{
-  "action": "notify_user" | "open_booking_flow" | "evaluate_backup" | "activate_backup" | "none",
-  "reason": "Explanation",
-  "toolCall": { "name": "notifyUser" | "openBookingFlow" | "activateBackupStrategy" | "recordEvent", "arguments": { ... } }
-}
+CRITICAL AUTHORIZATION MODE RULES:
+- authorizationMode = "assisted":
+  * Passenger retains final booking authority.
+  * When Tatkal window opens (windowOpen=true), NEVER pick "open_booking_flow" or "activate_backup". Pick "notify_user" or "none" to ask user to tap "Start booking".
+  * If primary strategy fails, NEVER pick "activate_backup". Pick "notify_user" to advise user to tap "Use backup".
+- authorizationMode = "permissioned":
+  * Passenger granted authorization to execute booking strategy.
+  * When Tatkal window opens (windowOpen=true) and primaryAvailable=true, pick "open_booking_flow".
+  * If primary strategy fails and backup strategy exists, pick "activate_backup".
 
 Observation:
 ${JSON.stringify(observation)}`;
@@ -262,17 +251,37 @@ ${JSON.stringify(observation)}`;
   }
 }
 
-/** Compute deterministic baseline decision when OpenAI is unavailable. */
+/** Compute deterministic baseline decision when AI is unavailable or as boundary fallback. */
 function computeLocalDecision(obs: AgentDecisionRequest["observation"]): {
   action: AllowedAgentAction;
   reason: string;
   toolCall?: { name: AllowedAgentTool; arguments?: Record<string, unknown> };
 } {
+  const isAssisted = obs.authorizationMode === "assisted";
+
   if (obs.primaryAvailable === false || obs.bookingStatus === "primary_failed") {
+    if (isAssisted) {
+      const channel = obs.channelPreferences?.email ? "email" : "in-app";
+      return {
+        action: "notify_user",
+        reason: "Primary strategy unavailable. User retains decision authority in Assisted mode — recommending backup.",
+        toolCall: {
+          name: "notifyUser",
+          arguments: {
+            channel,
+            priority: "high",
+            title: "Primary Strategy Unavailable",
+            message: "Primary train unavailable. Tap 'Use backup' to switch strategy.",
+            notificationKey: "assisted_primary_failed",
+          },
+        },
+      };
+    }
+
     if (obs.backupTrain) {
       return {
         action: "activate_backup",
-        reason: `Primary train unavailable. Local rule engine selected backup strategy: ${obs.backupTrain}`,
+        reason: `Primary train unavailable. Permissioned agent executing backup strategy: ${obs.backupTrain}`,
         toolCall: { name: "activateBackupStrategy", arguments: {} },
       };
     } else {
@@ -313,9 +322,27 @@ function computeLocalDecision(obs: AgentDecisionRequest["observation"]): {
   }
 
   if (obs.windowOpen && (obs.primaryAvailable ?? true) && obs.bookingStatus === "none") {
+    if (isAssisted) {
+      const channel = obs.channelPreferences?.email ? "email" : "in-app";
+      return {
+        action: "notify_user",
+        reason: "Tatkal window is open. Waiting for passenger to initiate booking in Assisted mode.",
+        toolCall: {
+          name: "notifyUser",
+          arguments: {
+            channel,
+            priority: "high",
+            title: "Tatkal Window Open",
+            message: "Tatkal window is open! Tap 'Start booking' to begin.",
+            notificationKey: "tatkal_open_assisted",
+          },
+        },
+      };
+    }
+
     return {
       action: "open_booking_flow",
-      reason: "Tatkal window is open. Initiating primary booking strategy.",
+      reason: "Tatkal window is open. Permissioned agent initiating primary booking strategy.",
       toolCall: { name: "openBookingFlow", arguments: {} },
     };
   }

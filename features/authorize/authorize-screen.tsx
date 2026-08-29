@@ -154,16 +154,17 @@ export function AuthorizeScreen() {
           active={mode === "assisted"}
           onClick={() => setMode("assisted")}
           icon={<Bell className="h-5 w-5" />}
-          title="Assisted"
-          badgeLabel="Recommended"
-          body="Prepare everything, watch the clock and notify me when I need to act. I'll make the final booking decision."
+          title="🤝 Assisted"
+          badgeLabel="Keep me in control"
+          body="Prepare everything, watch the clock, and make sure I'm there when Tatkal opens. I'll make the final booking decision."
         />
         <ModeCard
           active={mode === "auto"}
           onClick={() => setMode("auto")}
           icon={<Zap className="h-5 w-5" />}
-          title="Permissioned booking"
-          body="Simulate how an authorized agent could attempt the strategy the moment the window opens."
+          title="⚡ Permissioned"
+          badgeLabel="Let Copilot act"
+          body="Prepare everything and execute my booking strategy when Tatkal opens, including switching to my backup if needed."
           demo
         />
       </div>

@@ -277,27 +277,35 @@ function PlanMission({ plan }: { plan: Trip }) {
     agentRef.current?.updateTrip(plan);
   }, [plan]);
 
-  /** Inverted control handleDemoBeat: DemoClock emits environmental beat → Agent observes → OpenAI decides → Action validated → Tool executed */
+  /** Inverted control handleDemoBeat: DemoClock emits environmental beat → Agent observes → AI decides → Action validated → Tool executed */
   const handleDemoBeat = useCallback(async (envBeat: DemoEnvironmentBeat, index: number) => {
     const agent = agentRef.current;
     if (!agent) return;
 
     setDemoBeatIndex(index);
 
-    // Run full agent cycle (observe → evaluate via OpenAI → validate → act)
+    // Run full agent cycle (observe → evaluate via AI → validate → act)
     const { decision, validation, executedTool } = await agent.tick(envBeat);
 
     // Record decision trace entry
     const time = new Date().toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+    const isAssisted = plan.mode === "assisted";
+    const modeLabel = isAssisted ? "Assisted authorization" : "Permissioned authorization";
+    const observedLabel = `${envBeat.description} · ${modeLabel}`;
+
     const traceEntry: DecisionTraceRecord = {
       id: `trace_${Date.now()}_${index}`,
       timestamp: time,
-      observed: envBeat.description,
+      observed: observedLabel,
       decision: decision.action,
       why: decision.reason,
       action: decision.toolCall ? `${decision.toolCall.name}()` : "none",
       result: validation.valid
-        ? (executedTool ? `Executed ${executedTool}` : "No tool execution needed")
+        ? (executedTool
+            ? `Executed ${executedTool}`
+            : (isAssisted && envBeat.event === "tatkal_window_open"
+                ? "Waiting for user action"
+                : "No tool execution needed"))
         : `Rejected: ${validation.reason}`,
       source: decision.source,
       valid: validation.valid,
@@ -316,7 +324,15 @@ function PlanMission({ plan }: { plan: Trip }) {
         source: decision.source,
       },
     }], plan.id);
-  }, [plan.id, logActivity]);
+
+    // Mode A (Assisted) demo flow boundary:
+    // If Tatkal window opens in Assisted mode, pause demo clock and wait for user to click [Start booking]
+    if (isAssisted && envBeat.event === "tatkal_window_open") {
+      clockRef.current?.pause();
+      setDemoStatus("paused");
+      updateTrip(plan.id, { agentState: "window_open" });
+    }
+  }, [plan.id, plan.mode, logActivity, updateTrip]);
 
   const handleSimulateInactivity = useCallback(async () => {
     const agent = agentRef.current;
@@ -461,7 +477,7 @@ function PlanMission({ plan }: { plan: Trip }) {
       source: "local",
     };
 
-    const validation = validateAgentDecision(proposedDecision, plan, new Set());
+    const validation = validateAgentDecision(proposedDecision, plan, new Set(), true);
     if (!validation.valid) {
       setBackupError(`Cannot activate backup: ${validation.reason}`);
       setBackupLoading(false);

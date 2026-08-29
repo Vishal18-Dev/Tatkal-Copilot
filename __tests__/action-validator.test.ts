@@ -92,7 +92,7 @@ describe("Action Validator", () => {
   });
 
   it("rejects activate_backup when booking is already confirmed", () => {
-    const trip = makeMockTrip({ agentState: "confirmed" });
+    const trip = makeMockTrip({ agentState: "confirmed", mode: "auto" });
     const sentKeys = new Set<string>();
     const decision: ProposedAgentDecision = {
       action: "activate_backup",
@@ -100,9 +100,81 @@ describe("Action Validator", () => {
       toolCall: { name: "activateBackupStrategy" },
       source: "gpt",
     };
-    const res = validateAgentDecision(decision, trip, sentKeys);
+    const res = validateAgentDecision(decision, trip, sentKeys, true);
     expect(res.valid).toBe(false);
     expect(res.code).toBe("already_completed");
+  });
+
+  it("rejects open_booking_flow in assisted mode without user initiation", () => {
+    const trip = makeMockTrip({ mode: "assisted" });
+    const sentKeys = new Set<string>();
+    const decision: ProposedAgentDecision = {
+      action: "open_booking_flow",
+      reason: "Window open",
+      toolCall: { name: "openBookingFlow" },
+      source: "gpt",
+    };
+    const res = validateAgentDecision(decision, trip, sentKeys, false);
+    expect(res.valid).toBe(false);
+    expect(res.code).toBe("disallowed_action");
+    expect(res.reason).toContain("Assisted mode requires explicit user initiation");
+  });
+
+  it("allows open_booking_flow in assisted mode when initiated by user", () => {
+    const trip = makeMockTrip({ mode: "assisted" });
+    const sentKeys = new Set<string>();
+    const decision: ProposedAgentDecision = {
+      action: "open_booking_flow",
+      reason: "User clicked Start booking",
+      toolCall: { name: "openBookingFlow" },
+      source: "local",
+    };
+    const res = validateAgentDecision(decision, trip, sentKeys, true);
+    expect(res.valid).toBe(true);
+    expect(res.code).toBe("ok");
+  });
+
+  it("allows open_booking_flow in permissioned mode autonomously", () => {
+    const trip = makeMockTrip({ mode: "auto" });
+    const sentKeys = new Set<string>();
+    const decision: ProposedAgentDecision = {
+      action: "open_booking_flow",
+      reason: "Window open",
+      toolCall: { name: "openBookingFlow" },
+      source: "gpt",
+    };
+    const res = validateAgentDecision(decision, trip, sentKeys, false);
+    expect(res.valid).toBe(true);
+    expect(res.code).toBe("ok");
+  });
+
+  it("rejects activate_backup in assisted mode without user initiation", () => {
+    const trip = makeMockTrip({ mode: "assisted" });
+    const sentKeys = new Set<string>();
+    const decision: ProposedAgentDecision = {
+      action: "activate_backup",
+      reason: "Primary failed",
+      toolCall: { name: "activateBackupStrategy" },
+      source: "gpt",
+    };
+    const res = validateAgentDecision(decision, trip, sentKeys, false);
+    expect(res.valid).toBe(false);
+    expect(res.code).toBe("disallowed_action");
+    expect(res.reason).toContain("Assisted mode requires explicit user authorization");
+  });
+
+  it("allows activate_backup in permissioned mode autonomously", () => {
+    const trip = makeMockTrip({ mode: "auto" });
+    const sentKeys = new Set<string>();
+    const decision: ProposedAgentDecision = {
+      action: "activate_backup",
+      reason: "Primary failed",
+      toolCall: { name: "activateBackupStrategy" },
+      source: "gpt",
+    };
+    const res = validateAgentDecision(decision, trip, sentKeys, false);
+    expect(res.valid).toBe(true);
+    expect(res.code).toBe("ok");
   });
 
   it("rejects unregistered action", () => {

@@ -70,19 +70,26 @@ export async function POST(req: Request) {
         messages: [
           {
             role: "system",
-            content: `You are the AI Coach inside Tatkal Copilot, an Indian railway Tatkal ticket booking assistant. You speak warmly and clearly to Manoj, a 54-year-old not very tech-savvy traveller. 
+            content: `You are the AI Coach inside Tatkal Copilot, an Indian railway Tatkal ticket booking assistant. You speak warmly and clearly to Manoj, a 54-year-old traveller. 
 
 Your responses must be:
 - Grounded ONLY in the journey context provided below. Never invent train names, times, prices, or probabilities.
 - 2-4 sentences maximum. Plain, reassuring language.
 - Never mention raw percentages — use confidence words only: Very High, High, Medium, Low.
 - Never claim real IRCTC integration. This is a demo/prototype.
-- If the user asks why you emailed or notified them, explain that they were inactive shortly before Tatkal opened or an action was required, referencing the notificationsSent array.
-- If the user asks 'Why am I only 4/6 ready?' or 'What am I missing?', answer based strictly on the readiness array facts (blocking and missing items). State clearly which checks are ready and which items are missing or blocking.
-- If primary strategy failed and backup strategy is available, inform the passenger that primary train is unavailable and backup is ready, prompting them to tap 'Use backup'.
-- If primary strategy failed and NO backup strategy is configured, state that primary train is unavailable and no backup strategy is configured. NEVER mention 'Use backup' or tell them to tap any button if no backup exists.
-- If backup strategy is already active/in progress, state 'I've switched to your backup strategy and am checking availability.'
-- If the user asks if the ticket is booked, check bookingStatus strictly. Never claim a ticket is confirmed unless bookingStatus is 'success' or 'confirmed'.
+
+CRITICAL AUTHORIZATION MODE RULES:
+- If mode = "assisted":
+  * Before window open: "I'll watch the clock and make sure you're there when Tatkal opens."
+  * At window open: "The window is open. Your plan is ready. Tap Start booking when you're ready."
+  * Primary failure: "Your primary train is unavailable. Your backup is ready. Tap Use backup when you're ready."
+  * NEVER say "I've started booking" unless user initiated booking.
+- If mode = "auto" or "permissioned":
+  * Before window open: "I'll start the prepared booking strategy when Tatkal opens."
+  * At window open: "The window is open. I'm starting your prepared booking strategy now."
+  * Primary failure: "Your primary strategy is unavailable. I'm evaluating your backup."
+  * Backup activation: "Your primary option failed. I've switched to your prepared backup strategy."
+  * NEVER say "Tap Start booking" in Permissioned mode.
 
 Current journey context:
 ${contextStr}`,
@@ -125,6 +132,19 @@ async function callGeminiCoach(message: string, context: CoachRequest["journeyCo
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${geminiKey}`;
 
   const prompt = `You are the AI Coach inside Tatkal Copilot, an Indian railway Tatkal ticket booking assistant. Speak warmly, clearly, and concisely (2-3 sentences).
+
+CRITICAL AUTHORIZATION MODE RULES:
+- If mode = "assisted":
+  * Before window open: "I'll watch the clock and make sure you're there when Tatkal opens."
+  * At window open: "The window is open. Your plan is ready. Tap Start booking when you're ready."
+  * Primary failure: "Your primary train is unavailable. Your backup is ready. Tap Use backup when you're ready."
+  * NEVER say "I've started booking" unless user initiated booking.
+- If mode = "auto" or "permissioned":
+  * Before window open: "I'll start the prepared booking strategy when Tatkal opens."
+  * At window open: "The window is open. I'm starting your prepared booking strategy now."
+  * Primary failure: "Your primary strategy is unavailable. I'm evaluating your backup."
+  * Backup activation: "Your primary option failed. I've switched to your prepared backup strategy."
+  * NEVER say "Tap Start booking" in Permissioned mode.
 
 Current journey context:
 ${JSON.stringify(context, null, 2)}

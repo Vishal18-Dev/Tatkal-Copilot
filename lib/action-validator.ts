@@ -46,7 +46,8 @@ export interface ValidationResult {
 export function validateAgentDecision(
   decision: ProposedAgentDecision,
   trip: Trip,
-  sentNotificationKeys: Set<string>
+  sentNotificationKeys: Set<string>,
+  isUserInitiated?: boolean
 ): ValidationResult {
   const ALLOWED_ACTIONS: AllowedAgentAction[] = [
     "none",
@@ -83,7 +84,7 @@ export function validateAgentDecision(
     }
   }
 
-  // 3. Action-specific validation rules
+  // 3. Action-specific validation rules & mode boundaries
   switch (decision.action) {
     case "notify_user": {
       const channel = decision.toolCall?.arguments?.channel;
@@ -116,6 +117,13 @@ export function validateAgentDecision(
           code: "missing_backup",
         };
       }
+      if (trip.mode === "assisted" && !isUserInitiated) {
+        return {
+          valid: false,
+          reason: "Assisted mode requires explicit user authorization to activate backup strategy",
+          code: "disallowed_action",
+        };
+      }
       if (trip.agentState === "confirmed") {
         return {
           valid: false,
@@ -127,10 +135,24 @@ export function validateAgentDecision(
     }
 
     case "open_booking_flow": {
+      if (trip.mode === "assisted" && !isUserInitiated) {
+        return {
+          valid: false,
+          reason: "Assisted mode requires explicit user initiation to start booking",
+          code: "disallowed_action",
+        };
+      }
       if (trip.agentState === "confirmed") {
         return {
           valid: false,
           reason: "Cannot open booking flow: Ticket is already confirmed",
+          code: "already_completed",
+        };
+      }
+      if (trip.agentState === "booking_in_progress" || trip.agentState === "backup_attempt") {
+        return {
+          valid: false,
+          reason: "Cannot open booking flow: Booking is already in progress",
           code: "already_completed",
         };
       }

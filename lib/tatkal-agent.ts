@@ -98,9 +98,16 @@ export class TatkalAgent {
   private toolLog: ToolInvocation[] = [];
   private currentEnvBeat: DemoEnvironmentBeat | null = null;
 
-  constructor(trip: Trip, callbacks: AgentCallbacks) {
+  constructor(trip: Trip, callbacks?: Partial<AgentCallbacks>) {
     this.trip = trip;
-    this.callbacks = callbacks;
+    this.callbacks = {
+      updateTrip: callbacks?.updateTrip || (() => {}),
+      logActivity: callbacks?.logActivity || (() => {}),
+      pushNotification: callbacks?.pushNotification || (() => {}),
+      getTravellers: callbacks?.getTravellers || (() => []),
+      onExecutePrimaryBooking: callbacks?.onExecutePrimaryBooking,
+      onExecuteBackupBooking: callbacks?.onExecuteBackupBooking,
+    };
     for (const n of trip.planNotifications) {
       if (n.notificationKey) this.sentNotificationKeys.add(`key:${n.notificationKey}`);
       this.sentNotificationKeys.add(`${n.channel}:${n.title}`);
@@ -312,6 +319,7 @@ export class TatkalAgent {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             observation: {
+              authorizationMode: this.trip.mode === "assisted" ? "assisted" : "permissioned",
               journeyState: obs.journeyState,
               envEvent: obs.envEvent,
               secondsRemaining: obs.secondsRemaining,
@@ -348,9 +356,9 @@ export class TatkalAgent {
   }
 
   /** Execute & validate decision. Returns validation outcome. */
-  async act(decision: ProposedAgentDecision): Promise<{ validation: ValidationResult; executedTool?: string }> {
+  async act(decision: ProposedAgentDecision, isUserInitiated?: boolean): Promise<{ validation: ValidationResult; executedTool?: string }> {
     // 1. Validate decision
-    const validation = validateAgentDecision(decision, this.trip, this.sentNotificationKeys);
+    const validation = validateAgentDecision(decision, this.trip, this.sentNotificationKeys, isUserInitiated);
 
     if (!validation.valid) {
       this.recordEvent({
@@ -368,11 +376,11 @@ export class TatkalAgent {
     // 2. Log proposed reasoning
     this.recordEvent({
       kind: "agent_reasoning",
-      text: decision.reason,
+      text: `Decision: ${decision.action} (${decision.reason})`,
       metadata: {
         action: decision.action,
+        reason: decision.reason,
         tool: decision.toolCall?.name,
-        aiGenerated: decision.source === "gpt" || decision.source === "gemini",
         source: decision.source,
       },
     });
@@ -466,7 +474,28 @@ export class TatkalAgent {
   // ────── Private local evaluation baseline ──────
 
   private evaluateLocally(obs: AgentObservation): ProposedAgentDecision {
+    const isAssisted = this.trip.mode === "assisted";
+
     if (obs.primaryAvailable === false || obs.journeyState === "primary_failed") {
+      if (isAssisted) {
+        const channel = obs.channelPreferences?.email ? "email" : "in-app";
+        return {
+          action: "notify_user",
+          reason: "Primary strategy unavailable. User retains decision authority in Assisted mode — recommending backup.",
+          toolCall: {
+            name: "notifyUser",
+            arguments: {
+              channel,
+              priority: "high",
+              title: "Primary Strategy Unavailable",
+              message: "Primary train unavailable. Tap 'Use backup' to switch strategy.",
+              notificationKey: "assisted_primary_failed",
+            },
+          },
+          source: "local",
+        };
+      }
+
       if (obs.backupStrategy) {
         return {
           action: "activate_backup",
@@ -493,7 +522,7 @@ export class TatkalAgent {
         };
       }
     }
-    if (obs.userActive === false && (obs.secondsRemaining ?? 999) <= 600) {
+    if (obs.userActive === false && !obs.windowOpen && (obs.secondsRemaining ?? 999) <= 600) {
       const channel = obs.channelPreferences?.email ? "email" : "in-app";
       return {
         action: "notify_user",
@@ -512,6 +541,25 @@ export class TatkalAgent {
       };
     }
     if (obs.windowOpen && (obs.primaryAvailable ?? true) && obs.bookingStatus === "none") {
+      if (isAssisted) {
+        const channel = obs.channelPreferences?.email ? "email" : "in-app";
+        return {
+          action: "notify_user",
+          reason: "Tatkal window is open. Waiting for passenger to initiate booking in Assisted mode.",
+          toolCall: {
+            name: "notifyUser",
+            arguments: {
+              channel,
+              priority: "high",
+              title: "Tatkal Window Open",
+              message: "Tatkal window is open! Tap 'Start booking' to begin.",
+              notificationKey: "tatkal_open_assisted",
+            },
+          },
+          source: "local",
+        };
+      }
+
       return {
         action: "open_booking_flow",
         reason: "Tatkal window is open. Initiating primary booking.",
