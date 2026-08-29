@@ -11,11 +11,13 @@ export function AuthModal({
   open,
   onClose,
   onAuthed,
+  title,
   reason,
 }: {
   open: boolean;
   onClose: () => void;
   onAuthed?: (isNew: boolean) => void;
+  title?: string;
   reason?: string;
 }) {
   const { requestOtp, verifyOtp } = useStore();
@@ -85,7 +87,7 @@ export function AuthModal({
 
             {stage === "phone" ? (
               <>
-                <h3 className="mt-4 text-xl font-semibold text-ink">Sign in to continue</h3>
+                <h3 className="mt-4 text-xl font-semibold text-ink">{title ?? "Sign in to continue"}</h3>
                 <p className="mt-1.5 text-[0.95rem] text-ink-soft">
                   {reason ?? "We'll remember your travellers, trips and preferences."}
                 </p>

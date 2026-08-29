@@ -21,8 +21,10 @@ import {
 } from "lucide-react";
 import { Logo } from "@/components/brand/logo";
 import { LanguageToggle } from "@/components/brand/language-toggle";
+import { AuthModal } from "@/components/auth/auth-modal";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { useStore } from "@/lib/store";
 import { useLang } from "@/lib/i18n";
 
 const STEPS = [
@@ -53,28 +55,35 @@ const FEATURES = [
 
 export function Landing() {
   const { t } = useLang();
+  const { isAuthed } = useStore();
   const router = useRouter();
   const [goal, setGoal] = useState("");
+  const [authOpen, setAuthOpen] = useState(false);
 
   const plan = (g?: string) => {
     const q = (g ?? goal).trim();
     router.push(q ? `/app/plan?goal=${encodeURIComponent(q)}` : "/app/plan");
   };
 
+  const handleSignIn = () => {
+    if (isAuthed) {
+      router.push("/app");
+    } else {
+      setAuthOpen(true);
+    }
+  };
+
   return (
     <div>
-      {/* Header */}
+      {/* Header — Tatkal Copilot | LanguageToggle | Sign in */}
       <header className="sticky top-0 z-40 border-b border-line bg-canvas/80 backdrop-blur-xl">
         <div className="mx-auto flex max-w-6xl items-center justify-between px-5 py-3.5">
           <Logo />
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-3">
             <LanguageToggle />
-            <Link href="/app" className="hidden sm:block">
-              <Button variant="secondary" size="sm">Open app</Button>
-            </Link>
-            <Link href="/app/plan">
-              <Button size="sm">Plan a trip</Button>
-            </Link>
+            <Button size="sm" variant={isAuthed ? "secondary" : "primary"} onClick={handleSignIn}>
+              {isAuthed ? "Command Center" : "Sign in"}
+            </Button>
           </div>
         </div>
       </header>
@@ -90,7 +99,7 @@ export function Landing() {
             className="mb-6 inline-flex items-center gap-2 rounded-full border border-line-strong bg-surface/80 px-4 py-1.5 text-sm font-medium text-ink-soft backdrop-blur"
           >
             <Sparkles className="h-4 w-4 text-brand" />
-            {t("hero.eyebrow")}
+            Tell Copilot where you need to be
           </motion.div>
           <h1 className="text-display">
             <span className="block">{t("hero.title1")}</span>
@@ -117,7 +126,7 @@ export function Landing() {
               />
               <button
                 onClick={() => plan()}
-                aria-label="Plan"
+                aria-label="Plan journey"
                 className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-brand text-white shadow-[var(--shadow-brand)] hover:bg-[#4338ca]"
               >
                 <ArrowRight className="h-5 w-5" />
@@ -207,7 +216,7 @@ export function Landing() {
           Tell Copilot where you need to be. Get a strategy in seconds — no login required to start.
         </p>
         <Button size="xl" className="group mt-8" onClick={() => plan()}>
-          Plan a trip
+          Tell Copilot where you need to be
           <ArrowRight className="h-5 w-5 transition-transform group-hover:translate-x-1" />
         </Button>
       </section>
@@ -218,6 +227,13 @@ export function Landing() {
           <span>Prototype · Simulated booking · Not affiliated with IRCTC or Indian Railways.</span>
         </div>
       </footer>
+
+      <AuthModal
+        open={authOpen}
+        onClose={() => setAuthOpen(false)}
+        onAuthed={() => router.push("/app")}
+        reason="Sign in to save your journeys, travellers and Copilot preferences."
+      />
     </div>
   );
 }

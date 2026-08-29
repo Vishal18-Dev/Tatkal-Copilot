@@ -221,7 +221,8 @@ export function AuthorizeScreen() {
         open={authOpen}
         onClose={() => setAuthOpen(false)}
         onAuthed={() => activate()}
-        reason="Sign in to activate this plan so your agent can watch it for you."
+        title="Save this journey"
+        reason="Sign in so Copilot can remember your plan and keep watching the clock until Tatkal opens."
       />
     </StepShell>
   );
