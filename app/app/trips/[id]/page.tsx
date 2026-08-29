@@ -312,7 +312,7 @@ function PlanMission({ plan }: { plan: Trip }) {
       metadata: {
         tool: decision.toolCall?.name,
         action: decision.action,
-        aiGenerated: decision.source === "gpt",
+        aiGenerated: decision.source === "gpt" || decision.source === "gemini",
         source: decision.source,
       },
     }], plan.id);

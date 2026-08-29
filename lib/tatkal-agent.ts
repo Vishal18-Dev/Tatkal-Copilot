@@ -338,7 +338,7 @@ export class TatkalAgent {
           action: data.action as AllowedAgentAction,
           reason: data.reason || "Observation evaluated.",
           toolCall: data.toolCall,
-          source: (data.source as "gpt" | "local") || "local",
+          source: (data.source as "gpt" | "gemini" | "local") || "local",
         };
       } catch (err) {
         console.warn("[TatkalAgent] Agent reasoning call failed, using local decision logic:", err);
