@@ -14,21 +14,30 @@ import {
   Train,
   Clock,
   Brain,
+  ShieldCheck,
+  CheckCircle2,
+  AlertCircle,
+  Plus,
+  Compass,
+  Radio,
 } from "lucide-react";
 import { Card } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import { Chip } from "@/components/app/ui";
 import { useStore } from "@/lib/store";
 import { useLang } from "@/lib/i18n";
+import { readinessFor, statusMeta } from "@/lib/agent";
 import { formatFare } from "@/lib/utils";
 
 export default function HomePage() {
-  const { hydrated, user, trips, savedJourneys, travellers } = useStore();
+  const { hydrated, user, trips, savedJourneys, travellers, activity } = useStore();
   const { t } = useLang();
   const router = useRouter();
   const [goal, setGoal] = useState("");
 
   const upcoming = trips.filter((tr) => tr.agentState !== "confirmed");
   const booked = trips.filter((tr) => tr.agentState === "confirmed");
+  const activeTrip = upcoming[0] ?? null;
 
   function greeting() {
     const h = new Date().getHours();
@@ -44,7 +53,7 @@ export default function HomePage() {
 
   const travWord = (n: number) => (n > 1 ? t("common.travellers") : t("common.traveller"));
 
-  // Data-backed memory insights (never fabricated).
+  // Memory insights
   const routes = [
     ...booked.map((tr) => `${tr.from} → ${tr.to}`),
     ...savedJourneys.map((j) => `${j.from} → ${j.to}`),
@@ -56,23 +65,41 @@ export default function HomePage() {
   if (freqClass) insights.push(`${t("home.preferClass")} ${freqClass}.`);
 
   return (
-    <div className="mx-auto max-w-4xl">
-      <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}>
-        <p className="text-ink-soft">
-          {greeting()}
-          {user?.name ? `, ${user.name.split(" ")[0]}` : ""}.
-        </p>
-        <h1 className="mt-1 text-2xl font-semibold tracking-tight text-ink sm:text-[1.9rem]">
-          {t("home.title")}
-        </h1>
+    <div className="mx-auto max-w-4xl space-y-8">
+      {/* Header Greeting & Agent Status */}
+      <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="flex flex-wrap items-end justify-between gap-4">
+        <div>
+          <div className="flex items-center gap-2">
+            <span className="relative flex h-2.5 w-2.5">
+              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-confirm opacity-75" />
+              <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-confirm" />
+            </span>
+            <span className="text-xs font-semibold uppercase tracking-wider text-confirm">
+              Copilot is watching
+            </span>
+          </div>
+          <h1 className="mt-1 text-2xl font-semibold tracking-tight text-ink sm:text-[1.9rem]">
+            {greeting()}
+            {user?.name ? `, ${user.name.split(" ")[0]}` : ""}
+          </h1>
+          <p className="mt-0.5 text-sm text-ink-soft">
+            Command Center · Manage your Tatkal strategies & active monitor status
+          </p>
+        </div>
+
+        <Link href="/app/plan">
+          <Button size="md" className="gap-2 shadow-[var(--shadow-brand)]">
+            <Plus className="h-4 w-4" /> Plan a new trip
+          </Button>
+        </Link>
       </motion.div>
 
-      {/* Conversational entry */}
+      {/* Prominent Goal Entry */}
       <motion.div
         initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.05 }}
-        className="mt-5 rounded-[var(--radius-lg)] border border-line-strong bg-surface p-3 shadow-[var(--shadow-card)] focus-within:border-brand focus-within:ring-4 focus-within:ring-brand/10"
+        className="rounded-[var(--radius-lg)] border border-line-strong bg-surface p-3 shadow-[var(--shadow-card)] focus-within:border-brand focus-within:ring-4 focus-within:ring-brand/10"
       >
         <div className="flex items-center gap-2">
           <Sparkles className="ml-2 h-5 w-5 shrink-0 text-brand" />
@@ -80,79 +107,116 @@ export default function HomePage() {
             value={goal}
             onChange={(e) => setGoal(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && plan()}
-            placeholder={t("home.placeholder")}
-            className="w-full bg-transparent px-1 py-2.5 text-[1.05rem] text-ink placeholder:text-ink-faint focus:outline-none"
+            placeholder="Tell me where you need to be next…"
+            className="w-full bg-transparent px-1 py-2 text-[1.02rem] text-ink placeholder:text-ink-faint focus:outline-none"
           />
           <button
             onClick={() => plan()}
-            aria-label={t("nav.plan")}
+            aria-label="Plan trip"
             className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-brand text-white shadow-[var(--shadow-brand)] transition-colors hover:bg-[#4338ca]"
           >
             <ArrowRight className="h-5 w-5" />
           </button>
         </div>
       </motion.div>
-      <div className="mt-2.5 flex flex-wrap gap-2">
-        {[t("goal.example1"), t("goal.example3"), t("goal.example2")].map((ex) => (
-          <button
-            key={ex}
-            onClick={() => plan(ex)}
-            className="rounded-full border border-line bg-surface px-3 py-1.5 text-sm text-ink-soft transition-colors hover:border-brand/40 hover:text-ink"
-          >
-            {ex}
-          </button>
-        ))}
-      </div>
 
-      {/* Upcoming trip */}
-      {hydrated && upcoming.length > 0 && (
-        <div className="mt-8">
-          <SectionLabel>{t("home.upcoming")}</SectionLabel>
-          {upcoming.slice(0, 1).map((tr) => (
-            <Link key={tr.id} href={`/app/trips/${tr.id}`}>
-              <Card lift className="mt-2 flex items-center gap-4 p-5">
-                <span className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-brand-soft text-brand">
-                  <Train className="h-6 w-6" />
-                </span>
-                <div className="min-w-0 flex-1">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <span className="text-lg font-semibold text-ink">
-                      {tr.from} → {tr.to}
-                    </span>
-                    <Chip tone="brand">{tr.travelClass}</Chip>
-                    <span className="inline-flex items-center gap-1.5 text-xs text-ink-soft">
-                      <span className="h-2 w-2 rounded-full bg-confirm" /> {t("home.watching")}
-                    </span>
-                  </div>
-                  <div className="mt-0.5 text-sm text-ink-faint">
-                    {tr.dateLabel} · {tr.travellerIds.length} {travWord(tr.travellerIds.length)} · {tr.trainName}
-                  </div>
-                </div>
-                <span className="hidden items-center gap-1 text-sm font-medium text-brand sm:inline-flex">
-                  {t("home.missionControl")} <ArrowRight className="h-4 w-4" />
-                </span>
-              </Card>
+      {/* Primary Section: Active Tatkal Plan or Empty State */}
+      {hydrated && activeTrip ? (
+        <section>
+          <div className="mb-2.5 flex items-center justify-between">
+            <h2 className="text-xs font-semibold uppercase tracking-wide text-ink-faint">
+              Active Tatkal Plan · Needs Your Attention
+            </h2>
+            <Link href="/app/trips" className="text-xs font-medium text-brand hover:underline">
+              View all ({trips.length})
             </Link>
-          ))}
-        </div>
-      )}
+          </div>
 
-      {/* Quick actions */}
-      <div className="mt-8">
-        <SectionLabel>{t("home.quickActions")}</SectionLabel>
-        <div className="mt-2 grid grid-cols-2 gap-3 sm:grid-cols-4">
-          <QuickAction href="/app/plan" icon={<Sparkles className="h-5 w-5" />} label={t("nav.plan")} sub={t("home.newJourney")} />
-          <QuickAction href="/app/trips" icon={<Ticket className="h-5 w-5" />} label={t("nav.trips")} sub={`${trips.length} ${t("home.saved")}`} />
-          <QuickAction href="/app/travellers" icon={<Users className="h-5 w-5" />} label={t("nav.travellers")} sub={`${travellers.length} ${t("home.saved")}`} />
-          <QuickAction href="/app/activity" icon={<ActivityIcon className="h-5 w-5" />} label={t("nav.activity")} sub={t("home.agentLog")} />
-        </div>
-      </div>
+          <Card lift className="overflow-hidden border-brand/30 bg-gradient-to-br from-surface to-brand-soft/20 p-6">
+            <div className="flex flex-col gap-5 md:flex-row md:items-center md:justify-between">
+              <div className="space-y-2">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="text-xl font-bold tracking-tight text-ink">
+                    {activeTrip.from} → {activeTrip.to}
+                  </span>
+                  <Chip tone="brand">{activeTrip.travelClass}</Chip>
+                  <span className="inline-flex items-center gap-1.5 rounded-full bg-confirm-soft px-2.5 py-0.5 text-xs font-semibold text-confirm">
+                    <Radio className="h-3 w-3 animate-pulse" /> Active Watch
+                  </span>
+                </div>
 
-      {/* Saved journeys */}
+                <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-ink-soft">
+                  <span className="flex items-center gap-1.5">
+                    <Train className="h-4 w-4 text-brand" /> {activeTrip.primary.trainName}
+                  </span>
+                  <span className="flex items-center gap-1.5">
+                    <Clock className="h-4 w-4 text-brand" /> Tatkal opens {activeTrip.tatkalOpensAtLabel}
+                  </span>
+                  <span className="flex items-center gap-1.5">
+                    <Users className="h-4 w-4 text-brand" /> {activeTrip.travellerIds.length} {travWord(activeTrip.travellerIds.length)}
+                  </span>
+                </div>
+
+                <div className="flex items-center gap-3 pt-1">
+                  <span className="text-xs font-medium text-ink-faint">Readiness:</span>
+                  <div className="flex items-center gap-1">
+                    {readinessFor(activeTrip).map((r) => (
+                      <span
+                        key={r.id}
+                        title={r.label}
+                        className={`h-2.5 w-6 rounded-full ${r.done ? "bg-confirm" : "bg-line"}`}
+                      />
+                    ))}
+                  </div>
+                  <span className="text-xs font-semibold text-confirm">
+                    {readinessFor(activeTrip).filter((r) => r.done).length}/{readinessFor(activeTrip).length} Ready
+                  </span>
+                </div>
+              </div>
+
+              <div className="flex shrink-0 flex-col gap-2 sm:flex-row md:flex-col">
+                <Link href={`/app/trips/${activeTrip.id}`}>
+                  <Button size="lg" className="w-full gap-2 shadow-[var(--shadow-brand)]">
+                    <Compass className="h-4 w-4" /> View Mission Control
+                  </Button>
+                </Link>
+              </div>
+            </div>
+          </Card>
+        </section>
+      ) : hydrated ? (
+        <Card className="border-dashed border-line p-8 text-center">
+          <span className="mx-auto grid h-12 w-12 place-items-center rounded-2xl bg-brand-soft text-brand">
+            <Sparkles className="h-6 w-6" />
+          </span>
+          <h2 className="mt-4 text-lg font-semibold text-ink">Your next trip starts here.</h2>
+          <p className="mx-auto mt-1 max-w-md text-sm text-ink-soft">
+            Tell Copilot where you need to be and we&apos;ll prepare everything before Tatkal opens.
+          </p>
+          <Link href="/app/plan" className="mt-5 inline-block">
+            <Button size="md" className="gap-2">
+              <Plus className="h-4 w-4" /> Plan a trip
+            </Button>
+          </Link>
+        </Card>
+      ) : null}
+
+      {/* Quick Actions Grid */}
+      <section>
+        <h2 className="mb-2.5 text-xs font-semibold uppercase tracking-wide text-ink-faint">Quick Actions</h2>
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+          <QuickAction href="/app/plan" icon={<Sparkles className="h-5 w-5" />} label="Plan a Trip" sub="Create strategy" />
+          <QuickAction href="/app/trips" icon={<Ticket className="h-5 w-5" />} label="My Trips" sub={`${trips.length} saved`} />
+          <QuickAction href="/app/travellers" icon={<Users className="h-5 w-5" />} label="Travellers" sub={`${travellers.length} in vault`} />
+          <QuickAction href="/app/activity" icon={<ActivityIcon className="h-5 w-5" />} label="Activity" sub={`${activity.length} events`} />
+        </div>
+      </section>
+
+      {/* Saved Journeys & Memory */}
       {savedJourneys.length > 0 && (
-        <div className="mt-8">
-          <SectionLabel>{t("home.savedJourneys")}</SectionLabel>
-          <div className="mt-2 grid gap-3 sm:grid-cols-2">
+        <section>
+          <h2 className="mb-2.5 text-xs font-semibold uppercase tracking-wide text-ink-faint">Saved Journeys</h2>
+          <div className="grid gap-3 sm:grid-cols-2">
             {savedJourneys.slice(0, 4).map((j) => (
               <button
                 key={j.id}
@@ -168,19 +232,19 @@ export default function HomePage() {
                     {j.travelClass} · {j.travellerIds.length} {travWord(j.travellerIds.length)}
                   </div>
                 </div>
-                <span className="text-xs font-medium text-brand">{t("home.planAgain")}</span>
+                <span className="text-xs font-medium text-brand">Plan again</span>
               </button>
             ))}
           </div>
-        </div>
+        </section>
       )}
 
-      {/* Copilot memory (data-backed only) */}
+      {/* Data-backed Copilot Memory */}
       {insights.length > 0 && (
-        <Card className="mt-8 p-5">
+        <Card className="p-5">
           <div className="mb-2 flex items-center gap-2 text-brand">
             <Brain className="h-5 w-5" />
-            <SectionLabel>{t("home.memory")}</SectionLabel>
+            <h2 className="text-xs font-semibold uppercase tracking-wide text-ink-faint">What your Copilot remembers</h2>
           </div>
           <ul className="space-y-1.5">
             {insights.map((tx, i) => (
@@ -194,18 +258,14 @@ export default function HomePage() {
       )}
 
       {booked.length > 0 && (
-        <div className="mt-8 flex items-center gap-2 text-sm text-ink-faint">
+        <div className="flex items-center gap-2 text-sm text-ink-faint">
           <Clock className="h-4 w-4" />
-          {booked.length} {t("home.confirmed")} {booked.length > 1 ? t("home.bookings") : t("home.booking")} ·{" "}
-          {formatFare(booked.reduce((s, tr) => s + (tr.booking?.amount ?? 0), 0))} {t("home.total")}
+          {booked.length} confirmed {booked.length > 1 ? "bookings" : "booking"} ·{" "}
+          {formatFare(booked.reduce((s, tr) => s + (tr.booking?.amount ?? 0), 0))} total
         </div>
       )}
     </div>
   );
-}
-
-function SectionLabel({ children }: { children: React.ReactNode }) {
-  return <h2 className="text-xs font-semibold uppercase tracking-wide text-ink-faint">{children}</h2>;
 }
 
 function QuickAction({

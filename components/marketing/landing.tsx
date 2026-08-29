@@ -72,7 +72,9 @@ export function Landing() {
             <Link href="/app" className="hidden sm:block">
               <Button variant="secondary" size="sm">Open app</Button>
             </Link>
-            <Button size="sm" onClick={() => plan()}>Plan a trip</Button>
+            <Link href="/app/plan">
+              <Button size="sm">Plan a trip</Button>
+            </Link>
           </div>
         </div>
       </header>
