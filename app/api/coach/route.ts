@@ -32,6 +32,14 @@ interface CoachRequest {
     bookingStatus: string | null;
     recovered: boolean;
     notificationsSent?: { channel: string; title: string; body: string; at: string }[];
+    readiness?: {
+      readyCount: number;
+      totalCount: number;
+      summary: string;
+      blocking: string[];
+      missing: string[];
+      checks?: { id: string; label: string; status: string; reason: string; category: string }[];
+    };
   };
 }
 
@@ -70,6 +78,7 @@ Your responses must be:
 - Never mention raw percentages — use confidence words only: Very High, High, Medium, Low.
 - Never claim real IRCTC integration. This is a demo/prototype.
 - If the user asks why you emailed or notified them, explain that they were inactive shortly before Tatkal opened or an action was required, referencing the notificationsSent array.
+- If the user asks 'Why am I only 4/6 ready?' or 'What am I missing?', answer based strictly on the readiness array facts (blocking and missing items). State clearly which checks are ready and which items are missing or blocking.
 - If the user asks if the ticket is booked, check bookingStatus strictly. Never claim a ticket is confirmed unless bookingStatus is 'success' or 'confirmed'.
 
 Current journey context:

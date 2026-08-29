@@ -42,6 +42,8 @@ import {
   statusMeta,
   coachFor,
   readinessFor,
+  calculateReadiness,
+  type ReadinessCheck,
   beatFor,
   nextPreBookingState,
 } from "@/lib/agent";
@@ -101,8 +103,8 @@ function PlanMission({ plan }: { plan: Trip }) {
   const state = plan.agentState;
   const meta = statusMeta(state);
   const beat = beatFor(state);
-  const readiness = readinessFor(plan);
-  const readyCount = readiness.filter((r) => r.done).length;
+  const detailedReadiness = calculateReadiness(plan);
+  const [expandedCheckId, setExpandedCheckId] = useState<string | null>(null);
   const bookedTravellers = travellers.filter((t) => plan.travellerIds.includes(t.id));
 
   const [busy, setBusy] = useState(false);
@@ -144,6 +146,20 @@ function PlanMission({ plan }: { plan: Trip }) {
             mode: plan.mode,
             bookingStatus: plan.booking?.status ?? null,
             recovered: plan.booking?.recovered ?? false,
+            readiness: {
+              readyCount: detailedReadiness.readyCount,
+              totalCount: detailedReadiness.totalCount,
+              summary: detailedReadiness.summary,
+              blocking: detailedReadiness.blockingIds,
+              missing: detailedReadiness.missingIds,
+              checks: detailedReadiness.checks.map((c: ReadinessCheck) => ({
+                id: c.id,
+                label: c.label,
+                status: c.status,
+                reason: c.reason,
+                category: c.category,
+              })),
+            },
           },
         }),
       });
@@ -692,23 +708,55 @@ function PlanMission({ plan }: { plan: Trip }) {
 
           {/* RIGHT: readiness + plan + notifications */}
           <div className="space-y-4">
+            {/* Readiness Card with deterministic Readiness Engine & Why? expand */}
             <Card className="p-5">
-              <div className="mb-3 flex items-center justify-between">
+              <div className="mb-2 flex items-center justify-between">
                 <h3 className="text-sm font-semibold uppercase tracking-wide text-ink-faint">{t("mc.readiness")}</h3>
-                <span className="tabular text-sm font-semibold text-confirm">{readyCount}/{readiness.length}</span>
+                <span className={cn("tabular text-xs font-semibold px-2 py-0.5 rounded-full", detailedReadiness.isReady ? "bg-confirm-soft text-confirm" : "bg-brand-soft text-brand")}>
+                  {detailedReadiness.readyCount}/{detailedReadiness.totalCount} Ready
+                </span>
               </div>
+              <p className="mb-3.5 text-xs font-medium text-ink-soft">
+                {detailedReadiness.summary}
+              </p>
               <ul className="space-y-2">
-                {readiness.map((r) => (
-                  <li key={r.id} className={cn("flex items-start gap-3 rounded-xl border px-3.5 py-2.5", r.done ? "border-confirm/25 bg-confirm-soft/40" : "border-line bg-surface")}>
-                    <span className={cn("mt-0.5 grid h-5 w-5 shrink-0 place-items-center rounded-full", r.done ? "bg-confirm text-white" : "border-2 border-line-strong bg-surface")}>
-                      {r.done && <Check className="h-3 w-3" strokeWidth={3} />}
-                    </span>
-                    <div className="min-w-0">
-                      <div className={cn("text-[0.92rem] font-medium", r.done ? "text-ink" : "text-ink-soft")}>{t(`mc.ready.${r.id}`)}</div>
-                      <div className="text-xs text-ink-faint">{r.hint}</div>
-                    </div>
-                  </li>
-                ))}
+                {detailedReadiness.checks.map((c: ReadinessCheck) => {
+                  const isExpanded = expandedCheckId === c.id;
+                  return (
+                    <li key={c.id} className={cn("rounded-xl border transition-colors", c.done ? "border-confirm/25 bg-confirm-soft/30" : "border-line bg-surface")}>
+                      <div
+                        onClick={() => setExpandedCheckId(isExpanded ? null : c.id)}
+                        className="flex cursor-pointer items-start justify-between p-3"
+                      >
+                        <div className="flex items-start gap-3 min-w-0">
+                          <span className={cn("mt-0.5 grid h-5 w-5 shrink-0 place-items-center rounded-full text-xs font-bold", c.done ? "bg-confirm text-white" : "border-2 border-line-strong bg-surface text-ink-faint")}>
+                            {c.done ? <Check className="h-3 w-3" strokeWidth={3} /> : "○"}
+                          </span>
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              <span className={cn("text-[0.92rem] font-medium", c.done ? "text-ink" : "text-ink-soft")}>{c.label}</span>
+                              <span className={cn("text-[0.65rem] uppercase px-1.5 py-0.2 rounded font-semibold", c.category === "critical" ? "bg-line text-ink-faint" : "bg-surface-muted text-ink-faint")}>
+                                {c.category}
+                              </span>
+                            </div>
+                            <div className="text-xs text-ink-faint mt-0.5">{c.reason}</div>
+                          </div>
+                        </div>
+                        <button
+                          type="button"
+                          className="ml-2 text-xs font-semibold text-brand hover:underline shrink-0"
+                        >
+                          {isExpanded ? "Hide" : "Why?"}
+                        </button>
+                      </div>
+                      {isExpanded && (
+                        <div className="border-t border-line/60 bg-surface-muted/60 px-3.5 py-2.5 text-xs text-ink-soft rounded-b-xl">
+                          {c.explanation}
+                        </div>
+                      )}
+                    </li>
+                  );
+                })}
               </ul>
             </Card>
 

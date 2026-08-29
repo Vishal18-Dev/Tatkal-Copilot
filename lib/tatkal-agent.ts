@@ -8,7 +8,7 @@ import type {
   Traveller,
   ChannelPreferences,
 } from "@/types";
-import { readinessFor } from "@/lib/agent";
+import { readinessFor, calculateReadiness } from "@/lib/agent";
 import {
   validateAgentDecision,
   type ProposedAgentDecision,
@@ -50,6 +50,15 @@ export interface AgentObservation {
   primaryAvailable?: boolean;
   readinessDone: number;
   readinessTotal: number;
+  readiness?: {
+    readyCount: number;
+    totalCount: number;
+    isReady: boolean;
+    criticalReady: boolean;
+    summary: string;
+    blocking: string[];
+    missing: string[];
+  };
   selectedTrain: StrategySnapshot | null;
   backupStrategy: StrategySnapshot | null;
   currentTime: string;
@@ -265,15 +274,24 @@ export class TatkalAgent {
   /** Gather environmental + application context. */
   observe(envBeat?: DemoEnvironmentBeat): AgentObservation {
     if (envBeat) this.currentEnvBeat = envBeat;
-    const readiness = readinessFor(this.trip);
+    const detailed = calculateReadiness(this.trip);
     return {
       journeyState: this.trip.agentState,
       envEvent: this.currentEnvBeat?.event ?? "nominal",
       secondsRemaining: this.currentEnvBeat?.secondsRemaining ?? 0,
       userActive: this.currentEnvBeat?.userActive ?? true,
       primaryAvailable: this.currentEnvBeat?.primaryAvailable ?? true,
-      readinessDone: readiness.filter((r) => r.done).length,
-      readinessTotal: readiness.length,
+      readinessDone: detailed.readyCount,
+      readinessTotal: detailed.totalCount,
+      readiness: {
+        readyCount: detailed.readyCount,
+        totalCount: detailed.totalCount,
+        isReady: detailed.isReady,
+        criticalReady: detailed.criticalReady,
+        summary: detailed.summary,
+        blocking: detailed.blockingIds,
+        missing: detailed.missingIds,
+      },
       selectedTrain: this.trip.primary,
       backupStrategy: this.trip.backup ?? null,
       currentTime: new Date().toISOString(),
@@ -448,13 +466,32 @@ export class TatkalAgent {
   // ────── Private local evaluation baseline ──────
 
   private evaluateLocally(obs: AgentObservation): ProposedAgentDecision {
-    if (obs.primaryAvailable === false && obs.backupStrategy) {
-      return {
-        action: "activate_backup",
-        reason: "Primary strategy unavailable (quota exhausted). Fallback rule engine activated backup.",
-        toolCall: { name: "activateBackupStrategy", arguments: {} },
-        source: "local",
-      };
+    if (obs.primaryAvailable === false || obs.journeyState === "primary_failed") {
+      if (obs.backupStrategy) {
+        return {
+          action: "activate_backup",
+          reason: "Primary strategy unavailable (quota exhausted). Fallback rule engine activated backup.",
+          toolCall: { name: "activateBackupStrategy", arguments: {} },
+          source: "local",
+        };
+      } else {
+        const channel = obs.channelPreferences?.email ? "email" : "in-app";
+        return {
+          action: "notify_user",
+          reason: "Primary booking strategy failed and no backup is configured. Escalating alert to passenger.",
+          toolCall: {
+            name: "notifyUser",
+            arguments: {
+              channel,
+              priority: "high",
+              title: "Primary Booking Failed",
+              message: `Primary strategy failed for ${this.trip.from} → ${this.trip.to} and no backup strategy is configured.`,
+              notificationKey: "primary_failed_no_backup",
+            },
+          },
+          source: "local",
+        };
+      }
     }
     if (obs.userActive === false && (obs.secondsRemaining ?? 999) <= 600) {
       const channel = obs.channelPreferences?.email ? "email" : "in-app";
@@ -474,7 +511,7 @@ export class TatkalAgent {
         source: "local",
       };
     }
-    if (obs.windowOpen && obs.primaryAvailable !== false && obs.bookingStatus === "none") {
+    if (obs.windowOpen && (obs.primaryAvailable ?? true) && obs.bookingStatus === "none") {
       return {
         action: "open_booking_flow",
         reason: "Tatkal window is open. Initiating primary booking.",

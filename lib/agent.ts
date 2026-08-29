@@ -190,6 +190,10 @@ export function coachFor(state: AgentState, plan: Trip): string {
   }
 }
 
+import { calculateReadiness } from "./readiness";
+export { calculateReadiness } from "./readiness";
+export type { ReadinessCheck, DetailedReadiness } from "./readiness";
+
 /** Readiness checklist for a plan given its agent state. */
 export interface ReadinessItem {
   id: string;
@@ -199,16 +203,13 @@ export interface ReadinessItem {
 }
 
 export function readinessFor(plan: Trip): ReadinessItem[] {
-  const past = (s: AgentState) =>
-    lifecycleIndex(plan.agentState) >= lifecycleIndex(s);
-  return [
-    { id: "travellers", label: "Passengers ready", hint: "Pulled from your Travellers.", done: plan.travellerIds.length > 0 },
-    { id: "train", label: "Train selected", hint: `${plan.primary.trainName} · ${plan.primary.travelClass}`, done: true },
-    { id: "backup", label: "Backup strategy ready", hint: plan.backup ? plan.backup.trainName : "None available", done: !!plan.backup },
-    { id: "boarding", label: "Boarding station confirmed", hint: `Board at ${plan.primary.boardingStationName}`, done: true },
-    { id: "session", label: "Railway booking session ready", hint: "Keep the authorized channel open.", done: past("t_minus_10") },
-    { id: "device", label: "Phone & internet ready", hint: "A dropped connection loses your slot.", done: true },
-  ];
+  const detailed = calculateReadiness(plan);
+  return detailed.checks.map((c) => ({
+    id: c.id,
+    label: c.label,
+    hint: c.hint,
+    done: c.done,
+  }));
 }
 
 const LIFECYCLE: AgentState[] = [

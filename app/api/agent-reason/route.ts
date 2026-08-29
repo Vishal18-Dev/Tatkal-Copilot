@@ -96,10 +96,14 @@ Allowed tool names for toolCall:
 - "recordEvent" (arguments: { "kind": string, "text": string })
 
 Rules for intelligent escalation:
-- If userActive is TRUE: do NOT notify unnecessarily. Choose "none" unless booking requires user action.
-- If userActive is FALSE and secondsRemaining <= 600 (10 minutes or 5 minutes before Tatkal): pick "notify_user" using channel "email" (if channelPreferences.email is true) or "in-app", with priority "high" and notificationKey "tatkal_warning_10m".
+- Evaluate the structured readiness facts in observation.readiness (readyCount, blocking, missing).
+- If userActive is TRUE and readiness.criticalReady is true: choose "none" unless booking requires user action.
+- If userActive is FALSE and secondsRemaining <= 600: pick "notify_user" using channel "email" (if channelPreferences.email is true) or "in-app", with priority "high" and notificationKey "tatkal_warning_10m".
+- If userActive is FALSE and blocking items exist (e.g. "booking_session" missing), pick "notify_user" to alert passenger.
 - If Tatkal window is open (windowOpen=true) and primaryAvailable=true and bookingStatus="none", pick "open_booking_flow".
-- If primaryAvailable=false or bookingStatus="primary_failed", and backupTrain exists, pick "activate_backup".
+- If primaryAvailable=false or bookingStatus="primary_failed":
+  * If backupTrain exists / backup strategy is ready: pick "activate_backup".
+  * If NO backup exists (backup in missing): pick "notify_user" to alert passenger that primary strategy failed and no backup is configured. Do NOT pick activate_backup.
 - If booking is confirmed or no action needed, pick "none".
 - Never invent facts. Output strictly valid JSON matching:
 {
@@ -225,12 +229,30 @@ function computeLocalDecision(obs: AgentDecisionRequest["observation"]): {
   reason: string;
   toolCall?: { name: AllowedAgentTool; arguments?: Record<string, unknown> };
 } {
-  if (obs.primaryAvailable === false && obs.backupTrain) {
-    return {
-      action: "activate_backup",
-      reason: `Primary train unavailable. Local rule engine selected backup strategy: ${obs.backupTrain}`,
-      toolCall: { name: "activateBackupStrategy", arguments: {} },
-    };
+  if (obs.primaryAvailable === false || obs.bookingStatus === "primary_failed") {
+    if (obs.backupTrain) {
+      return {
+        action: "activate_backup",
+        reason: `Primary train unavailable. Local rule engine selected backup strategy: ${obs.backupTrain}`,
+        toolCall: { name: "activateBackupStrategy", arguments: {} },
+      };
+    } else {
+      const channel = obs.channelPreferences?.email ? "email" : "in-app";
+      return {
+        action: "notify_user",
+        reason: "Primary train unavailable and no backup strategy configured. Escalating alert to passenger.",
+        toolCall: {
+          name: "notifyUser",
+          arguments: {
+            channel,
+            priority: "high",
+            title: "Primary Booking Failed",
+            message: `Primary booking attempt failed for ${obs.from} → ${obs.to} and no backup strategy is configured.`,
+            notificationKey: "primary_failed_no_backup",
+          },
+        },
+      };
+    }
   }
 
   if (obs.userActive === false && (obs.secondsRemaining ?? 999) <= 600) {
@@ -251,7 +273,7 @@ function computeLocalDecision(obs: AgentDecisionRequest["observation"]): {
     };
   }
 
-  if (obs.windowOpen && obs.primaryAvailable !== false && obs.bookingStatus === "none") {
+  if (obs.windowOpen && (obs.primaryAvailable ?? true) && obs.bookingStatus === "none") {
     return {
       action: "open_booking_flow",
       reason: "Tatkal window is open. Initiating primary booking strategy.",
