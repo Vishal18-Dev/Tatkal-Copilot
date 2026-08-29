@@ -136,8 +136,8 @@ User question: "${message}"`;
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        contents: [{ parts: [{ text: prompt }] }],
-        generationConfig: { temperature: 0.5, maxOutputTokens: 300 },
+        contents: [{ role: "user", parts: [{ text: prompt }] }],
+        generationConfig: { temperature: 0.5, maxOutputTokens: 1500 },
       }),
     });
 

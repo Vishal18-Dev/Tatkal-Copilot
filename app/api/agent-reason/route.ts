@@ -201,7 +201,7 @@ ${JSON.stringify(observation)}`;
         ],
         generationConfig: {
           temperature: 0.1,
-          maxOutputTokens: 1000,
+          maxOutputTokens: 1500,
           responseMimeType: "application/json",
         },
       }),
