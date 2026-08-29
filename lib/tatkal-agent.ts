@@ -287,44 +287,46 @@ export class TatkalAgent {
 
   /** Send observation to OpenAI (/api/agent-reason) to DECIDE the action. */
   async evaluate(obs: AgentObservation): Promise<ProposedAgentDecision> {
-    try {
-      const res = await fetch("/api/agent-reason", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          observation: {
-            journeyState: obs.journeyState,
-            envEvent: obs.envEvent,
-            secondsRemaining: obs.secondsRemaining,
-            userActive: obs.userActive,
-            primaryAvailable: obs.primaryAvailable,
-            from: this.trip.from,
-            to: this.trip.to,
-            primaryTrain: obs.selectedTrain?.trainName ?? "",
-            backupTrain: obs.backupStrategy?.trainName ?? null,
-            readinessDone: obs.readinessDone,
-            readinessTotal: obs.readinessTotal,
-            tatkalOpensLabel: obs.tatkalOpensLabel,
-            windowOpen: obs.windowOpen,
-            bookingStatus: obs.bookingStatus,
-            notificationsSent: obs.notificationsSent,
-            channelPreferences: obs.channelPreferences,
-          },
-        }),
-      });
+    if (typeof window !== "undefined" && typeof fetch !== "undefined") {
+      try {
+        const res = await fetch("/api/agent-reason", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            observation: {
+              journeyState: obs.journeyState,
+              envEvent: obs.envEvent,
+              secondsRemaining: obs.secondsRemaining,
+              userActive: obs.userActive,
+              primaryAvailable: obs.primaryAvailable,
+              from: this.trip.from,
+              to: this.trip.to,
+              primaryTrain: obs.selectedTrain?.trainName ?? "",
+              backupTrain: obs.backupStrategy?.trainName ?? null,
+              readinessDone: obs.readinessDone,
+              readinessTotal: obs.readinessTotal,
+              tatkalOpensLabel: obs.tatkalOpensLabel,
+              windowOpen: obs.windowOpen,
+              bookingStatus: obs.bookingStatus,
+              notificationsSent: obs.notificationsSent,
+              channelPreferences: obs.channelPreferences,
+            },
+          }),
+        });
 
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const data = await res.json();
-      return {
-        action: data.action as AllowedAgentAction,
-        reason: data.reason || "Observation evaluated.",
-        toolCall: data.toolCall,
-        source: (data.source as "gpt" | "local") || "local",
-      };
-    } catch (err) {
-      console.warn("[TatkalAgent] Agent reasoning call failed, using local decision logic:", err);
-      return this.evaluateLocally(obs);
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+        return {
+          action: data.action as AllowedAgentAction,
+          reason: data.reason || "Observation evaluated.",
+          toolCall: data.toolCall,
+          source: (data.source as "gpt" | "local") || "local",
+        };
+      } catch (err) {
+        console.warn("[TatkalAgent] Agent reasoning call failed, using local decision logic:", err);
+      }
     }
+    return this.evaluateLocally(obs);
   }
 
   /** Execute & validate decision. Returns validation outcome. */
@@ -454,7 +456,7 @@ export class TatkalAgent {
         source: "local",
       };
     }
-    if (obs.userActive === false && (obs.secondsRemaining ?? 999) <= 30) {
+    if (obs.userActive === false && (obs.secondsRemaining ?? 999) <= 600) {
       const channel = obs.channelPreferences?.email ? "email" : "in-app";
       return {
         action: "notify_user",

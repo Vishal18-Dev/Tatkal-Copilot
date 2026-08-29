@@ -219,19 +219,42 @@ function PlanMission({ plan }: { plan: Trip }) {
     setBusy(false);
   }, [plan, updateTrip, logActivity, pushNotification, bookedTravellers]);
 
-  // Initialize agent with booking execution callbacks
+  const [simulatedInactive, setSimulatedInactive] = useState(false);
+
+  const callbacksRef = useRef({
+    updateTrip,
+    logActivity,
+    pushNotification,
+    getTravellers: () => bookedTravellers,
+    onExecutePrimaryBooking: executePrimaryBooking,
+    onExecuteBackupBooking: executeBackupBooking,
+  });
+
   useEffect(() => {
-    agentRef.current = new TatkalAgent(plan, {
+    callbacksRef.current = {
       updateTrip,
       logActivity,
       pushNotification,
       getTravellers: () => bookedTravellers,
       onExecutePrimaryBooking: executePrimaryBooking,
       onExecuteBackupBooking: executeBackupBooking,
+    };
+  });
+
+  // Initialize agent strictly ONCE per plan.id
+  useEffect(() => {
+    agentRef.current = new TatkalAgent(plan, {
+      updateTrip: (id, patch) => callbacksRef.current.updateTrip(id, patch),
+      logActivity: (events, tripId) => callbacksRef.current.logActivity(events, tripId),
+      pushNotification: (n) => callbacksRef.current.pushNotification(n),
+      getTravellers: () => callbacksRef.current.getTravellers(),
+      onExecutePrimaryBooking: () => callbacksRef.current.onExecutePrimaryBooking?.(),
+      onExecuteBackupBooking: () => callbacksRef.current.onExecuteBackupBooking?.(),
     });
-    return () => { agentRef.current = null; };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [plan.id, executePrimaryBooking, executeBackupBooking]);
+    return () => {
+      agentRef.current = null;
+    };
+  }, [plan.id]);
 
   // Keep agent in sync with trip state changes
   useEffect(() => {
@@ -278,6 +301,44 @@ function PlanMission({ plan }: { plan: Trip }) {
       },
     }], plan.id);
   }, [plan.id, logActivity]);
+
+  const handleSimulateInactivity = useCallback(async () => {
+    const agent = agentRef.current;
+    if (!agent) return;
+
+    setSimulatedInactive(true);
+
+    const inactivityBeat: DemoEnvironmentBeat = {
+      event: "user_inactive",
+      secondsRemaining: 600,
+      countdownLabel: "10:00",
+      description: "Passenger inactive · 10 minutes to Tatkal window",
+      windowOpen: false,
+      userActive: false,
+      primaryAvailable: true,
+    };
+
+    await handleDemoBeat(inactivityBeat, demoBeatIndex);
+  }, [handleDemoBeat, demoBeatIndex]);
+
+  const handleResetInactivity = useCallback(async () => {
+    const agent = agentRef.current;
+    if (!agent) return;
+
+    setSimulatedInactive(false);
+
+    const activeBeat: DemoEnvironmentBeat = {
+      event: "monitoring_started",
+      secondsRemaining: 1800,
+      countdownLabel: "30:00",
+      description: "Passenger active · Monitoring journey",
+      windowOpen: false,
+      userActive: true,
+      primaryAvailable: true,
+    };
+
+    await handleDemoBeat(activeBeat, demoBeatIndex);
+  }, [handleDemoBeat, demoBeatIndex]);
 
   function startDemo() {
     if (clockRef.current) clockRef.current.destroy();
@@ -409,10 +470,12 @@ function PlanMission({ plan }: { plan: Trip }) {
         </Link>
         <span className="inline-flex items-center gap-2 text-sm">
           <span className="relative flex h-2.5 w-2.5">
-            <span className={cn("absolute inline-flex h-full w-full animate-ping rounded-full opacity-60", meta.dot)} />
-            <span className={cn("relative inline-flex h-2.5 w-2.5 rounded-full", meta.dot)} />
+            <span className={cn("absolute inline-flex h-full w-full animate-ping rounded-full opacity-60", simulatedInactive ? "bg-caution" : meta.dot)} />
+            <span className={cn("relative inline-flex h-2.5 w-2.5 rounded-full", simulatedInactive ? "bg-caution" : meta.dot)} />
           </span>
-          <span className="font-medium text-ink">{t(meta.labelKey)}</span>
+          <span className={cn("font-medium", simulatedInactive ? "text-caution font-semibold" : "text-ink")}>
+            {simulatedInactive ? "Passenger inactive · Copilot watching" : t(meta.labelKey)}
+          </span>
         </span>
       </div>
 
@@ -572,20 +635,28 @@ function PlanMission({ plan }: { plan: Trip }) {
                 </Button>
               )}
               
-              {/* Simulate User Inactivity toggle for demo */}
-              <Button
-                variant="secondary"
-                size="lg"
-                onClick={() => {
-                  const currentBeat = DEMO_ENVIRONMENT_TIMELINE[demoBeatIndex] || DEMO_ENVIRONMENT_TIMELINE[3];
-                  const toggledBeat = { ...currentBeat, userActive: !currentBeat.userActive };
-                  handleDemoBeat(toggledBeat, demoBeatIndex);
-                }}
-                title="Simulate passenger closing app / leaving screen"
-              >
-                <UserX className="h-4 w-4 text-brand" />
-                Simulate Inactivity
-              </Button>
+              {/* Simulate / Reset User Inactivity toggle for demo */}
+              {simulatedInactive ? (
+                <Button
+                  variant="secondary"
+                  size="lg"
+                  onClick={handleResetInactivity}
+                  className="border-caution/50 bg-caution-soft/50 text-caution hover:bg-caution-soft"
+                >
+                  <RotateCcw className="h-4 w-4 text-caution" />
+                  Reset Inactivity
+                </Button>
+              ) : (
+                <Button
+                  variant="secondary"
+                  size="lg"
+                  onClick={handleSimulateInactivity}
+                  title="Simulate passenger closing app / leaving screen"
+                >
+                  <UserX className="h-4 w-4 text-brand" />
+                  Simulate Inactivity
+                </Button>
+              )}
 
               {/* Manual controls */}
               {!demoRunning && canStartBooking && (
@@ -596,7 +667,7 @@ function PlanMission({ plan }: { plan: Trip }) {
               {!demoRunning && canFastForward && (
                 <Button variant="secondary" size="lg" onClick={fastForward} className={canStartBooking ? "" : "flex-1"}>
                   <FastForward className="h-4 w-4" />
-                  {beat.windowOpen ? t("mc.simulateInactive") : t("mc.fastForward")}
+                  {t("mc.fastForward")}
                 </Button>
               )}
             </div>
