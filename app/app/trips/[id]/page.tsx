@@ -49,7 +49,7 @@ import {
 } from "@/lib/agent";
 import { TatkalAgent, type AgentObservation } from "@/lib/tatkal-agent";
 import { DemoClock, type DemoEnvironmentBeat, type DemoClockStatus, DEMO_ENVIRONMENT_TIMELINE } from "@/lib/demo-clock";
-import type { ProposedAgentDecision, ValidationResult } from "@/lib/action-validator";
+import { validateAgentDecision, type ProposedAgentDecision, type ValidationResult } from "@/lib/action-validator";
 import { cn, formatFare } from "@/lib/utils";
 import type { AgentState, NotificationChannel, Trip } from "@/types";
 
@@ -439,10 +439,60 @@ function PlanMission({ plan }: { plan: Trip }) {
     await executePrimaryBooking();
   }
 
-  async function useBackup() {
-    if (busy || !plan.backup) return;
-    await executeBackupBooking();
-  }
+  const [backupLoading, setBackupLoading] = useState(false);
+  const [backupError, setBackupError] = useState<string | null>(null);
+
+  const canUseBackup =
+    !!plan.backup &&
+    (state === "primary_failed" || state === "backup_recommended" || plan.booking?.status === "failed") &&
+    state !== "backup_attempt" &&
+    state !== "confirmed" &&
+    plan.booking?.status !== "success";
+
+  const useBackup = useCallback(async () => {
+    if (busy || backupLoading || !plan.backup) return;
+    setBackupLoading(true);
+    setBackupError(null);
+
+    const proposedDecision: ProposedAgentDecision = {
+      action: "activate_backup",
+      reason: `Passenger authorized recommended backup strategy: ${plan.backup.trainName}`,
+      toolCall: { name: "activateBackupStrategy", arguments: {} },
+      source: "local",
+    };
+
+    const validation = validateAgentDecision(proposedDecision, plan, new Set());
+    if (!validation.valid) {
+      setBackupError(`Cannot activate backup: ${validation.reason}`);
+      setBackupLoading(false);
+      return;
+    }
+
+    // Add entry to Agent Decision Trace
+    const timeStr = new Date().toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+    setDecisionTrace((prev) => [
+      ...prev,
+      {
+        id: `trace_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+        timestamp: timeStr,
+        observed: `Primary strategy unavailable · Backup available (${plan.backup?.trainName})`,
+        decision: "activate_backup",
+        why: `User authorized agent recommendation: Activate ${plan.backup?.trainName}`,
+        action: "activateBackupStrategy()",
+        result: "Backup strategy activated by user",
+        source: "local",
+        valid: true,
+      },
+    ]);
+
+    try {
+      await executeBackupBooking();
+    } catch {
+      setBackupError("Couldn't activate backup strategy. Please try again.");
+    } finally {
+      setBackupLoading(false);
+    }
+  }, [busy, backupLoading, plan, executeBackupBooking]);
 
   function finishConfirmed(record: Trip["booking"], steps: OrchestratorStep[]) {
     if (!record) return;
@@ -557,17 +607,41 @@ function PlanMission({ plan }: { plan: Trip }) {
               </Card>
             ) : null}
 
-            {state === "backup_recommended" && !busy && (
-              <Card className="border-caution/40 bg-caution-soft/40 p-5">
-                <div className="flex items-center gap-2 text-caution">
-                  <Split className="h-5 w-5" />
-                  <h4 className="text-sm font-semibold uppercase tracking-wide">{t("mc.primaryFailed")}</h4>
+            {canUseBackup && !busy && (
+              <Card className="border-caution/40 bg-caution-soft/40 p-5 shadow-sm">
+                <div className="flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-2 text-caution font-semibold">
+                    <Split className="h-5 w-5" />
+                    <h4 className="text-sm font-semibold uppercase tracking-wide">{t("mc.primaryFailed")}</h4>
+                  </div>
+                  <Chip tone="caution">Backup Ready</Chip>
                 </div>
-                <p className="mt-2 text-[0.95rem] text-ink">
-                  {coachFor("backup_recommended", plan)}
+                <p className="mt-2 text-[0.95rem] text-ink font-medium">
+                  {plan.primary.trainName} is no longer available. Your backup strategy ({plan.backup?.trainName}) is ready for instant booking.
                 </p>
-                <Button size="lg" className="mt-4 w-full" onClick={useBackup}>
-                  <Split className="h-5 w-5" /> {t("mc.useBackup")}
+
+                {backupError && (
+                  <div className="mt-3 rounded-lg border border-danger/30 bg-danger-soft/50 p-2.5 text-xs font-medium text-danger flex items-center gap-2">
+                    <AlertTriangle className="h-4 w-4 shrink-0" />
+                    <span>{backupError}</span>
+                  </div>
+                )}
+
+                <Button
+                  size="lg"
+                  className="mt-4 w-full bg-gradient-to-r from-caution to-brand text-white shadow-md hover:opacity-95"
+                  onClick={useBackup}
+                  disabled={busy || backupLoading}
+                >
+                  {backupLoading ? (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin" /> Activating backup…
+                    </>
+                  ) : (
+                    <>
+                      <Split className="h-5 w-5" /> {t("mc.useBackup")} · {plan.backup?.trainName}
+                    </>
+                  )}
                 </Button>
               </Card>
             )}

@@ -180,6 +180,9 @@ export function coachFor(state: AgentState, plan: Trip): string {
       return `Attempting ${primary} now. Stay put — I'll switch to your backup instantly if the quota runs out.`;
     case "primary_failed":
     case "backup_recommended":
+      if (!plan.backup) {
+        return `${primary} is no longer available and no backup strategy is configured for this journey.`;
+      }
       return `${primary} is no longer available. Don't restart the search${via ? ` — your backup via ${via} is ready` : ""}. Tap Use backup.`;
     case "backup_attempt":
       return `Booking ${backup ?? "your backup"} now.`;
