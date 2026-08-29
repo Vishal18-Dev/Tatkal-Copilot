@@ -46,6 +46,9 @@ export function AuthorizeScreen() {
     useJourney();
   const { isAuthed, saveJourney, addTrip, logActivity, pushNotification } = useStore();
   const [saveJ, setSaveJ] = useState(true);
+  const [prefInApp, setPrefInApp] = useState(true);
+  const [prefEmail, setPrefEmail] = useState(true);
+  const [prefWhatsapp, setPrefWhatsapp] = useState(false);
   const [authOpen, setAuthOpen] = useState(false);
   const router = useRouter();
 
@@ -81,6 +84,11 @@ export function AuthorizeScreen() {
       backup,
       readinessDone: [],
       planNotifications: [],
+      channelPreferences: {
+        inApp: prefInApp,
+        email: prefEmail,
+        whatsappDemo: prefWhatsapp,
+      },
     });
 
     if (saveJ) {
@@ -152,6 +160,51 @@ export function AuthorizeScreen() {
           demo
         />
       </div>
+
+      {/* Notification Channel Preferences */}
+      <Card className="mt-4 p-6">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2 text-brand">
+            <Bell className="h-5 w-5" />
+            <h3 className="text-sm font-semibold uppercase tracking-wide">How should Copilot reach you?</h3>
+          </div>
+          <span className="rounded-full bg-confirm-soft px-2.5 py-0.5 text-xs font-semibold text-confirm">
+            Email + In-app Recommended
+          </span>
+        </div>
+        <p className="mt-1 text-sm text-ink-soft">
+          Email lets Copilot reach you even after you&apos;ve closed the app.
+        </p>
+        <div className="mt-4 grid gap-2.5 sm:grid-cols-3">
+          <label className="flex cursor-pointer items-center justify-between rounded-xl border border-line bg-surface p-3">
+            <span className="text-sm font-medium text-ink">In-app Notification</span>
+            <input
+              type="checkbox"
+              checked={prefInApp}
+              onChange={(e) => setPrefInApp(e.target.checked)}
+              className="h-4 w-4 rounded border-line-strong text-brand focus:ring-brand"
+            />
+          </label>
+          <label className="flex cursor-pointer items-center justify-between rounded-xl border border-line bg-surface p-3">
+            <span className="text-sm font-medium text-ink">Email Escalation</span>
+            <input
+              type="checkbox"
+              checked={prefEmail}
+              onChange={(e) => setPrefEmail(e.target.checked)}
+              className="h-4 w-4 rounded border-line-strong text-brand focus:ring-brand"
+            />
+          </label>
+          <label className="flex cursor-pointer items-center justify-between rounded-xl border border-line bg-surface p-3">
+            <span className="text-sm font-medium text-ink">WhatsApp (Demo)</span>
+            <input
+              type="checkbox"
+              checked={prefWhatsapp}
+              onChange={(e) => setPrefWhatsapp(e.target.checked)}
+              className="h-4 w-4 rounded border-line-strong text-brand focus:ring-brand"
+            />
+          </label>
+        </div>
+      </Card>
 
       <Card className="mt-4 p-6">
         <div className="flex items-center gap-2 text-brand">

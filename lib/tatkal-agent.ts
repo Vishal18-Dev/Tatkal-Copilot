@@ -3,8 +3,10 @@ import type {
   AgentState,
   ActivityKind,
   NotificationChannel,
+  NotificationDeliveryStatus,
   StrategySnapshot,
   Traveller,
+  ChannelPreferences,
 } from "@/types";
 import { readinessFor } from "@/lib/agent";
 import {
@@ -17,7 +19,7 @@ import {
 import type { DemoEnvironmentBeat } from "@/lib/demo-clock";
 
 /* ============================================================
-   TatkalAgent — Genuine Agentic Runtime (v1.4)
+   TatkalAgent — Genuine Agentic Runtime (v1.6)
 
    Control Flow:
      DemoClock/Env Event
@@ -55,6 +57,7 @@ export interface AgentObservation {
   windowOpen: boolean;
   bookingStatus: string;
   notificationsSent: string[];
+  channelPreferences?: ChannelPreferences;
 }
 
 export interface AgentEventRecord {
@@ -90,7 +93,9 @@ export class TatkalAgent {
     this.trip = trip;
     this.callbacks = callbacks;
     for (const n of trip.planNotifications) {
+      if (n.notificationKey) this.sentNotificationKeys.add(`key:${n.notificationKey}`);
       this.sentNotificationKeys.add(`${n.channel}:${n.title}`);
+      this.sentNotificationKeys.add(`title:${n.title}`);
     }
   }
 
@@ -102,35 +107,118 @@ export class TatkalAgent {
   //  TOOLS — Each tool handles actual state mutation
   // ════════════════════════════════════════════
 
-  notifyUser(channel: NotificationChannel, title: string, body: string): boolean {
-    const key = `${channel}:${title}`;
-    if (this.sentNotificationKeys.has(key)) {
+  async notifyUser(
+    channel: NotificationChannel,
+    title: string,
+    body: string,
+    options?: {
+      priority?: "low" | "medium" | "high";
+      notificationKey?: string;
+      reason?: string;
+      recipientEmail?: string;
+    }
+  ): Promise<boolean> {
+    const notifKey = options?.notificationKey;
+    const dedupeKey = notifKey ? `key:${notifKey}` : `${channel}:${title}`;
+    
+    if (this.sentNotificationKeys.has(dedupeKey) || this.sentNotificationKeys.has(`title:${title}`)) {
+      this.recordEvent({
+        kind: "notification_sent",
+        text: `Notification suppressed — identical notification (${title}) already sent`,
+        metadata: { tool: "notifyUser", channel, action: "notify_user", reason: "suppressed" },
+      });
       this.logTool("notifyUser", { channel, title, deduplicated: true }, false);
       return false;
     }
-    this.sentNotificationKeys.add(key);
+
+    this.sentNotificationKeys.add(dedupeKey);
+    if (notifKey) this.sentNotificationKeys.add(`key:${notifKey}`);
+    this.sentNotificationKeys.add(`${channel}:${title}`);
+    this.sentNotificationKeys.add(`title:${title}`);
+
+    let deliveryStatus: NotificationDeliveryStatus = "sent";
+    let recipient = options?.recipientEmail || "passenger@example.com";
+
+    try {
+      if (typeof window !== "undefined" && typeof fetch !== "undefined") {
+        const res = await fetch("/api/notifications/send", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            tripId: this.trip.id,
+            channel,
+            priority: options?.priority || "high",
+            title,
+            body,
+            reason: options?.reason,
+            recipientEmail: recipient,
+            notificationKey: notifKey,
+          }),
+        });
+        if (res.ok) {
+          const data = await res.json();
+          deliveryStatus = data.deliveryStatus || "sent";
+          if (data.recipientEmail) recipient = data.recipientEmail;
+        }
+      } else {
+        const { sendNotification } = await import("@/lib/notifications");
+        const res = await sendNotification({
+          tripId: this.trip.id,
+          channel,
+          priority: options?.priority || "high",
+          title,
+          body,
+          reason: options?.reason,
+          recipientEmail: recipient,
+          notificationKey: notifKey,
+        });
+        deliveryStatus = res.deliveryStatus;
+        if (res.recipientEmail) recipient = res.recipientEmail;
+      }
+    } catch {
+      deliveryStatus = channel === "email" ? "demo_generated" : "sent";
+    }
 
     this.callbacks.pushNotification({ title, body });
 
-    const notif = {
+    const notif: import("@/types").PlanNotification = {
       id: `n_${Date.now()}_${Math.random().toString(36).slice(2, 5)}`,
       at: new Date().toISOString(),
       channel,
+      priority: options?.priority || "high",
       title,
       body,
+      deliveryStatus,
+      recipientEmail: recipient,
+      notificationKey: notifKey,
+      reason: options?.reason,
     };
+
     this.callbacks.updateTrip(this.trip.id, {
       planNotifications: [...this.trip.planNotifications, notif],
       agentState: "user_action_required",
     });
 
+    const statusLabel =
+      deliveryStatus === "demo_generated"
+        ? "Demo email generated"
+        : deliveryStatus === "email_unavailable"
+        ? "Email unavailable (in-app fallback)"
+        : "Sent";
+
     this.recordEvent({
       kind: "notification_sent",
-      text: `${channel.toUpperCase()} notification sent: ${title}`,
-      metadata: { tool: "notifyUser", channel, action: "notify_user" },
+      text: `${channel.toUpperCase()} notification (${statusLabel}): ${title}`,
+      metadata: {
+        tool: "notifyUser",
+        channel,
+        action: "notify_user",
+        reason: options?.reason || "User escalation",
+        source: "gpt",
+      },
     });
 
-    this.logTool("notifyUser", { channel, title }, true);
+    this.logTool("notifyUser", { channel, title, deliveryStatus }, true);
     return true;
   }
 
@@ -193,6 +281,7 @@ export class TatkalAgent {
       windowOpen: this.currentEnvBeat?.windowOpen ?? (this.trip.agentState === "window_open" || this.trip.agentState === "booking_in_progress"),
       bookingStatus: this.trip.booking?.status ?? "none",
       notificationsSent: Array.from(this.sentNotificationKeys),
+      channelPreferences: this.trip.channelPreferences || { inApp: true, email: true, whatsappDemo: false },
     };
   }
 
@@ -219,6 +308,7 @@ export class TatkalAgent {
             windowOpen: obs.windowOpen,
             bookingStatus: obs.bookingStatus,
             notificationsSent: obs.notificationsSent,
+            channelPreferences: obs.channelPreferences,
           },
         }),
       });
@@ -272,10 +362,20 @@ export class TatkalAgent {
 
     switch (decision.action) {
       case "notify_user": {
-        const channel = (decision.toolCall?.arguments?.channel as NotificationChannel) || "whatsapp";
+        const prefEmail = this.trip.channelPreferences?.email ?? true;
+        const channel = (decision.toolCall?.arguments?.channel as NotificationChannel) || (prefEmail ? "email" : "in-app");
         const title = (decision.toolCall?.arguments?.title as string) || "Tatkal Window Alert";
-        const msg = (decision.toolCall?.arguments?.message as string) || `Tatkal window opens soon for ${this.trip.from} → ${this.trip.to}.`;
-        this.notifyUser(channel, title, msg);
+        const msg = (decision.toolCall?.arguments?.message as string) ||
+          (decision.toolCall?.arguments?.body as string) ||
+          `Tatkal window opens soon for ${this.trip.from} → ${this.trip.to}.`;
+        const priority = (decision.toolCall?.arguments?.priority as "low" | "medium" | "high") || "high";
+        const notificationKey = (decision.toolCall?.arguments?.notificationKey as string) || undefined;
+
+        await this.notifyUser(channel, title, msg, {
+          priority,
+          notificationKey,
+          reason: decision.reason,
+        });
         executedTool = "notifyUser";
         break;
       }
@@ -335,6 +435,7 @@ export class TatkalAgent {
       tatkalOpens: this.trip.tatkalOpensAtLabel,
       bookingState: this.trip.booking ?? null,
       notificationsSent: Array.from(this.sentNotificationKeys),
+      channelPreferences: this.trip.channelPreferences,
     };
   }
 
@@ -354,15 +455,18 @@ export class TatkalAgent {
       };
     }
     if (obs.userActive === false && (obs.secondsRemaining ?? 999) <= 30) {
+      const channel = obs.channelPreferences?.email ? "email" : "in-app";
       return {
         action: "notify_user",
-        reason: "Passenger inactive shortly before Tatkal window. Dispatching alert.",
+        reason: "Passenger inactive shortly before Tatkal window. Dispatching email/app alert.",
         toolCall: {
           name: "notifyUser",
           arguments: {
-            channel: "whatsapp",
-            title: "Tatkal Window Opening",
-            message: "Your Tatkal window opens in 5 minutes.",
+            channel,
+            priority: "high",
+            title: "Tatkal Window Opening Soon",
+            message: `Your Tatkal window opens in ${obs.secondsRemaining ?? 5} minutes for ${this.trip.from} → ${this.trip.to}.`,
+            notificationKey: "tatkal_warning_10m",
           },
         },
         source: "local",
@@ -378,7 +482,7 @@ export class TatkalAgent {
     }
     return {
       action: "none",
-      reason: "Monitoring environment.",
+      reason: "Monitoring environment. Systems nominal.",
       source: "local",
     };
   }

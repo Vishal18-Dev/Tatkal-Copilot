@@ -88,12 +88,19 @@ export function validateAgentDecision(
     case "notify_user": {
       const channel = decision.toolCall?.arguments?.channel;
       const title = decision.toolCall?.arguments?.title || "Tatkal Copilot";
-      if (channel) {
-        const key = `${channel}:${title}`;
-        if (sentNotificationKeys.has(key)) {
+      const notifKey = decision.toolCall?.arguments?.notificationKey as string | undefined;
+
+      const keysToCheck = [
+        notifKey ? `key:${notifKey}` : null,
+        channel ? `${channel}:${title}` : null,
+        title ? `title:${title}` : null,
+      ].filter(Boolean) as string[];
+
+      for (const k of keysToCheck) {
+        if (sentNotificationKeys.has(k)) {
           return {
             valid: false,
-            reason: `Notification '${key}' has already been sent to user`,
+            reason: `Notification suppressed — identical notification (${k}) already sent`,
             code: "duplicate_notification",
           };
         }

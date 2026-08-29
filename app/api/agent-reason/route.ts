@@ -7,7 +7,7 @@ export const runtime = "nodejs";
 const MODEL = process.env.OPENAI_MODEL || "gpt-4o-mini";
 
 /* ------------------------------------------------------------------
-   Agent Decision API (v1.4 Genuine Agent Decision Loop)
+   Agent Decision API (v1.6 Genuine Agent Decision Loop + Escalation)
 
    The client sends environmental & journey OBSERVATIONS ONLY.
    OpenAI evaluates the observation and DECIDES the action and tool call.
@@ -45,6 +45,7 @@ interface AgentDecisionRequest {
     windowOpen: boolean;
     bookingStatus: string;
     notificationsSent: string[];
+    channelPreferences?: { inApp: boolean; email: boolean; whatsappDemo: boolean };
   };
 }
 
@@ -85,20 +86,21 @@ export async function POST(req: Request) {
 Given the passenger's current observation, you MUST DECIDE the single best agent action to take right now.
 
 Allowed actions (pick exactly one):
-1. "none": No immediate action required.
-2. "notify_user": Send a reminder or alert to the passenger.
+1. "none": No immediate action required. Do NOT notify if user is active or no intervention is warranted.
+2. "notify_user": Send a targeted reminder or escalation alert to the passenger.
 3. "open_booking_flow": Initiate the booking attempt on the primary strategy.
 4. "evaluate_backup": Assess the backup strategy because primary is unavailable or risky.
 5. "activate_backup": Execute booking on the prepared backup strategy.
 
 Allowed tool names for toolCall:
-- "notifyUser" (arguments: { "channel": "push"|"whatsapp"|"in-app"|"email", "title": string, "message": string })
+- "notifyUser" (arguments: { "channel": "email"|"in-app"|"whatsapp"|"push", "priority": "low"|"medium"|"high", "title": string, "message": string, "notificationKey": string })
 - "openBookingFlow" (arguments: {})
 - "activateBackupStrategy" (arguments: {})
 - "recordEvent" (arguments: { "kind": string, "text": string })
 
-Rules:
-- If userActive is false and secondsRemaining <= 30 and Tatkal window opens soon, pick "notify_user" with channel "whatsapp" or "push".
+Rules for intelligent escalation:
+- If userActive is TRUE: do NOT notify unnecessarily. Choose "none" unless booking requires user action.
+- If userActive is FALSE and secondsRemaining <= 600 (10 minutes or 5 minutes before Tatkal): pick "notify_user" using channel "email" (if channelPreferences.email is true) or "in-app", with priority "high" and notificationKey "tatkal_warning_10m".
 - If Tatkal window is open (windowOpen=true) and primaryAvailable=true and bookingStatus="none", pick "open_booking_flow".
 - If primaryAvailable=false or bookingStatus="primary_failed", and backupTrain exists, pick "activate_backup".
 - If booking is confirmed or no action needed, pick "none".
@@ -161,16 +163,19 @@ function computeLocalDecision(obs: AgentDecisionRequest["observation"]): {
     };
   }
 
-  if (obs.userActive === false && (obs.secondsRemaining ?? 999) <= 30) {
+  if (obs.userActive === false && (obs.secondsRemaining ?? 999) <= 600) {
+    const channel = obs.channelPreferences?.email ? "email" : "in-app";
     return {
       action: "notify_user",
-      reason: "Passenger inactive shortly before Tatkal window. Sending urgent notification.",
+      reason: "Passenger inactive shortly before Tatkal window. Escalating via " + channel + ".",
       toolCall: {
         name: "notifyUser",
         arguments: {
-          channel: "whatsapp",
+          channel,
+          priority: "high",
           title: "Tatkal Window Opening Soon",
-          message: `Your Tatkal window opens in ${obs.secondsRemaining ?? 5} minutes. Open Tatkal Copilot to monitor booking.`,
+          message: `Your Tatkal window opens soon for ${obs.from} → ${obs.to}. Open Tatkal Copilot to monitor booking.`,
+          notificationKey: "tatkal_warning_10m",
         },
       },
     };

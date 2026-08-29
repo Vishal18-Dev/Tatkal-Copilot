@@ -31,6 +31,7 @@ interface CoachRequest {
     mode: string;
     bookingStatus: string | null;
     recovered: boolean;
+    notificationsSent?: { channel: string; title: string; body: string; at: string }[];
   };
 }
 
@@ -78,6 +79,8 @@ Your responses must be:
 - 2-4 sentences maximum. Plain, reassuring language.
 - Never mention raw percentages — use confidence words only: Very High, High, Medium, Low.
 - Never claim real IRCTC integration. This is a demo/prototype.
+- If the user asks why you emailed or notified them, explain that they were inactive shortly before Tatkal opened or an action was required, referencing the notificationsSent array.
+- If the user asks if the ticket is booked, check bookingStatus strictly. Never claim a ticket is confirmed unless bookingStatus is 'success' or 'confirmed'.
 - If the user asks something outside your journey context, say so honestly.
 
 Current journey context:

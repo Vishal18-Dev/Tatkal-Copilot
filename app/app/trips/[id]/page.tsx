@@ -30,6 +30,7 @@ import {
   Pause,
   AlertTriangle,
   Cpu,
+  UserX,
 } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -571,6 +572,21 @@ function PlanMission({ plan }: { plan: Trip }) {
                 </Button>
               )}
               
+              {/* Simulate User Inactivity toggle for demo */}
+              <Button
+                variant="secondary"
+                size="lg"
+                onClick={() => {
+                  const currentBeat = DEMO_ENVIRONMENT_TIMELINE[demoBeatIndex] || DEMO_ENVIRONMENT_TIMELINE[3];
+                  const toggledBeat = { ...currentBeat, userActive: !currentBeat.userActive };
+                  handleDemoBeat(toggledBeat, demoBeatIndex);
+                }}
+                title="Simulate passenger closing app / leaving screen"
+              >
+                <UserX className="h-4 w-4 text-brand" />
+                Simulate Inactivity
+              </Button>
+
               {/* Manual controls */}
               {!demoRunning && canStartBooking && (
                 <Button size="lg" onClick={startBooking} className="flex-1">
@@ -635,23 +651,40 @@ function PlanMission({ plan }: { plan: Trip }) {
             {plan.planNotifications.length > 0 && (
               <Card className="p-5">
                 <h3 className="mb-3 text-sm font-semibold uppercase tracking-wide text-ink-faint">{t("mc.agentNotifications")}</h3>
-                <div className="space-y-2.5">
+                <div className="space-y-3">
                   {[...plan.planNotifications].reverse().slice(0, 6).map((n) => {
                     const Icon = CHANNEL_ICON[n.channel];
+                    const isEmail = n.channel === "email";
+                    const isDemo = n.deliveryStatus === "demo_generated";
+                    const isUnavailable = n.deliveryStatus === "email_unavailable";
+
                     return (
-                      <div key={n.id} className="flex items-start gap-2.5">
-                        <span className="mt-0.5 grid h-7 w-7 shrink-0 place-items-center rounded-full bg-brand-soft text-brand">
-                          <Icon className="h-3.5 w-3.5" />
-                        </span>
-                        <div className="min-w-0">
-                          <div className="flex items-center gap-1.5 text-[0.9rem] font-medium text-ink">
+                      <div key={n.id} className="rounded-xl border border-line bg-surface p-3 text-[0.88rem]">
+                        <div className="mb-1 flex items-center justify-between">
+                          <span className="flex items-center gap-1.5 font-semibold text-ink">
+                            <Icon className="h-4 w-4 text-brand" />
                             {n.title}
-                            <span className="rounded-full bg-surface-muted px-1.5 py-0.5 text-[0.6rem] font-semibold uppercase text-ink-faint">
-                              {n.channel === "in-app" ? "in-app" : n.channel} · sim
-                            </span>
-                          </div>
-                          <div className="text-xs text-ink-soft">{n.body}</div>
+                          </span>
+                          <span className={cn(
+                            "rounded-full px-2 py-0.5 text-[0.65rem] font-semibold uppercase",
+                            isEmail && !isDemo && !isUnavailable ? "bg-confirm-soft text-confirm" :
+                            isDemo ? "bg-brand-soft text-brand" :
+                            isUnavailable ? "bg-caution-soft text-caution" :
+                            "bg-surface-muted text-ink-faint"
+                          )}>
+                            {isEmail && !isDemo && !isUnavailable ? "📧 Email sent" :
+                             isDemo ? "📱 Demo email generated" :
+                             isUnavailable ? "⚠ Email unavailable" :
+                             n.channel === "whatsapp" ? "📱 WhatsApp · Demo" :
+                             "🔔 In-app notification"}
+                          </span>
                         </div>
+                        <p className="text-xs text-ink-soft">{n.body}</p>
+                        {n.recipientEmail && (
+                          <div className="mt-1 text-[0.75rem] text-ink-faint">
+                            Recipient: <span className="font-mono">{n.recipientEmail}</span>
+                          </div>
+                        )}
                       </div>
                     );
                   })}

@@ -209,6 +209,7 @@ export interface User {
   phone: string;
   name?: string;
   email?: string;
+  emailVerified?: boolean;
   createdAt: string;
 }
 
@@ -221,6 +222,12 @@ export interface Session {
 
 export type ConfirmationPriority = "confirmation" | "balanced" | "price";
 export type BookingMode = "assisted" | "auto";
+
+export interface ChannelPreferences {
+  inApp: boolean;
+  email: boolean;
+  whatsappDemo: boolean;
+}
 
 export interface UserPreferences {
   homeStationCode?: string;
@@ -235,6 +242,7 @@ export interface UserPreferences {
     bookingUpdates: boolean;
     tripReminders: boolean;
   };
+  channelPreferences?: ChannelPreferences;
   /** True once the user has finished (or skipped) onboarding. */
   onboarded: boolean;
 }
@@ -306,13 +314,19 @@ export interface StrategySnapshot {
 }
 
 export type NotificationChannel = "in-app" | "push" | "whatsapp" | "email";
+export type NotificationDeliveryStatus = "sent" | "demo_generated" | "email_unavailable" | "suppressed" | "failed";
 
 export interface PlanNotification {
   id: string;
   at: string;
   channel: NotificationChannel;
+  priority?: "low" | "medium" | "high";
   title: string;
   body: string;
+  deliveryStatus?: NotificationDeliveryStatus;
+  recipientEmail?: string;
+  notificationKey?: string;
+  reason?: string;
 }
 
 /**
@@ -347,6 +361,7 @@ export interface Trip {
   backup?: StrategySnapshot | null;
   readinessDone: string[];
   planNotifications: PlanNotification[];
+  channelPreferences?: ChannelPreferences;
 }
 
 export type ActivityKind =
