@@ -362,6 +362,7 @@ export interface Trip {
   readinessDone: string[];
   planNotifications: PlanNotification[];
   channelPreferences?: ChannelPreferences;
+  userEmail?: string;
 }
 
 export type ActivityKind =
@@ -393,7 +394,7 @@ export interface ActivityEvent {
     channel?: NotificationChannel;
     aiGenerated?: boolean;
     reason?: string;
-    source?: "gpt" | "local";
+    source?: "gpt" | "gemini" | "local";
   };
 }
 

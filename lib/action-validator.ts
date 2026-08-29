@@ -34,7 +34,7 @@ export interface ProposedAgentDecision {
   action: AllowedAgentAction;
   reason: string;
   toolCall?: AgentToolCallProposal;
-  source: "gpt" | "local";
+  source: "gpt" | "gemini" | "local";
 }
 
 export interface ValidationResult {

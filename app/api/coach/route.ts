@@ -48,31 +48,21 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "message required" }, { status: 400 });
   }
 
+  // 1. Try OpenAI if key is present
   const apiKey = process.env.OPENAI_API_KEY;
-  if (!apiKey) {
-    // Graceful degradation — return deterministic coach
-    return NextResponse.json({
-      response: coachFor(
-        journeyContext?.agentState ?? "scheduled",
-        buildMinimalTrip(journeyContext)
-      ),
-      source: "local",
-    });
-  }
+  if (apiKey) {
+    try {
+      const client = new OpenAI({ apiKey });
+      const contextStr = JSON.stringify(journeyContext, null, 2);
 
-  const client = new OpenAI({ apiKey });
-
-  try {
-    const contextStr = JSON.stringify(journeyContext, null, 2);
-
-    const completion = await client.chat.completions.create({
-      model: MODEL,
-      temperature: 0.5,
-      max_tokens: 300,
-      messages: [
-        {
-          role: "system",
-          content: `You are the AI Coach inside Tatkal Copilot, an Indian railway Tatkal ticket booking assistant. You speak warmly and clearly to Manoj, a 54-year-old not very tech-savvy traveller. 
+      const completion = await client.chat.completions.create({
+        model: MODEL,
+        temperature: 0.5,
+        max_tokens: 300,
+        messages: [
+          {
+            role: "system",
+            content: `You are the AI Coach inside Tatkal Copilot, an Indian railway Tatkal ticket booking assistant. You speak warmly and clearly to Manoj, a 54-year-old not very tech-savvy traveller. 
 
 Your responses must be:
 - Grounded ONLY in the journey context provided below. Never invent train names, times, prices, or probabilities.
@@ -81,26 +71,70 @@ Your responses must be:
 - Never claim real IRCTC integration. This is a demo/prototype.
 - If the user asks why you emailed or notified them, explain that they were inactive shortly before Tatkal opened or an action was required, referencing the notificationsSent array.
 - If the user asks if the ticket is booked, check bookingStatus strictly. Never claim a ticket is confirmed unless bookingStatus is 'success' or 'confirmed'.
-- If the user asks something outside your journey context, say so honestly.
 
 Current journey context:
 ${contextStr}`,
-        },
-        { role: "user", content: message },
-      ],
+          },
+          { role: "user", content: message },
+        ],
+      });
+
+      const response = completion.choices[0]?.message?.content;
+      if (response) {
+        return NextResponse.json({ response, source: "gpt" });
+      }
+    } catch (err) {
+      console.warn("[api/coach] GPT failed, checking Gemini fallback:", err);
+    }
+  }
+
+  // 2. Try Gemini fallback if OpenAI failed or key is absent
+  const geminiResponse = await callGeminiCoach(message, journeyContext);
+  if (geminiResponse) {
+    return NextResponse.json({ response: geminiResponse, source: "gemini" });
+  }
+
+  // 3. Graceful degradation — return deterministic coach
+  return NextResponse.json({
+    response: coachFor(
+      journeyContext?.agentState ?? "scheduled",
+      buildMinimalTrip(journeyContext)
+    ),
+    source: "local",
+  });
+}
+
+/** Fallback AI coach via Google Gemini REST API. */
+async function callGeminiCoach(message: string, context: CoachRequest["journeyContext"]) {
+  const geminiKey = process.env.GEMINI_API_KEY?.trim();
+  if (!geminiKey) return null;
+
+  const model = process.env.GEMINI_MODEL || "gemini-2.0-flash";
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${geminiKey}`;
+
+  const prompt = `You are the AI Coach inside Tatkal Copilot, an Indian railway Tatkal ticket booking assistant. Speak warmly, clearly, and concisely (2-3 sentences).
+
+Current journey context:
+${JSON.stringify(context, null, 2)}
+
+User question: "${message}"`;
+
+  try {
+    const res = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        contents: [{ parts: [{ text: prompt }] }],
+        generationConfig: { temperature: 0.5, maxOutputTokens: 300 },
+      }),
     });
 
-    const response = completion.choices[0]?.message?.content ?? "I'm not sure how to help with that right now.";
-    return NextResponse.json({ response, source: "gpt" });
+    if (!res.ok) return null;
+    const data = await res.json();
+    return data?.candidates?.[0]?.content?.parts?.[0]?.text ?? null;
   } catch (err) {
-    console.warn("[api/coach] GPT failed, using local coach:", err);
-    return NextResponse.json({
-      response: coachFor(
-        journeyContext?.agentState ?? "scheduled",
-        buildMinimalTrip(journeyContext)
-      ),
-      source: "local",
-    });
+    console.warn("[api/coach] Gemini call failed:", err);
+    return null;
   }
 }
 

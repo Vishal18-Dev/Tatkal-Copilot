@@ -69,7 +69,7 @@ export interface AgentEventRecord {
     channel?: NotificationChannel;
     aiGenerated?: boolean;
     reason?: string;
-    source?: "gpt" | "local";
+    source?: "gpt" | "gemini" | "local";
   };
 }
 
@@ -137,7 +137,7 @@ export class TatkalAgent {
     this.sentNotificationKeys.add(`title:${title}`);
 
     let deliveryStatus: NotificationDeliveryStatus = "sent";
-    let recipient = options?.recipientEmail || "passenger@example.com";
+    let recipient = options?.recipientEmail || this.trip.userEmail || "vishal@example.com";
 
     try {
       if (typeof window !== "undefined" && typeof fetch !== "undefined") {
@@ -354,7 +354,7 @@ export class TatkalAgent {
       metadata: {
         action: decision.action,
         tool: decision.toolCall?.name,
-        aiGenerated: decision.source === "gpt",
+        aiGenerated: decision.source === "gpt" || decision.source === "gemini",
         source: decision.source,
       },
     });

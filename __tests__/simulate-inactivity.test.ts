@@ -187,4 +187,28 @@ describe("v1.6 Simulate Inactivity Integration & Agent Autonomy Tests", () => {
     const decision = agent["evaluateLocally"](obs);
     expect(decision.action).toBe("none");
   });
+
+  it("Test 9: Uses custom trip.userEmail when delivering notification", async () => {
+    let currentTrip = { ...mockTrip, userEmail: "vishal@example.com" };
+    const agent = new TatkalAgent(currentTrip, {
+      updateTrip: (id, patch) => { currentTrip = { ...currentTrip, ...patch }; },
+      logActivity: () => {},
+      pushNotification: () => {},
+      getTravellers: () => [],
+    });
+
+    const inactivityBeat: DemoEnvironmentBeat = {
+      event: "user_inactive",
+      secondsRemaining: 600,
+      countdownLabel: "10:00",
+      description: "Passenger inactive · 10 minutes to Tatkal window",
+      windowOpen: false,
+      userActive: false,
+      primaryAvailable: true,
+    };
+
+    await agent.tick(inactivityBeat);
+    expect(currentTrip.planNotifications.length).toBe(1);
+    expect(currentTrip.planNotifications[0].recipientEmail).toBe("vishal@example.com");
+  });
 });

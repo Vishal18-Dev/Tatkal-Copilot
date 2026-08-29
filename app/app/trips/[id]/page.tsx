@@ -66,7 +66,7 @@ export interface DecisionTraceRecord {
   why: string;
   action: string;
   result: string;
-  source: "gpt" | "local";
+  source: "gpt" | "gemini" | "local";
   valid: boolean;
 }
 
@@ -578,9 +578,13 @@ function PlanMission({ plan }: { plan: Trip }) {
                         <span className="font-mono">{trace.timestamp}</span>
                         <span className={cn(
                           "rounded-full px-1.5 py-0.5 text-[0.6rem] font-semibold uppercase",
-                          trace.source === "gpt" ? "bg-[#eef2ff] text-[#4338ca]" : "bg-surface-muted text-ink-faint"
+                          trace.source === "gpt" ? "bg-[#eef2ff] text-[#4338ca]" :
+                          trace.source === "gemini" ? "bg-brand-soft text-brand" :
+                          "bg-surface-muted text-ink-faint"
                         )}>
-                          {trace.source === "gpt" ? "AI Provider: OpenAI" : "AI Provider: Demo fallback"}
+                          {trace.source === "gpt" ? "AI Provider: OpenAI" :
+                           trace.source === "gemini" ? "AI Provider: Gemini" :
+                           "AI Provider: Demo fallback"}
                         </span>
                       </div>
                       <div className="space-y-1">

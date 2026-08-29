@@ -16,6 +16,7 @@ import {
   Info,
   Bookmark,
   Eye,
+  Mail,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -44,11 +45,12 @@ function snapshot(o: StrategyOption): StrategySnapshot {
 export function AuthorizeScreen() {
   const { plan, chosenOption, recoveryOption, selectedPassengers, mode, setMode } =
     useJourney();
-  const { isAuthed, saveJourney, addTrip, logActivity, pushNotification } = useStore();
+  const { user, isAuthed, updateProfile, saveJourney, addTrip, logActivity, pushNotification } = useStore();
   const [saveJ, setSaveJ] = useState(true);
   const [prefInApp, setPrefInApp] = useState(true);
   const [prefEmail, setPrefEmail] = useState(true);
   const [prefWhatsapp, setPrefWhatsapp] = useState(false);
+  const [userEmail, setUserEmail] = useState(user?.email || "vishal@example.com");
   const [authOpen, setAuthOpen] = useState(false);
   const router = useRouter();
 
@@ -89,7 +91,12 @@ export function AuthorizeScreen() {
         email: prefEmail,
         whatsappDemo: prefWhatsapp,
       },
+      userEmail: userEmail || user?.email || "vishal@example.com",
     });
+
+    if (userEmail) {
+      updateProfile({ email: userEmail });
+    }
 
     if (saveJ) {
       saveJourney({
@@ -173,8 +180,26 @@ export function AuthorizeScreen() {
           </span>
         </div>
         <p className="mt-1 text-sm text-ink-soft">
-          Email lets Copilot reach you even after you&apos;ve closed the app.
+          We&apos;ll email you if you&apos;re away when Tatkal needs your attention.
         </p>
+
+        {prefEmail && (
+          <div className="mt-3">
+            <label className="mb-1 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-ink-faint">
+              <Mail className="h-3.5 w-3.5 text-brand" /> Notification Email Address
+            </label>
+            <input
+              type="email"
+              value={userEmail}
+              onChange={(e) => setUserEmail(e.target.value)}
+              placeholder="e.g. vishal@example.com"
+              className="w-full rounded-xl border border-line bg-surface px-3.5 py-2.5 text-sm font-medium text-ink focus:border-brand focus:outline-none focus:ring-1 focus:ring-brand"
+            />
+            <p className="mt-1 text-[0.78rem] text-ink-faint">
+              Real email alerts sent via Resend REST API or demo payload generated
+            </p>
+          </div>
+        )}
         <div className="mt-4 grid gap-2.5 sm:grid-cols-3">
           <label className="flex cursor-pointer items-center justify-between rounded-xl border border-line bg-surface p-3">
             <span className="text-sm font-medium text-ink">In-app Notification</span>
