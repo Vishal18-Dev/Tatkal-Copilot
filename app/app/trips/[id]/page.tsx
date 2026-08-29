@@ -498,9 +498,9 @@ function PlanMission({ plan }: { plan: Trip }) {
                 <div className="mb-3 flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <Cpu className="h-4 w-4 text-brand" />
-                    <span className="text-sm font-semibold uppercase tracking-wide text-ink-faint">Agent Decision Trace</span>
+                    <span className="text-sm font-semibold uppercase tracking-wide text-ink-faint">{t("mc.agentDecisionTrace")}</span>
                   </div>
-                  <span className="rounded-full bg-brand-soft px-2 py-0.5 text-[0.65rem] font-semibold text-brand">INVERTED CONTROL</span>
+                  <span className="rounded-full bg-brand-soft px-2 py-0.5 text-[0.65rem] font-semibold text-brand">{t("mc.invertedControl")}</span>
                 </div>
                 <div className="max-h-72 space-y-3 overflow-y-auto">
                   {decisionTrace.map((trace) => (
@@ -552,22 +552,22 @@ function PlanMission({ plan }: { plan: Trip }) {
               {/* Demo controls */}
               {!demoRunning && (
                 <Button size="lg" onClick={startDemo} className="flex-1 bg-gradient-to-r from-brand to-[#7c74f5] text-white shadow-[var(--shadow-brand)]">
-                  <Play className="h-4 w-4" /> Run Demo
+                  <Play className="h-4 w-4" /> {t("mc.runDemo")}
                 </Button>
               )}
               {demoStatus === "running" && (
                 <Button variant="secondary" size="lg" onClick={pauseDemo} className="flex-1">
-                  <Pause className="h-4 w-4" /> Pause Demo
+                  <Pause className="h-4 w-4" /> {t("mc.pauseDemo")}
                 </Button>
               )}
               {demoStatus === "paused" && (
                 <Button size="lg" onClick={resumeDemo} className="flex-1">
-                  <Play className="h-4 w-4" /> Resume Demo
+                  <Play className="h-4 w-4" /> {t("mc.resumeDemo")}
                 </Button>
               )}
               {(demoRunning || demoStatus === "complete") && (
                 <Button variant="secondary" size="lg" onClick={resetDemo}>
-                  <RotateCcw className="h-4 w-4" /> Reset
+                  <RotateCcw className="h-4 w-4" /> {t("mc.reset")}
                 </Button>
               )}
               

@@ -14,9 +14,6 @@ import {
   Train,
   Clock,
   Brain,
-  ShieldCheck,
-  CheckCircle2,
-  AlertCircle,
   Plus,
   Compass,
   Radio,
@@ -26,7 +23,7 @@ import { Button } from "@/components/ui/button";
 import { Chip } from "@/components/app/ui";
 import { useStore } from "@/lib/store";
 import { useLang } from "@/lib/i18n";
-import { readinessFor, statusMeta } from "@/lib/agent";
+import { readinessFor } from "@/lib/agent";
 import { formatFare } from "@/lib/utils";
 
 export default function HomePage() {
@@ -75,7 +72,7 @@ export default function HomePage() {
               <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-confirm" />
             </span>
             <span className="text-xs font-semibold uppercase tracking-wider text-confirm">
-              Copilot is watching
+              {t("home.copilotWatching")}
             </span>
           </div>
           <h1 className="mt-1 text-2xl font-semibold tracking-tight text-ink sm:text-[1.9rem]">
@@ -83,13 +80,13 @@ export default function HomePage() {
             {user?.name ? `, ${user.name.split(" ")[0]}` : ""}
           </h1>
           <p className="mt-0.5 text-sm text-ink-soft">
-            Command Center · Manage your Tatkal strategies & active monitor status
+            {t("home.commandCenterSub")}
           </p>
         </div>
 
         <Link href="/app/plan">
           <Button size="md" className="gap-2 shadow-[var(--shadow-brand)]">
-            <Plus className="h-4 w-4" /> Plan a new trip
+            <Plus className="h-4 w-4" /> {t("home.planNewTrip")}
           </Button>
         </Link>
       </motion.div>
@@ -107,12 +104,12 @@ export default function HomePage() {
             value={goal}
             onChange={(e) => setGoal(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && plan()}
-            placeholder="Tell me where you need to be next…"
+            placeholder={t("home.placeholderNext")}
             className="w-full bg-transparent px-1 py-2 text-[1.02rem] text-ink placeholder:text-ink-faint focus:outline-none"
           />
           <button
             onClick={() => plan()}
-            aria-label="Plan trip"
+            aria-label={t("nav.plan")}
             className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-brand text-white shadow-[var(--shadow-brand)] transition-colors hover:bg-[#4338ca]"
           >
             <ArrowRight className="h-5 w-5" />
@@ -125,10 +122,10 @@ export default function HomePage() {
         <section>
           <div className="mb-2.5 flex items-center justify-between">
             <h2 className="text-xs font-semibold uppercase tracking-wide text-ink-faint">
-              Active Tatkal Plan · Needs Your Attention
+              {t("home.activePlanHeader")}
             </h2>
             <Link href="/app/trips" className="text-xs font-medium text-brand hover:underline">
-              View all ({trips.length})
+              {t("home.viewAll")} ({trips.length})
             </Link>
           </div>
 
@@ -141,7 +138,7 @@ export default function HomePage() {
                   </span>
                   <Chip tone="brand">{activeTrip.travelClass}</Chip>
                   <span className="inline-flex items-center gap-1.5 rounded-full bg-confirm-soft px-2.5 py-0.5 text-xs font-semibold text-confirm">
-                    <Radio className="h-3 w-3 animate-pulse" /> Active Watch
+                    <Radio className="h-3 w-3 animate-pulse" /> {t("home.activeWatch")}
                   </span>
                 </div>
 
@@ -150,7 +147,7 @@ export default function HomePage() {
                     <Train className="h-4 w-4 text-brand" /> {activeTrip.primary.trainName}
                   </span>
                   <span className="flex items-center gap-1.5">
-                    <Clock className="h-4 w-4 text-brand" /> Tatkal opens {activeTrip.tatkalOpensAtLabel}
+                    <Clock className="h-4 w-4 text-brand" /> {t("home.tatkalOpens")} {activeTrip.tatkalOpensAtLabel}
                   </span>
                   <span className="flex items-center gap-1.5">
                     <Users className="h-4 w-4 text-brand" /> {activeTrip.travellerIds.length} {travWord(activeTrip.travellerIds.length)}
@@ -158,7 +155,7 @@ export default function HomePage() {
                 </div>
 
                 <div className="flex items-center gap-3 pt-1">
-                  <span className="text-xs font-medium text-ink-faint">Readiness:</span>
+                  <span className="text-xs font-medium text-ink-faint">{t("home.readinessLabel")}</span>
                   <div className="flex items-center gap-1">
                     {readinessFor(activeTrip).map((r) => (
                       <span
@@ -169,7 +166,7 @@ export default function HomePage() {
                     ))}
                   </div>
                   <span className="text-xs font-semibold text-confirm">
-                    {readinessFor(activeTrip).filter((r) => r.done).length}/{readinessFor(activeTrip).length} Ready
+                    {readinessFor(activeTrip).filter((r) => r.done).length}/{readinessFor(activeTrip).length} {t("home.ready")}
                   </span>
                 </div>
               </div>
@@ -177,7 +174,7 @@ export default function HomePage() {
               <div className="flex shrink-0 flex-col gap-2 sm:flex-row md:flex-col">
                 <Link href={`/app/trips/${activeTrip.id}`}>
                   <Button size="lg" className="w-full gap-2 shadow-[var(--shadow-brand)]">
-                    <Compass className="h-4 w-4" /> View Mission Control
+                    <Compass className="h-4 w-4" /> {t("home.viewMissionControl")}
                   </Button>
                 </Link>
               </div>
@@ -189,13 +186,13 @@ export default function HomePage() {
           <span className="mx-auto grid h-12 w-12 place-items-center rounded-2xl bg-brand-soft text-brand">
             <Sparkles className="h-6 w-6" />
           </span>
-          <h2 className="mt-4 text-lg font-semibold text-ink">Your next trip starts here.</h2>
+          <h2 className="mt-4 text-lg font-semibold text-ink">{t("trips.emptyUpTitle")}</h2>
           <p className="mx-auto mt-1 max-w-md text-sm text-ink-soft">
-            Tell Copilot where you need to be and we&apos;ll prepare everything before Tatkal opens.
+            {t("trips.emptyUpBody")}
           </p>
           <Link href="/app/plan" className="mt-5 inline-block">
             <Button size="md" className="gap-2">
-              <Plus className="h-4 w-4" /> Plan a trip
+              <Plus className="h-4 w-4" /> {t("trips.planTrip")}
             </Button>
           </Link>
         </Card>
@@ -203,19 +200,19 @@ export default function HomePage() {
 
       {/* Quick Actions Grid */}
       <section>
-        <h2 className="mb-2.5 text-xs font-semibold uppercase tracking-wide text-ink-faint">Quick Actions</h2>
+        <h2 className="mb-2.5 text-xs font-semibold uppercase tracking-wide text-ink-faint">{t("home.quickActions")}</h2>
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-          <QuickAction href="/app/plan" icon={<Sparkles className="h-5 w-5" />} label="Plan a Trip" sub="Create strategy" />
-          <QuickAction href="/app/trips" icon={<Ticket className="h-5 w-5" />} label="My Trips" sub={`${trips.length} saved`} />
-          <QuickAction href="/app/travellers" icon={<Users className="h-5 w-5" />} label="Travellers" sub={`${travellers.length} in vault`} />
-          <QuickAction href="/app/activity" icon={<ActivityIcon className="h-5 w-5" />} label="Activity" sub={`${activity.length} events`} />
+          <QuickAction href="/app/plan" icon={<Sparkles className="h-5 w-5" />} label={t("nav.plan")} sub={t("home.newJourney")} />
+          <QuickAction href="/app/trips" icon={<Ticket className="h-5 w-5" />} label={t("nav.trips")} sub={`${trips.length} ${t("home.saved")}`} />
+          <QuickAction href="/app/travellers" icon={<Users className="h-5 w-5" />} label={t("nav.travellers")} sub={`${travellers.length} ${t("home.inVault")}`} />
+          <QuickAction href="/app/activity" icon={<ActivityIcon className="h-5 w-5" />} label={t("nav.activity")} sub={`${activity.length} ${t("home.events")}`} />
         </div>
       </section>
 
       {/* Saved Journeys & Memory */}
       {savedJourneys.length > 0 && (
         <section>
-          <h2 className="mb-2.5 text-xs font-semibold uppercase tracking-wide text-ink-faint">Saved Journeys</h2>
+          <h2 className="mb-2.5 text-xs font-semibold uppercase tracking-wide text-ink-faint">{t("home.savedJourneys")}</h2>
           <div className="grid gap-3 sm:grid-cols-2">
             {savedJourneys.slice(0, 4).map((j) => (
               <button
@@ -232,7 +229,7 @@ export default function HomePage() {
                     {j.travelClass} · {j.travellerIds.length} {travWord(j.travellerIds.length)}
                   </div>
                 </div>
-                <span className="text-xs font-medium text-brand">Plan again</span>
+                <span className="text-xs font-medium text-brand">{t("home.planAgain")}</span>
               </button>
             ))}
           </div>
@@ -244,7 +241,7 @@ export default function HomePage() {
         <Card className="p-5">
           <div className="mb-2 flex items-center gap-2 text-brand">
             <Brain className="h-5 w-5" />
-            <h2 className="text-xs font-semibold uppercase tracking-wide text-ink-faint">What your Copilot remembers</h2>
+            <h2 className="text-xs font-semibold uppercase tracking-wide text-ink-faint">{t("home.memory")}</h2>
           </div>
           <ul className="space-y-1.5">
             {insights.map((tx, i) => (
@@ -260,8 +257,8 @@ export default function HomePage() {
       {booked.length > 0 && (
         <div className="flex items-center gap-2 text-sm text-ink-faint">
           <Clock className="h-4 w-4" />
-          {booked.length} confirmed {booked.length > 1 ? "bookings" : "booking"} ·{" "}
-          {formatFare(booked.reduce((s, tr) => s + (tr.booking?.amount ?? 0), 0))} total
+          {booked.length} {t("home.confirmed")} {booked.length > 1 ? t("home.bookings") : t("home.booking")} ·{" "}
+          {formatFare(booked.reduce((s, tr) => s + (tr.booking?.amount ?? 0), 0))} {t("home.total")}
         </div>
       )}
     </div>
