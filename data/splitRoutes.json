@@ -1,0 +1,30 @@
+[
+  {
+    "corridor": "BCT-NDLS",
+    "viaCode": "KOTA",
+    "viaName": "Kota Junction",
+    "legs": [
+      {
+        "trainNumber": "12953",
+        "trainName": "August Kranti Rajdhani",
+        "fromCode": "BCT",
+        "toCode": "KOTA",
+        "departure": "16:35",
+        "arrival": "00:40",
+        "confirmProbability": 88
+      },
+      {
+        "trainNumber": "12059",
+        "trainName": "Kota–Nizamuddin Jan Shatabdi",
+        "fromCode": "KOTA",
+        "toCode": "NZM",
+        "departure": "05:55",
+        "arrival": "12:20",
+        "confirmProbability": 86
+      }
+    ],
+    "combinedConfirmProbability": 84,
+    "fare": 2540,
+    "reason": "Each shorter leg has a far deeper Tatkal pool than the full Mumbai→Delhi run, so booking the two legs separately clears when the direct berth does not — the single highest-confidence path, at the cost of a longer trip and a later arrival."
+  }
+]

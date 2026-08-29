@@ -1,0 +1,29 @@
+[
+  {
+    "id": "p-manoj",
+    "name": "Manoj Sharma",
+    "age": 54,
+    "gender": "M",
+    "berthPreference": "Lower",
+    "mealPreference": "Veg",
+    "isSenior": false
+  },
+  {
+    "id": "p-sunita",
+    "name": "Sunita Sharma",
+    "age": 51,
+    "gender": "F",
+    "berthPreference": "Lower",
+    "mealPreference": "Veg",
+    "isSenior": false
+  },
+  {
+    "id": "p-arjun",
+    "name": "Arjun Sharma",
+    "age": 24,
+    "gender": "M",
+    "berthPreference": "Side Lower",
+    "mealPreference": "Non-veg",
+    "isSenior": false
+  }
+]

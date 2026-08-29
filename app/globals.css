@@ -1,0 +1,165 @@
+@import "tailwindcss";
+
+/* ============================================================
+   Tatkal Copilot — Design System
+   Language: Apple / Linear. Calm, intelligent, trustworthy.
+   Light-first, single confident accent, generous whitespace.
+   ============================================================ */
+
+@theme {
+  /* Surfaces */
+  --color-canvas: #f7f7f5; /* app background, warm off-white */
+  --color-surface: #ffffff; /* cards */
+  --color-surface-muted: #f2f2ef;
+
+  /* Ink */
+  --color-ink: #0a0a0b; /* primary text */
+  --color-ink-soft: #4b4b52; /* secondary text */
+  --color-ink-faint: #8a8a93; /* tertiary / captions */
+
+  /* Lines */
+  --color-line: #e9e9e6;
+  --color-line-strong: #dcdcd7;
+
+  /* Brand — deep indigo, confident but calm */
+  --color-brand: #4f46e5;
+  --color-brand-soft: #eef0fe;
+  --color-brand-ink: #3730a3;
+
+  /* Semantic */
+  --color-confirm: #0f9d6e; /* probability / success green */
+  --color-confirm-soft: #e6f6ef;
+  --color-caution: #d97706; /* backup / amber */
+  --color-caution-soft: #fdf3e6;
+  --color-danger: #dc2626; /* urgency / low time */
+  --color-danger-soft: #fdecec;
+
+  /* Typography */
+  --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, monospace;
+
+  /* Radius */
+  --radius-sm: 0.5rem;
+  --radius: 0.875rem;
+  --radius-lg: 1.25rem;
+  --radius-xl: 1.75rem;
+
+  /* Shadows — soft, elevated, Apple-like */
+  --shadow-card: 0 1px 2px rgba(10, 10, 11, 0.04),
+    0 8px 24px -12px rgba(10, 10, 11, 0.12);
+  --shadow-lift: 0 2px 4px rgba(10, 10, 11, 0.05),
+    0 20px 48px -18px rgba(10, 10, 11, 0.22);
+  --shadow-brand: 0 12px 32px -12px rgba(79, 70, 229, 0.5);
+
+  /* Easing */
+  --ease-out-soft: cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+:root {
+  color-scheme: light;
+}
+
+* {
+  border-color: var(--color-line);
+}
+
+html,
+body {
+  height: 100%;
+}
+
+body {
+  background: var(--color-canvas);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+/* Fluid display type used across hero + headlines */
+.text-display {
+  font-size: clamp(2.4rem, 7vw, 4.75rem);
+  line-height: 1.02;
+  letter-spacing: -0.03em;
+  font-weight: 600;
+}
+
+.text-headline {
+  font-size: clamp(1.6rem, 4.5vw, 2.5rem);
+  line-height: 1.08;
+  letter-spacing: -0.025em;
+  font-weight: 600;
+}
+
+.text-title {
+  font-size: clamp(1.15rem, 2.5vw, 1.4rem);
+  line-height: 1.2;
+  letter-spacing: -0.015em;
+  font-weight: 600;
+}
+
+/* Numeric / countdown */
+.tabular {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum";
+}
+
+/* Focus ring — accessible, on-brand */
+:where(a, button, [role="button"], input, textarea, [tabindex]):focus-visible {
+  outline: 2px solid var(--color-brand);
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+
+/* Subtle grid backdrop for hero / mission screens */
+.bg-grid {
+  background-image: radial-gradient(
+    circle at 1px 1px,
+    rgba(10, 10, 11, 0.05) 1px,
+    transparent 0
+  );
+  background-size: 28px 28px;
+}
+
+/* Streaming text caret */
+@keyframes caret-blink {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0;
+  }
+}
+.caret::after {
+  content: "";
+  display: inline-block;
+  width: 2px;
+  height: 1em;
+  margin-left: 2px;
+  vertical-align: -0.12em;
+  background: var(--color-brand);
+  animation: caret-blink 1s step-end infinite;
+}
+
+/* Respect reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* Custom scrollbar for a refined feel */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--color-line-strong);
+  border-radius: 999px;
+  border: 3px solid var(--color-canvas);
+}

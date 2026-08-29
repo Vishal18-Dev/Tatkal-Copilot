@@ -1,0 +1,14 @@
+[
+  { "code": "BCT", "name": "Mumbai Central", "city": "Mumbai" },
+  { "code": "BDTS", "name": "Bandra Terminus", "city": "Mumbai" },
+  { "code": "BVI", "name": "Borivali", "city": "Mumbai", "isAlternateBoarding": true },
+  { "code": "BSR", "name": "Vasai Road", "city": "Mumbai", "isAlternateBoarding": true },
+  { "code": "DR", "name": "Dadar", "city": "Mumbai" },
+  { "code": "NDLS", "name": "New Delhi", "city": "Delhi" },
+  { "code": "NZM", "name": "Hazrat Nizamuddin", "city": "Delhi" },
+  { "code": "DLI", "name": "Old Delhi", "city": "Delhi" },
+  { "code": "KOTA", "name": "Kota Junction", "city": "Kota" },
+  { "code": "RTM", "name": "Ratlam Junction", "city": "Ratlam" },
+  { "code": "SBC", "name": "KSR Bengaluru", "city": "Bengaluru" },
+  { "code": "MAS", "name": "MGR Chennai Central", "city": "Chennai" }
+]

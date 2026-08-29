@@ -1,0 +1,123 @@
+[
+  {
+    "number": "12953",
+    "name": "August Kranti Rajdhani",
+    "fromCode": "BCT",
+    "toCode": "NZM",
+    "departure": "16:35",
+    "arrival": "06:40",
+    "arrivalDayOffset": 1,
+    "durationMins": 845,
+    "runsOn": ["Daily"],
+    "tatkalOpensAt": "10:00",
+    "competition": 58,
+    "classes": [
+      { "travelClass": "3A", "tatkalQuota": 62, "confirmProbability": 63, "fare": 2360 },
+      { "travelClass": "2A", "tatkalQuota": 34, "confirmProbability": 48, "fare": 3190 },
+      { "travelClass": "1A", "tatkalQuota": 12, "confirmProbability": 71, "fare": 5240 }
+    ],
+    "alternateBoarding": [
+      {
+        "stationCode": "BVI",
+        "stationName": "Borivali",
+        "reachesAfterMins": 25,
+        "confirmUplift": 14,
+        "reason": "Tatkal competition for the Borivali boarding point is far lower than Mumbai Central, yet the same coach and berth are released."
+      },
+      {
+        "stationCode": "BSR",
+        "stationName": "Vasai Road",
+        "reachesAfterMins": 41,
+        "confirmUplift": 9,
+        "reason": "Fewer passengers target Vasai Road as an origin, leaving more of the Tatkal pool open."
+      }
+    ]
+  },
+  {
+    "number": "12951",
+    "name": "Mumbai Rajdhani",
+    "fromCode": "BCT",
+    "toCode": "NDLS",
+    "departure": "17:00",
+    "arrival": "08:35",
+    "arrivalDayOffset": 1,
+    "durationMins": 935,
+    "runsOn": ["Daily"],
+    "tatkalOpensAt": "10:00",
+    "competition": 92,
+    "classes": [
+      { "travelClass": "3A", "tatkalQuota": 58, "confirmProbability": 29, "fare": 2410 },
+      { "travelClass": "2A", "tatkalQuota": 30, "confirmProbability": 22, "fare": 3260 },
+      { "travelClass": "1A", "tatkalQuota": 10, "confirmProbability": 38, "fare": 5390 }
+    ],
+    "alternateBoarding": [
+      {
+        "stationCode": "BVI",
+        "stationName": "Borivali",
+        "reachesAfterMins": 26,
+        "confirmUplift": 8,
+        "reason": "Slightly lighter competition at Borivali, but this train is heavily targeted overall."
+      }
+    ]
+  },
+  {
+    "number": "12909",
+    "name": "Garib Rath",
+    "fromCode": "BDTS",
+    "toCode": "NZM",
+    "departure": "15:50",
+    "arrival": "10:05",
+    "arrivalDayOffset": 1,
+    "durationMins": 1095,
+    "runsOn": ["Daily"],
+    "tatkalOpensAt": "10:00",
+    "competition": 57,
+    "classes": [
+      { "travelClass": "3A", "tatkalQuota": 72, "confirmProbability": 54, "fare": 1490 }
+    ],
+    "alternateBoarding": [
+      {
+        "stationCode": "BVI",
+        "stationName": "Borivali",
+        "reachesAfterMins": 20,
+        "confirmUplift": 10,
+        "reason": "Borivali boarding taps a lighter Tatkal pool on this all-AC train."
+      }
+    ]
+  },
+  {
+    "number": "11301",
+    "name": "Udyan Express",
+    "fromCode": "BCT",
+    "toCode": "SBC",
+    "departure": "20:05",
+    "arrival": "05:30",
+    "arrivalDayOffset": 2,
+    "durationMins": 1885,
+    "runsOn": ["Daily"],
+    "tatkalOpensAt": "11:00",
+    "competition": 61,
+    "classes": [
+      { "travelClass": "3A", "tatkalQuota": 52, "confirmProbability": 52, "fare": 2280 },
+      { "travelClass": "2A", "tatkalQuota": 26, "confirmProbability": 46, "fare": 3310 },
+      { "travelClass": "SL", "tatkalQuota": 96, "confirmProbability": 61, "fare": 880 }
+    ]
+  },
+  {
+    "number": "11041",
+    "name": "Mumbai–Chennai Express",
+    "fromCode": "BCT",
+    "toCode": "MAS",
+    "departure": "12:05",
+    "arrival": "19:10",
+    "arrivalDayOffset": 1,
+    "durationMins": 1865,
+    "runsOn": ["Daily"],
+    "tatkalOpensAt": "11:00",
+    "competition": 54,
+    "classes": [
+      { "travelClass": "SL", "tatkalQuota": 104, "confirmProbability": 64, "fare": 640 },
+      { "travelClass": "3A", "tatkalQuota": 46, "confirmProbability": 51, "fare": 1720 }
+    ]
+  }
+]

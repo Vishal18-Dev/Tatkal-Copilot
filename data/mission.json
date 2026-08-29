@@ -1,0 +1,89 @@
+{
+  "countdownSeconds": 60,
+  "checklist": [
+    {
+      "id": "passengers",
+      "label": "Passengers ready",
+      "hint": "Pulled from your Passenger Vault — one tap to fill.",
+      "done": true
+    },
+    {
+      "id": "boarding",
+      "label": "Boarding station set to Borivali",
+      "hint": "Board from BVI, not Mumbai Central, for higher confirmation.",
+      "done": false,
+      "auto": true
+    },
+    {
+      "id": "payment",
+      "label": "UPI / payment ready",
+      "hint": "Open your UPI app so paying is a single tap.",
+      "done": false,
+      "auto": true
+    },
+    {
+      "id": "login",
+      "label": "IRCTC login ready",
+      "hint": "Stay logged in on the official site before the window opens.",
+      "done": false,
+      "auto": true
+    },
+    {
+      "id": "backup",
+      "label": "Backup plan open",
+      "hint": "Keep the Split-via-Kota plan in a second tab.",
+      "done": false,
+      "auto": true
+    },
+    {
+      "id": "phone",
+      "label": "Phone charged & internet strong",
+      "hint": "A dropped connection mid-booking loses your slot.",
+      "done": true
+    }
+  ],
+  "coach": [
+    {
+      "id": "c60",
+      "atSecondsLeft": 58,
+      "text": "One minute to go. Breathe — you are more prepared than most people booking right now.",
+      "tone": "info"
+    },
+    {
+      "id": "c50",
+      "atSecondsLeft": 50,
+      "text": "Keep your backup — Split via Kota — open in a second tab, just in case.",
+      "tone": "action"
+    },
+    {
+      "id": "c42",
+      "atSecondsLeft": 42,
+      "text": "Open your UPI app now so payment is a single tap when it matters.",
+      "tone": "action"
+    },
+    {
+      "id": "c34",
+      "atSecondsLeft": 34,
+      "text": "Set your boarding station to Borivali (BVI) — not Mumbai Central. This is your edge.",
+      "tone": "warn"
+    },
+    {
+      "id": "c26",
+      "atSecondsLeft": 26,
+      "text": "When it opens, do not refresh repeatedly. It slows you down and can log you out.",
+      "tone": "warn"
+    },
+    {
+      "id": "c16",
+      "atSecondsLeft": 16,
+      "text": "Your passengers auto-fill from the Vault — that alone saves you about 90 seconds.",
+      "tone": "info"
+    },
+    {
+      "id": "c8",
+      "atSecondsLeft": 8,
+      "text": "Almost there. Fill fast, pay immediately, don't second-guess the plan.",
+      "tone": "action"
+    }
+  ]
+}
