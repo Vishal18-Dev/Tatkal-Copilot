@@ -162,7 +162,7 @@ async function callGeminiReasoning(observation: AgentDecisionRequest["observatio
   const geminiKey = process.env.GEMINI_API_KEY?.trim();
   if (!geminiKey) return null;
 
-  const model = process.env.GEMINI_MODEL || "gemini-2.0-flash";
+  const model = process.env.GEMINI_MODEL || "gemini-2.5-flash";
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${geminiKey}`;
 
   const prompt = `You are the autonomous decision engine for Tatkal Copilot, an Indian railway booking agent.
@@ -193,10 +193,15 @@ ${JSON.stringify(observation)}`;
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        contents: [{ parts: [{ text: prompt }] }],
+        contents: [
+          {
+            role: "user",
+            parts: [{ text: prompt }],
+          },
+        ],
         generationConfig: {
-          temperature: 0.2,
-          maxOutputTokens: 300,
+          temperature: 0.1,
+          maxOutputTokens: 1000,
           responseMimeType: "application/json",
         },
       }),
@@ -207,14 +212,48 @@ ${JSON.stringify(observation)}`;
     const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
     if (!text) return null;
 
-    const parsed = JSON.parse(text);
+    let jsonStr = text.trim();
+    const firstBrace = jsonStr.indexOf("{");
+    const lastBrace = jsonStr.lastIndexOf("}");
+    if (firstBrace !== -1 && lastBrace !== -1) {
+      jsonStr = jsonStr.substring(firstBrace, lastBrace + 1);
+    }
+
+    let parsed: any;
+    try {
+      parsed = JSON.parse(jsonStr);
+    } catch {
+      return null;
+    }
+
     if (!parsed.action || !["none", "notify_user", "open_booking_flow", "evaluate_backup", "activate_backup"].includes(parsed.action)) {
       return null;
     }
+
+    let toolCall = parsed.toolCall;
+    if (toolCall && !toolCall.name) {
+      if (parsed.action === "notify_user") {
+        toolCall = {
+          name: "notifyUser",
+          arguments: {
+            channel: observation.channelPreferences?.email ? "email" : "in-app",
+            priority: "high",
+            title: "Tatkal Window Opening Soon",
+            message: `Your Tatkal window opens soon for ${observation.from} → ${observation.to}.`,
+            notificationKey: "tatkal_warning_10m",
+          },
+        };
+      } else if (parsed.action === "open_booking_flow") {
+        toolCall = { name: "openBookingFlow", arguments: {} };
+      } else if (parsed.action === "activate_backup") {
+        toolCall = { name: "activateBackupStrategy", arguments: {} };
+      }
+    }
+
     return {
       action: parsed.action as AllowedAgentAction,
       reason: parsed.reason || "Observation evaluated via Gemini.",
-      toolCall: parsed.toolCall,
+      toolCall,
       source: "gemini" as const,
     };
   } catch (err) {

@@ -121,7 +121,7 @@ async function callGeminiCoach(message: string, context: CoachRequest["journeyCo
   const geminiKey = process.env.GEMINI_API_KEY?.trim();
   if (!geminiKey) return null;
 
-  const model = process.env.GEMINI_MODEL || "gemini-2.0-flash";
+  const model = process.env.GEMINI_MODEL || "gemini-2.5-flash";
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${geminiKey}`;
 
   const prompt = `You are the AI Coach inside Tatkal Copilot, an Indian railway Tatkal ticket booking assistant. Speak warmly, clearly, and concisely (2-3 sentences).
