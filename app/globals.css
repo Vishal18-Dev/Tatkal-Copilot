@@ -1,55 +1,60 @@
 @import "tailwindcss";
 
 /* ============================================================
-   Tatkal Copilot — Design System
-   Language: Apple / Linear. Calm, intelligent, trustworthy.
+   Tatkal Copilot — Design System (V2)
+   Language: calm, warm, premium — Indian railway inspired.
+   The journey is the metaphor: deep signal-blue, terracotta
+   platform-lamp amber, station-signal green. Manrope carries
+   the voice; JetBrains Mono is reserved for railway data.
    Light-first, single confident accent, generous whitespace.
    ============================================================ */
 
 @theme {
-  /* Surfaces */
-  --color-canvas: #f7f7f5; /* app background, warm off-white */
+  /* Surfaces — soft, cool paper with pure-white cards */
+  --color-canvas: #f5f6fa; /* app background */
   --color-surface: #ffffff; /* cards */
-  --color-surface-muted: #f2f2ef;
+  --color-surface-muted: #eef0f6;
 
-  /* Ink */
-  --color-ink: #0a0a0b; /* primary text */
-  --color-ink-soft: #4b4b52; /* secondary text */
-  --color-ink-faint: #8a8a93; /* tertiary / captions */
+  /* Ink — cool near-black, a touch of navy (Figma on-surface) */
+  --color-ink: #191c20; /* primary text */
+  --color-ink-soft: #44474e; /* secondary text / on-surface-variant */
+  --color-ink-faint: #7b8493; /* tertiary / captions */
 
-  /* Lines */
-  --color-line: #e9e9e6;
-  --color-line-strong: #dcdcd7;
+  /* Lines (Figma outline-variant / surface-container-high) */
+  --color-line: #e7e8ee;
+  --color-line-strong: #cdd0d9;
 
-  /* Brand — deep indigo, confident but calm */
-  --color-brand: #4f46e5;
-  --color-brand-soft: #eef0fe;
-  --color-brand-ink: #3730a3;
+  /* Brand — deep railway signal-blue (Figma primary #002046) */
+  --color-brand: #1b365d; /* primary-container — buttons, accents */
+  --color-brand-strong: #12294a; /* pressed / hover */
+  --color-brand-soft: #e5ecf7;
+  --color-brand-ink: #002046; /* headline emphasis on light */
 
   /* Semantic */
-  --color-confirm: #0f9d6e; /* probability / success green */
-  --color-confirm-soft: #e6f6ef;
-  --color-caution: #d97706; /* backup / amber */
-  --color-caution-soft: #fdf3e6;
-  --color-danger: #dc2626; /* urgency / low time */
-  --color-danger-soft: #fdecec;
+  --color-confirm: #059669; /* station-signal green / success */
+  --color-confirm-soft: #e2f2ea;
+  --color-caution: #9e4300; /* Tatkal amber — platform-lamp terracotta */
+  --color-caution-soft: #fbe8da;
+  --color-danger: #c0392c; /* urgency / low time */
+  --color-danger-soft: #f9e2df;
 
   /* Typography */
-  --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
-  --font-mono: var(--font-geist-mono), ui-monospace, monospace;
+  --font-sans: var(--font-manrope), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-jetbrains-mono), ui-monospace, "SFMono-Regular",
+    monospace;
 
-  /* Radius */
+  /* Radius — modern, restrained (not everything a pill) */
   --radius-sm: 0.5rem;
-  --radius: 0.875rem;
-  --radius-lg: 1.25rem;
-  --radius-xl: 1.75rem;
+  --radius: 0.75rem;
+  --radius-lg: 1rem;
+  --radius-xl: 1.25rem;
 
-  /* Shadows — soft, elevated, Apple-like */
-  --shadow-card: 0 1px 2px rgba(10, 10, 11, 0.04),
-    0 8px 24px -12px rgba(10, 10, 11, 0.12);
-  --shadow-lift: 0 2px 4px rgba(10, 10, 11, 0.05),
-    0 20px 48px -18px rgba(10, 10, 11, 0.22);
-  --shadow-brand: 0 12px 32px -12px rgba(79, 70, 229, 0.5);
+  /* Shadows — soft, low, cool-neutral */
+  --shadow-card: 0 1px 2px rgba(20, 30, 50, 0.05),
+    0 10px 26px -14px rgba(20, 30, 50, 0.14);
+  --shadow-lift: 0 2px 6px rgba(20, 30, 50, 0.06),
+    0 22px 48px -20px rgba(20, 30, 50, 0.2);
+  --shadow-brand: 0 10px 26px -12px rgba(27, 58, 99, 0.42);
 
   /* Easing */
   --ease-out-soft: cubic-bezier(0.22, 1, 0.36, 1);
@@ -140,6 +145,33 @@ body {
   vertical-align: -0.12em;
   background: var(--color-brand);
   animation: caret-blink 1s step-end infinite;
+}
+
+/* Railway metaphor — a train easing gently along the track.
+   Subtle by design; communicates PLAN → SEARCHING → OPTIONS,
+   never decorates for its own sake. Neutralised under
+   prefers-reduced-motion by the block below. */
+@keyframes rail-glide {
+  0% {
+    transform: translateX(-8%);
+  }
+  100% {
+    transform: translateX(108%);
+  }
+}
+.rail-glide {
+  animation: rail-glide 9s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+}
+
+/* Evenly spaced sleepers/ties under a rail line. */
+.rail-sleepers {
+  background-image: repeating-linear-gradient(
+    to right,
+    var(--color-line-strong) 0,
+    var(--color-line-strong) 2px,
+    transparent 2px,
+    transparent 12px
+  );
 }
 
 /* Respect reduced motion */

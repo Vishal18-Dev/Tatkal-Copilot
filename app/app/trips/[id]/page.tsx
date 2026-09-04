@@ -568,12 +568,28 @@ function PlanMission({ plan }: { plan: Trip }) {
         <Chip tone="brand">{plan.travelClass}</Chip>
         <DemoBadge />
       </div>
-      <p className="mb-6 text-ink-soft">
+      <p className="mb-3 text-ink-soft">
         {plan.dateLabel}
         {plan.arrivalTargetLabel ? ` · ${t("mc.arrive")} ${plan.arrivalTargetLabel}` : ""} ·{" "}
         {plan.travellerIds.length} {plan.travellerIds.length > 1 ? t("common.travellers") : t("common.traveller")} ·{" "}
         {plan.mode === "auto" ? t("mc.agentPermissioned") : t("mc.agentAssisted")}
       </p>
+
+      {/* Route summary strip */}
+      <div className="mb-6 flex flex-wrap items-center gap-x-2 gap-y-1.5 rounded-[var(--radius)] border border-line bg-surface px-4 py-2.5 text-[0.83rem]">
+        <span className="font-semibold text-brand-ink">{plan.fromCode}</span>
+        <span className="text-ink-faint">→</span>
+        <span className="font-semibold text-brand-ink">{plan.toCode}</span>
+        <span className="text-line-strong">·</span>
+        <span className="text-ink-soft">{plan.dateLabel}</span>
+        <span className="text-line-strong">·</span>
+        <span className="text-ink-soft">
+          {plan.travellerIds.length} {plan.travellerIds.length > 1 ? t("common.travellers") : t("common.traveller")}
+        </span>
+        <span className="ml-auto tabular font-semibold text-brand-ink">
+          {formatFare(plan.fare * Math.max(1, plan.travellerIds.length))}
+        </span>
+      </div>
 
       {state === "confirmed" ? (
         <Confirmation plan={plan} travellers={bookedTravellers} />
@@ -725,7 +741,7 @@ function PlanMission({ plan }: { plan: Trip }) {
             <div className="flex flex-wrap gap-2">
               {/* Demo controls */}
               {!demoRunning && (
-                <Button size="lg" onClick={startDemo} className="flex-1 bg-gradient-to-r from-brand to-[#7c74f5] text-white shadow-[var(--shadow-brand)]">
+                <Button size="lg" onClick={startDemo} className="flex-1 bg-gradient-to-r from-brand to-brand-strong text-white shadow-[var(--shadow-brand)]">
                   <Play className="h-4 w-4" /> {t("mc.runDemo")}
                 </Button>
               )}
@@ -923,6 +939,11 @@ function CountdownCard({
   const { t } = useLang();
   const opening = ["scheduled", "ready", "draft", "waiting"].includes(state);
   const urgent = state === "t_minus_10";
+  const tone = beat.windowOpen ? "text-caution" : urgent ? "text-danger" : "text-brand-ink";
+  const label = beat.windowOpen ? t("mc.open") : opening ? tatkalLabel : beat.countdown;
+  // Only split into MM:SS hero digits when the label is a real running countdown.
+  const parts = !opening && !beat.windowOpen ? label.match(/^(\d{1,2}):(\d{2})$/) : null;
+
   return (
     <Card className={cn("relative overflow-hidden p-8 text-center", beat.windowOpen ? "border-caution/40" : urgent ? "border-danger/30" : "border-brand/20")}>
       <div className="pointer-events-none absolute inset-0 bg-grid opacity-40" />
@@ -930,10 +951,36 @@ function CountdownCard({
         <p className="text-sm font-medium uppercase tracking-wide text-ink-faint">
           {beat.windowOpen ? t("mc.windowIs") : opening ? t("mc.tatkalOpens") : t("mc.tatkalOpensIn")}
         </p>
-        <div className={cn("tabular mt-2 text-[3.4rem] font-semibold leading-none sm:text-[4.2rem]", beat.windowOpen ? "text-caution" : urgent ? "text-danger" : "text-ink")}>
-          {beat.windowOpen ? t("mc.open") : opening ? tatkalLabel : beat.countdown}
-        </div>
-        {opening && <p className="mt-2 text-sm text-ink-faint">{t("mc.tomorrowWatching")}</p>}
+
+        {parts ? (
+          <div className="mt-3 flex items-center justify-center gap-3">
+            <div>
+              <div className={cn("tabular font-mono text-[3.4rem] font-bold leading-none sm:text-[4.2rem]", tone)}>
+                {parts[1]}
+              </div>
+              <div className="mt-1 text-[0.68rem] font-semibold uppercase tracking-wide text-ink-faint">
+                {t("mc.minutes")}
+              </div>
+            </div>
+            <div className={cn("font-mono text-[2.6rem] font-bold leading-none sm:text-[3.4rem]", tone, "opacity-40")}>
+              :
+            </div>
+            <div>
+              <div className={cn("tabular font-mono text-[3.4rem] font-bold leading-none sm:text-[4.2rem]", tone)}>
+                {parts[2]}
+              </div>
+              <div className="mt-1 text-[0.68rem] font-semibold uppercase tracking-wide text-ink-faint">
+                {t("mc.seconds")}
+              </div>
+            </div>
+          </div>
+        ) : (
+          <div className={cn("tabular mt-2 text-[3.4rem] font-semibold leading-none sm:text-[4.2rem]", tone)}>
+            {label}
+          </div>
+        )}
+
+        {opening && <p className="mt-3 text-sm text-ink-faint">{t("mc.tomorrowWatching")}</p>}
       </div>
     </Card>
   );
@@ -1069,7 +1116,7 @@ function Confirmation({ plan, travellers }: { plan: Trip; travellers: import("@/
 
       <p className="mt-7 text-center text-xl font-semibold tracking-tight text-ink">
         You didn&apos;t book faster.{" "}
-        <span className="bg-gradient-to-r from-brand to-[#7c74f5] bg-clip-text text-transparent">You booked smarter.</span>
+        <span className="bg-gradient-to-r from-brand to-brand-strong bg-clip-text text-transparent">You booked smarter.</span>
       </p>
 
       <div className="mt-6 flex flex-col gap-2.5 sm:flex-row sm:justify-center">

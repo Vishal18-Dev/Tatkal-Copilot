@@ -34,10 +34,7 @@ export function GoalComposer() {
 
   return (
     <div className="w-full">
-      <label className="mb-2 block text-left text-sm font-semibold text-ink-soft">
-        {t("goal.prompt")}
-      </label>
-      <div className="rounded-[var(--radius-lg)] border border-line-strong bg-surface p-3 text-left shadow-[var(--shadow-card)] transition focus-within:border-brand focus-within:ring-4 focus-within:ring-brand/10">
+      <div className="rounded-[var(--radius-lg)] border border-line-strong bg-surface p-3.5 text-left shadow-[var(--shadow-card)] transition focus-within:border-brand focus-within:ring-4 focus-within:ring-brand/10">
         <textarea
           value={value}
           onChange={(e) => setValue(e.target.value)}
@@ -45,8 +42,9 @@ export function GoalComposer() {
             if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) submit();
           }}
           rows={2}
+          aria-label={t("goal.title")}
           placeholder={speech.listening ? t("goal.listening") : t("goal.placeholder")}
-          className="w-full resize-none bg-transparent px-3 py-2 text-lg leading-relaxed text-ink placeholder:text-ink-faint focus:outline-none"
+          className="w-full resize-none bg-transparent px-3 py-2 text-xl leading-relaxed text-ink placeholder:text-ink-faint focus:outline-none"
         />
         <div className="flex items-center justify-between gap-3 px-1 pt-1">
           {speech.supported ? (

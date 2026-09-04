@@ -1,18 +1,22 @@
 import type { Metadata, Viewport } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import { Manrope, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
 import { LanguageProvider } from "@/lib/i18n";
 import { StoreProvider } from "@/lib/store";
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
+// V2 design system — Manrope carries all product copy; JetBrains Mono is
+// reserved for railway data (PNR, train numbers, countdowns, coach/berth).
+const manrope = Manrope({
+  variable: "--font-manrope",
   subsets: ["latin"],
+  weight: ["400", "500", "600", "700"],
   display: "swap",
 });
 
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
+const jetbrainsMono = JetBrains_Mono({
+  variable: "--font-jetbrains-mono",
   subsets: ["latin"],
+  weight: ["400", "500", "600"],
   display: "swap",
 });
 
@@ -23,7 +27,7 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: "#f7f7f5",
+  themeColor: "#f5f6fa",
   width: "device-width",
   initialScale: 1,
   maximumScale: 1,
@@ -37,7 +41,7 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${geistSans.variable} ${geistMono.variable} antialiased`}
+      className={`${manrope.variable} ${jetbrainsMono.variable} antialiased`}
     >
       <body className="min-h-full">
         <LanguageProvider>

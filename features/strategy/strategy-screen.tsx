@@ -4,6 +4,7 @@ import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   ArrowRight,
+  ChevronDown,
   RotateCcw,
   Sparkles,
   ShieldCheck,
@@ -11,21 +12,27 @@ import {
   Clock,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { StepShell, Eyebrow } from "@/components/step-shell";
+import { StepShell } from "@/components/step-shell";
+import { OptionCard } from "./option-card";
 import { TrainRow } from "./train-row";
 import { useJourney } from "@/lib/journey";
 import { useLang } from "@/lib/i18n";
 import { explainDeviation } from "@/lib/planner";
+import { formatFare } from "@/lib/utils";
 
 export function StrategyScreen() {
   const { plan, chosenOption, chosenOptionId, chooseOption, goTo } = useJourney();
   const { t } = useLang();
   const [pendingId, setPendingId] = useState<string | null>(null);
+  const [showMore, setShowMore] = useState(false);
 
   if (!plan || !chosenOption) return null;
 
   const recommended = plan.options.find((o) => o.id === plan.recommendedId)!;
   const deviation = pendingId ? explainDeviation(plan, pendingId) : null;
+
+  const hero = plan.options.slice(0, 2);
+  const rest = plan.options.slice(2);
 
   function choose(id: string) {
     if (id === recommended.id || id === chosenOptionId) {
@@ -37,25 +44,40 @@ export function StrategyScreen() {
 
   return (
     <StepShell wide>
-      <Eyebrow>{t("results.eyebrow")}</Eyebrow>
-      <h2 className="text-headline">{t("results.title")}</h2>
-
-      {/* Route summary — familiar search context */}
-      <div className="mt-4 flex flex-wrap items-center gap-x-5 gap-y-2 rounded-2xl border border-line bg-surface px-4 py-3 text-sm">
-        <span className="font-semibold text-ink">
-          {plan.intent.from} → {plan.intent.to}
-        </span>
-        <span className="inline-flex items-center gap-1.5 text-ink-soft">
-          <Users className="h-4 w-4 text-ink-faint" />
+      {/* Route breadcrumb */}
+      <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5 text-[0.8rem]">
+        <span className="font-semibold text-brand-ink">{plan.intent.from}</span>
+        <ArrowRight className="h-3.5 w-3.5 text-ink-faint" />
+        <span className="font-semibold text-brand-ink">{plan.intent.to}</span>
+        <span className="text-line-strong">·</span>
+        <span className="text-ink-soft">{t("plan.form.dateVal")}</span>
+        <span className="text-line-strong">·</span>
+        <span className="rounded-[4px] bg-surface-muted px-2 py-0.5 font-medium text-ink">
           {plan.intent.passengers}{" "}
           {plan.intent.passengers > 1 ? t("results.travellers") : t("results.traveller")}
+          {plan.intent.preferredClass !== "any" ? ` · ${plan.intent.preferredClass}` : ""}
         </span>
-        {plan.intent.arrivalDeadline && (
-          <span className="inline-flex items-center gap-1.5 text-ink-soft">
-            <Clock className="h-4 w-4 text-ink-faint" />
-            {t("results.by")} {plan.intent.arrivalDeadline}
+      </div>
+
+      {/* Heading + Tatkal window reminder */}
+      <div className="mt-3 flex flex-col items-start justify-between gap-4 sm:flex-row sm:items-end">
+        <div>
+          <h1 className="text-headline text-brand-ink">{t("results.title")}</h1>
+          <p className="mt-1 max-w-lg text-[0.98rem] text-ink-soft">
+            {t("results.subtitlePrefix")} {plan.options.length} {t("results.subtitleSuffix")}
+          </p>
+        </div>
+        <div className="flex shrink-0 items-center gap-3 rounded-[var(--radius)] border border-line bg-surface px-4 py-3 shadow-[var(--shadow-card)]">
+          <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-brand-soft text-brand">
+            <Clock className="h-[18px] w-[18px]" />
           </span>
-        )}
+          <div>
+            <div className="text-[0.9rem] font-semibold text-brand-ink">
+              {recommended.tatkalOpensAt} {t("results.windowLabel")}
+            </div>
+            <div className="text-xs text-ink-soft">{t("results.windowNote")}</div>
+          </div>
+        </div>
       </div>
 
       {/* Agent intro — the copilot voice */}
@@ -63,24 +85,13 @@ export function StrategyScreen() {
         <span className="mt-0.5 grid h-7 w-7 shrink-0 place-items-center rounded-full bg-brand text-white">
           <Sparkles className="h-4 w-4" />
         </span>
-        <p className="text-[0.95rem] leading-relaxed text-ink">
-          {plan.narrative.whyRecommended}
-        </p>
+        <p className="text-[0.95rem] leading-relaxed text-ink">{plan.narrative.whyRecommended}</p>
       </div>
 
-      {/* Column header (desktop) */}
-      <div className="mt-6 hidden px-5 text-[0.7rem] font-semibold uppercase tracking-wide text-ink-faint sm:flex sm:items-center sm:gap-4">
-        <span className="flex-1">{t("results.colTrain")}</span>
-        <span className="w-52 text-center">{t("results.colTiming")}</span>
-        <span className="w-24 text-right">{t("results.colFare")}</span>
-        <span className="w-28 text-center">{t("results.colConfidence")}</span>
-        <span className="w-32" />
-      </div>
-
-      {/* Results list */}
-      <div className="mt-2 space-y-3">
-        {plan.options.map((o, i) => (
-          <TrainRow
+      {/* Hero cards — top options */}
+      <div className={`mt-6 grid gap-5 ${hero.length > 1 ? "sm:grid-cols-2" : ""}`}>
+        {hero.map((o, i) => (
+          <OptionCard
             key={o.id}
             option={o}
             chosen={chosenOptionId === o.id}
@@ -90,7 +101,44 @@ export function StrategyScreen() {
         ))}
       </div>
 
-      {/* Sticky-feel footer */}
+      {/* More trains, tucked away */}
+      {rest.length > 0 && (
+        <div className="mt-6">
+          <button
+            onClick={() => setShowMore((s) => !s)}
+            className="mx-auto flex items-center gap-2 rounded-full border border-line bg-surface px-5 py-2.5 text-[0.9rem] font-semibold text-brand-ink shadow-sm transition-colors hover:border-line-strong"
+          >
+            {showMore
+              ? t("results.hideOthers")
+              : `${t("results.showOthersPrefix")} ${rest.length} ${t("results.showOthersSuffix")}`}
+            <ChevronDown className={`h-4 w-4 transition-transform ${showMore ? "rotate-180" : ""}`} />
+          </button>
+          <AnimatePresence initial={false}>
+            {showMore && (
+              <motion.div
+                initial={{ height: 0, opacity: 0 }}
+                animate={{ height: "auto", opacity: 1 }}
+                exit={{ height: 0, opacity: 0 }}
+                className="overflow-hidden"
+              >
+                <div className="mt-4 space-y-3">
+                  {rest.map((o, i) => (
+                    <TrainRow
+                      key={o.id}
+                      option={o}
+                      chosen={chosenOptionId === o.id}
+                      onChoose={() => choose(o.id)}
+                      index={i}
+                    />
+                  ))}
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
+      )}
+
+      {/* Sticky-feel footer summary */}
       <div className="mt-8 flex flex-col gap-4 rounded-[var(--radius-lg)] border border-line bg-surface p-5 shadow-[var(--shadow-card)] sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-3">
           <span className="grid h-10 w-10 place-items-center rounded-full bg-brand-soft text-brand">
@@ -107,6 +155,10 @@ export function StrategyScreen() {
                   {t("results.notOurPick")}
                 </span>
               )}
+            </div>
+            <div className="tabular mt-0.5 text-[0.85rem] text-ink-soft">
+              {formatFare(chosenOption.fare * plan.intent.passengers)} · {plan.intent.passengers}{" "}
+              {plan.intent.passengers > 1 ? t("results.travellers") : t("results.traveller")}
             </div>
           </div>
         </div>

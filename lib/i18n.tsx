@@ -6,6 +6,7 @@ import {
   useState,
   useCallback,
   useMemo,
+  useEffect,
   type ReactNode,
 } from "react";
 
@@ -34,7 +35,15 @@ const en: Dict = {
 
   // Search results (the AI-annotated train list)
   "results.eyebrow": "Step 3 · Choose your train",
-  "results.title": "Here are your trains.",
+  "results.title": "Your best options",
+  "results.subtitlePrefix": "We checked trains on this route and found",
+  "results.subtitleSuffix": "worth considering.",
+  "results.windowLabel": "Tatkal window",
+  "results.windowNote": "We'll be ready together 5 mins before.",
+  "results.showOthersPrefix": "Show",
+  "results.showOthersSuffix": "other trains on this route",
+  "results.hideOthers": "Hide other trains",
+  "results.details": "Trade-offs & risks",
   "results.travellers": "travellers",
   "results.traveller": "traveller",
   "results.by": "by",
@@ -55,7 +64,7 @@ const en: Dict = {
   "results.goingWith": "Going with",
   "results.notOurPick": "Not our pick",
   "results.chooseRec": "Choose recommended",
-  "results.continue": "Continue",
+  "results.continue": "Continue to passenger details",
   "results.advisory": "AI advisory",
   "results.continueAnyway": "Continue anyway",
 
@@ -182,6 +191,10 @@ const en: Dict = {
   "set.phone": "Phone",
   "set.email": "Email",
   "set.emailPh": "Add email (optional)",
+  "set.emailStatus": "Email status",
+  "set.emailVerified": "Verified",
+  "set.emailConfigured": "Configured",
+  "set.emailNotSet": "Not set",
   "set.notSignedIn": "Not signed in",
   "set.travelPrefs": "Travel preferences",
   "set.homeStation": "Home station",
@@ -271,6 +284,8 @@ const en: Dict = {
   "mc.tatkalOpensIn": "Tatkal opens in",
   "mc.windowIs": "Tatkal window is",
   "mc.open": "OPEN",
+  "mc.minutes": "Minutes",
+  "mc.seconds": "Seconds",
   "mc.tomorrowWatching": "tomorrow · your agent is watching",
   "mc.coach": "AI Coach",
   "mc.readiness": "Readiness",
@@ -311,25 +326,57 @@ const en: Dict = {
   "mc.reset": "Reset",
 
   // Goal composer
-  "goal.prompt": "Where do you need to be?",
-  "goal.title": "Tell me your travel goal.",
-  "goal.subtitle": "Plain words. No forms. I'll work out the rest.",
-  "goal.placeholder": "I need to reach Delhi before 8 tomorrow morning.",
+  "goal.prompt": "Plan your journey",
+  "goal.title": "Plan your journey",
+  "goal.subtitle": "Tell us where you want to go. We'll look after your Tatkal booking.",
+  "goal.placeholder": "Mumbai to Delhi before 8 tomorrow morning",
   "goal.mic": "Speak",
   "goal.listening": "Listening…",
-  "goal.submit": "Plan my strategy",
+  "goal.submit": "Plan my journey",
   "goal.example1": "Reach Delhi before 8 tomorrow morning",
   "goal.example2": "AC ticket to Bangalore tonight",
   "goal.example3": "Cheapest confirmed ticket to Delhi",
   "goal.example4": "Lower berth for my parents to Delhi",
+  "plan.watchTitle": "We watch the clock",
+  "plan.watchBody": "No need to sit refreshing before 10 AM. We'll be ready the moment Tatkal opens.",
+  "plan.backupTitle": "A backup, ready",
+  "plan.backupBody": "If your first choice fills up, we'll already have a strong second option lined up.",
+  "plan.controlTitle": "You stay in control",
+  "plan.controlBody": "Everything is prepared for you — but nothing is ever booked without your go-ahead.",
+  "brand.tagline": "Railway booking, made peaceful",
+  "plan.form.origin": "Origin",
+  "plan.form.destination": "Destination",
+  "plan.form.swap": "Swap origin and destination",
+  "plan.form.originPh": "Departure station",
+  "plan.form.destPh": "Destination station",
+  "plan.form.date": "Date of travel",
+  "plan.form.dateVal": "Tomorrow",
+  "plan.form.passengers": "Passengers",
+  "plan.form.class": "Class",
+  "plan.form.classAny": "Any class",
+  "plan.form.pref": "Preference",
+  "plan.form.prefSeat": "Best chance of a seat",
+  "plan.form.prefSeatSub": "Recommended for Tatkal",
+  "plan.form.prefFast": "Fastest train",
+  "plan.form.prefFastSub": "Saves travel time",
+  "plan.form.prefFare": "Lowest fare",
+  "plan.form.prefFareSub": "Standard fares only",
+  "plan.form.trackClear": "Track clear · Western line",
+  "plan.form.notify": "We'll notify you 5 minutes before booking opens",
+  "plan.form.cta": "Find my best train",
+  "plan.form.nlToggle": "Prefer to describe it in your own words?",
+  "plan.form.nlHide": "Use the guided form instead",
+  "nav.options": "Options",
+  "nav.prepare": "Prepare",
+  "nav.book": "Book",
 
   // Thinking
-  "thinking.title": "Building your strategy",
-  "thinking.subtitle": "Reasoning over years of Tatkal booking patterns…",
+  "thinking.title": "Finding the best way to get you there.",
+  "thinking.subtitle": "One moment — we're comparing your options.",
   "thinking.step1": "Understanding your journey",
-  "thinking.step2": "Checking train options",
-  "thinking.step3": "Comparing simulated historical demand",
-  "thinking.step4": "Finding alternate boarding stations",
+  "thinking.step2": "Checking routes",
+  "thinking.step3": "Comparing trains",
+  "thinking.step4": "Preparing your options",
   "thinking.step5": "Preparing backup plans",
   "thinking.step6": "Choosing the safest strategy",
 
@@ -505,7 +552,15 @@ const hi: Dict = {
   "map.travel": "यात्रा",
 
   "results.eyebrow": "चरण 3 · अपनी ट्रेन चुनें",
-  "results.title": "ये रहीं आपकी ट्रेनें।",
+  "results.title": "आपके सबसे बेहतर विकल्प",
+  "results.subtitlePrefix": "हमने इस रूट की ट्रेनें जाँचीं और",
+  "results.subtitleSuffix": "बेहतरीन विकल्प मिले।",
+  "results.windowLabel": "तत्काल विंडो",
+  "results.windowNote": "हम इससे 5 मिनट पहले साथ तैयार रहेंगे।",
+  "results.showOthersPrefix": "इस रूट की",
+  "results.showOthersSuffix": "अन्य ट्रेनें दिखाएँ",
+  "results.hideOthers": "अन्य ट्रेनें छुपाएँ",
+  "results.details": "ट्रेड-ऑफ़ और जोखिम",
   "results.travellers": "यात्री",
   "results.traveller": "यात्री",
   "results.by": "तक",
@@ -526,7 +581,7 @@ const hi: Dict = {
   "results.goingWith": "आप चुन रहे हैं",
   "results.notOurPick": "हमारी पसंद नहीं",
   "results.chooseRec": "अनुशंसित चुनें",
-  "results.continue": "आगे बढ़ें",
+  "results.continue": "यात्री विवरण पर आगे बढ़ें",
   "results.advisory": "एआई सलाह",
   "results.continueAnyway": "फिर भी आगे बढ़ें",
 
@@ -646,6 +701,10 @@ const hi: Dict = {
   "set.phone": "फ़ोन",
   "set.email": "ईमेल",
   "set.emailPh": "ईमेल जोड़ें (वैकल्पिक)",
+  "set.emailStatus": "ईमेल स्थिति",
+  "set.emailVerified": "सत्यापित",
+  "set.emailConfigured": "कॉन्फ़िगर",
+  "set.emailNotSet": "सेट नहीं",
   "set.notSignedIn": "साइन इन नहीं",
   "set.travelPrefs": "यात्रा प्राथमिकताएँ",
   "set.homeStation": "घरेलू स्टेशन",
@@ -733,6 +792,8 @@ const hi: Dict = {
   "mc.tatkalOpensIn": "तत्काल खुलने में",
   "mc.windowIs": "तत्काल विंडो है",
   "mc.open": "खुली",
+  "mc.minutes": "मिनट",
+  "mc.seconds": "सेकंड",
   "mc.tomorrowWatching": "कल · आपका एजेंट नज़र रख रहा है",
   "mc.coach": "एआई कोच",
   "mc.readiness": "तैयारी",
@@ -772,24 +833,56 @@ const hi: Dict = {
   "mc.resumeDemo": "डेमो जारी रखें",
   "mc.reset": "रिसेट",
 
-  "goal.prompt": "आपको कहाँ पहुँचना है?",
-  "goal.title": "अपनी यात्रा का लक्ष्य बताएँ।",
-  "goal.subtitle": "सरल शब्दों में। कोई फ़ॉर्म नहीं। बाकी मैं समझ लूँगा।",
-  "goal.placeholder": "मुझे कल सुबह 8 बजे से पहले दिल्ली पहुँचना है।",
+  "goal.prompt": "अपनी यात्रा बनाएँ",
+  "goal.title": "अपनी यात्रा बनाएँ",
+  "goal.subtitle": "बस बताएँ आपको कहाँ जाना है। आपकी तत्काल बुकिंग हम सँभाल लेंगे।",
+  "goal.placeholder": "मुंबई से दिल्ली, कल सुबह 8 बजे से पहले",
   "goal.mic": "बोलें",
   "goal.listening": "सुन रहा हूँ…",
-  "goal.submit": "मेरी रणनीति बनाएँ",
+  "goal.submit": "मेरी यात्रा बनाएँ",
   "goal.example1": "कल सुबह 8 बजे से पहले दिल्ली पहुँचें",
   "goal.example2": "आज रात बैंगलोर के लिए एसी टिकट",
   "goal.example3": "दिल्ली के लिए सबसे सस्ता कन्फर्म टिकट",
   "goal.example4": "माता-पिता के लिए दिल्ली की लोअर बर्थ",
+  "plan.watchTitle": "हम घड़ी पर नज़र रखते हैं",
+  "plan.watchBody": "10 बजे से पहले बार-बार रिफ़्रेश करने की ज़रूरत नहीं। तत्काल खुलते ही हम तैयार रहेंगे।",
+  "plan.backupTitle": "बैकअप तैयार",
+  "plan.backupBody": "अगर आपकी पहली पसंद भर जाए, तो एक मज़बूत दूसरा विकल्प पहले से तैयार रहेगा।",
+  "plan.controlTitle": "नियंत्रण आपके पास",
+  "plan.controlBody": "सब कुछ आपके लिए तैयार है — पर आपकी अनुमति के बिना कभी कुछ बुक नहीं होता।",
+  "brand.tagline": "रेल बुकिंग, अब शांति से",
+  "plan.form.origin": "प्रस्थान",
+  "plan.form.destination": "गंतव्य",
+  "plan.form.swap": "स्टेशन आपस में बदलें",
+  "plan.form.originPh": "प्रस्थान स्टेशन",
+  "plan.form.destPh": "गंतव्य स्टेशन",
+  "plan.form.date": "यात्रा की तारीख",
+  "plan.form.dateVal": "कल",
+  "plan.form.passengers": "यात्री",
+  "plan.form.class": "श्रेणी",
+  "plan.form.classAny": "कोई भी श्रेणी",
+  "plan.form.pref": "प्राथमिकता",
+  "plan.form.prefSeat": "सीट मिलने की सबसे अच्छी संभावना",
+  "plan.form.prefSeatSub": "तत्काल के लिए अनुशंसित",
+  "plan.form.prefFast": "सबसे तेज़ ट्रेन",
+  "plan.form.prefFastSub": "यात्रा का समय बचाएँ",
+  "plan.form.prefFare": "सबसे कम किराया",
+  "plan.form.prefFareSub": "केवल सामान्य किराया",
+  "plan.form.trackClear": "रास्ता साफ़ · पश्चिम रेलवे",
+  "plan.form.notify": "बुकिंग खुलने से 5 मिनट पहले हम आपको सूचित करेंगे",
+  "plan.form.cta": "मेरी सबसे अच्छी ट्रेन ढूँढें",
+  "plan.form.nlToggle": "अपने शब्दों में बताना चाहेंगे?",
+  "plan.form.nlHide": "गाइडेड फ़ॉर्म का उपयोग करें",
+  "nav.options": "विकल्प",
+  "nav.prepare": "तैयारी",
+  "nav.book": "बुकिंग",
 
-  "thinking.title": "आपकी रणनीति बन रही है",
-  "thinking.subtitle": "वर्षों के तत्काल बुकिंग पैटर्न पर विचार किया जा रहा है…",
+  "thinking.title": "आपको वहाँ पहुँचाने का सबसे अच्छा रास्ता ढूँढ रहे हैं।",
+  "thinking.subtitle": "बस एक पल — हम आपके विकल्पों की तुलना कर रहे हैं।",
   "thinking.step1": "आपकी यात्रा को समझा जा रहा है",
-  "thinking.step2": "ट्रेन विकल्प जाँचे जा रहे हैं",
-  "thinking.step3": "अनुमानित ऐतिहासिक माँग की तुलना",
-  "thinking.step4": "वैकल्पिक बोर्डिंग स्टेशन ढूँढे जा रहे हैं",
+  "thinking.step2": "रास्ते जाँचे जा रहे हैं",
+  "thinking.step3": "ट्रेनों की तुलना की जा रही है",
+  "thinking.step4": "आपके विकल्प तैयार किए जा रहे हैं",
   "thinking.step5": "बैकअप योजनाएँ तैयार की जा रही हैं",
   "thinking.step6": "सबसे सुरक्षित रणनीति चुनी जा रही है",
 
@@ -948,10 +1041,43 @@ interface Ctx {
 
 const LanguageContext = createContext<Ctx | null>(null);
 
-export function LanguageProvider({ children }: { children: ReactNode }) {
-  const [lang, setLang] = useState<Lang>("en");
+const LANG_KEY = "tatkal.lang.v1";
 
-  const toggle = useCallback(() => setLang((l) => (l === "en" ? "hi" : "en")), []);
+export function LanguageProvider({ children }: { children: ReactNode }) {
+  const [lang, setLangState] = useState<Lang>("en");
+
+  // Restore the saved language on mount (client-only, avoids SSR mismatch).
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem(LANG_KEY);
+      if (saved === "hi" || saved === "en") setLangState(saved);
+    } catch {
+      /* ignore */
+    }
+  }, []);
+
+  const persist = (l: Lang) => {
+    try {
+      localStorage.setItem(LANG_KEY, l);
+    } catch {
+      /* ignore */
+    }
+  };
+
+  const setLang = useCallback((l: Lang) => {
+    setLangState(l);
+    persist(l);
+  }, []);
+
+  const toggle = useCallback(
+    () =>
+      setLangState((prev) => {
+        const next = prev === "en" ? "hi" : "en";
+        persist(next);
+        return next;
+      }),
+    []
+  );
 
   const t = useCallback(
     (key: string) => {

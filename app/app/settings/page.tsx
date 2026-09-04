@@ -41,9 +41,9 @@ export default function SettingsPage() {
               <span className="text-sm text-ink-soft">+91 {user?.phone}</span>
             </Row>
             <TextRow label={t("set.email")} value={user?.email ?? ""} placeholder={t("set.emailPh")} onSave={(email) => updateProfile({ email })} />
-            <Row label="Email Status">
+            <Row label={t("set.emailStatus")}>
               <span className="inline-flex items-center gap-1.5 text-xs font-semibold px-2 py-0.5 rounded-full bg-brand-soft text-brand">
-                {user?.email ? (user.emailVerified ? "Email Verified" : "Email Configured") : "Not Set"}
+                {user?.email ? (user.emailVerified ? t("set.emailVerified") : t("set.emailConfigured")) : t("set.emailNotSet")}
               </span>
             </Row>
           </>
