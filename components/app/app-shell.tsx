@@ -17,7 +17,9 @@ import {
 } from "lucide-react";
 import { Logo } from "@/components/brand/logo";
 import { LanguageToggle } from "@/components/brand/language-toggle";
+import { ThemeToggle } from "@/components/brand/theme-toggle";
 import { AuthModal } from "@/components/auth/auth-modal";
+import { VoiceButton } from "@/components/voice/VoiceButton";
 import { useStore } from "@/lib/store";
 import { useLang } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
@@ -85,6 +87,8 @@ export function AppShell({ children }: { children: ReactNode }) {
               {t("nav.help")}
             </Link>
             <LanguageToggle />
+            <ThemeToggle />
+            <VoiceButton />
             <NotificationsButton count={unreadCount} notifications={notifications} />
             <ProfilePill
               isAuthed={isAuthed}

@@ -31,6 +31,8 @@ import {
   AlertTriangle,
   Cpu,
   UserX,
+  Wallet,
+  Landmark,
 } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -38,6 +40,7 @@ import { Chip, DemoBadge } from "@/components/app/ui";
 import { useStore } from "@/lib/store";
 import { useLang } from "@/lib/i18n";
 import { providers, type OrchestratorStep } from "@/lib/providers";
+import { paymentProvider } from "@/lib/payments";
 import {
   statusMeta,
   coachFor,
@@ -98,7 +101,7 @@ export default function PlanMissionPage({
 }
 
 function PlanMission({ plan }: { plan: Trip }) {
-  const { updateTrip, logActivity, pushNotification, travellers } = useStore();
+  const { updateTrip, logActivity, pushNotification, travellers, wallet, debitWallet } = useStore();
   const { t } = useLang();
   const state = plan.agentState;
   const meta = statusMeta(state);
@@ -109,6 +112,10 @@ function PlanMission({ plan }: { plan: Trip }) {
 
   const [busy, setBusy] = useState(false);
   const [log, setLog] = useState<OrchestratorStep[]>([]);
+  // Payment-rail stall → Rail Wallet recovery (§ wallet-recovery moment).
+  const [paymentStall, setPaymentStall] = useState<
+    { amount: number; covers: boolean; recovering: boolean } | null
+  >(null);
 
   // ═══════════════════════════════════════════
   //  AI Coach Chat
@@ -180,29 +187,83 @@ function PlanMission({ plan }: { plan: Trip }) {
   const [decisionTrace, setDecisionTrace] = useState<DecisionTraceRecord[]>([]);
   const [demoBeatIndex, setDemoBeatIndex] = useState(0);
 
+  // Helper: complete a held booking via the Rail Wallet after the bank rail stalls.
+  const completeWithWallet = useCallback(
+    async (amount: number) => {
+      setPaymentStall((s) => (s ? { ...s, recovering: true } : s));
+      setBusy(true);
+
+      const debit = await debitWallet(amount);
+      if (!debit.ok) {
+        // Wallet couldn't cover it — leave the recovery card up, stop the spinner.
+        setPaymentStall((s) => (s ? { ...s, recovering: false } : s));
+        setBusy(false);
+        return;
+      }
+
+      logActivity(
+        [{ kind: "payment_event", text: "Bank gateway stalled — Rail Wallet authorised payment" }],
+        plan.id
+      );
+      await revealSteps([{ kind: "payment_event", text: t("pay.walletAuthorised") }]);
+
+      // bookPrimary is used purely as the confirmation-record factory; the visible
+      // payment narrative reflects the Rail Wallet recovery, not the bank rail.
+      const { record } = await providers.orchestrator.bookPrimary(plan.primary, bookedTravellers);
+      const walletRecord: Trip["booking"] = { ...record, paidVia: "wallet", amount };
+
+      await revealSteps([{ kind: "confirmed", text: `Confirmed on ${plan.primary.trainName}` }]);
+      setPaymentStall(null);
+      finishConfirmed(walletRecord, []);
+    },
+    [plan, bookedTravellers, debitWallet, logActivity, t]
+  );
+
   // Helper: execute primary booking when agent tool calls openBookingFlow()
   const executePrimaryBooking = useCallback(async () => {
     setBusy(true);
     setLog([]);
+    setPaymentStall(null);
     logActivity([{ kind: "attempt_started", text: "Primary strategy attempt initiated by agent" }], plan.id);
 
     const { available, steps } = await providers.orchestrator.attemptPrimary(plan.primary);
     await revealSteps(steps);
     logActivity(steps.map((s) => ({ kind: s.kind, text: s.text })), plan.id);
 
-    if (available) {
-      const { record, steps: bs } = await providers.orchestrator.bookPrimary(
-        plan.primary,
-        bookedTravellers
-      );
-      await revealSteps(bs);
-      finishConfirmed(record, bs);
-    } else {
+    if (!available) {
       logActivity([{ kind: "primary_unavailable", text: `Primary strategy failed · ${plan.primary.trainName}` }], plan.id);
       updateTrip(plan.id, { agentState: "primary_failed" });
+      setBusy(false);
+      return;
     }
+
+    // Seats available → hold the berth, then attempt the primary bank payment rail.
+    const amount = plan.primary.fare * Math.max(1, bookedTravellers.length);
+    await revealSteps([{ kind: "payment_event", text: t("pay.contactingBank") }]);
+    const railOutcome = await paymentProvider.attempt(amount);
+
+    if (railOutcome === "success") {
+      const { record, steps: bs } = await providers.orchestrator.bookPrimary(plan.primary, bookedTravellers);
+      await revealSteps(bs);
+      finishConfirmed({ ...record, paidVia: "bank", amount }, bs);
+      return;
+    }
+
+    // Bank rail stalled/failed → surface the Rail Wallet as the recovery rail.
+    logActivity(
+      [{ kind: "payment_event", text: "Primary bank payment stalled — Rail Wallet offered" }],
+      plan.id
+    );
+    const covers = wallet.balance >= amount;
+    setPaymentStall({ amount, covers, recovering: false });
     setBusy(false);
-  }, [plan, updateTrip, logActivity, bookedTravellers]);
+
+    // Permissioned (auto) mode: the agent completes the recovery on your behalf.
+    if (plan.mode === "auto" && covers) {
+      await new Promise((r) => setTimeout(r, 1500));
+      await completeWithWallet(amount);
+    }
+  }, [plan, updateTrip, logActivity, bookedTravellers, wallet.balance, t, completeWithWallet]);
 
   // Helper: execute backup booking when agent tool calls activateBackupStrategy()
   const executeBackupBooking = useCallback(async () => {
@@ -639,6 +700,15 @@ function PlanMission({ plan }: { plan: Trip }) {
               </Card>
             ) : null}
 
+            {paymentStall && (
+              <WalletRecoveryCard
+                stall={paymentStall}
+                walletBalance={wallet.balance}
+                mode={plan.mode}
+                onRecover={() => completeWithWallet(paymentStall.amount)}
+              />
+            )}
+
             {canUseBackup && !busy && (
               <Card className="border-caution/40 bg-caution-soft/40 p-5 shadow-sm">
                 <div className="flex items-center justify-between gap-3">
@@ -1071,8 +1141,92 @@ function Recap({ icon, label, value }: { icon: React.ReactNode; label: string; v
   );
 }
 
+function WalletRecoveryCard({
+  stall,
+  walletBalance,
+  mode,
+  onRecover,
+}: {
+  stall: { amount: number; covers: boolean; recovering: boolean };
+  walletBalance: number;
+  mode: Trip["mode"];
+  onRecover: () => void;
+}) {
+  const { t } = useLang();
+  const auto = mode === "auto";
+  return (
+    <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}>
+      <Card className="border-brand/40 bg-brand-soft/40 p-5 shadow-sm">
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2 font-semibold text-brand-ink">
+            <Landmark className="h-5 w-5" />
+            <h4 className="text-sm font-semibold uppercase tracking-wide">{t("pay.railStalled")}</h4>
+          </div>
+          <DemoBadge />
+        </div>
+
+        <p className="mt-2 text-[0.95rem] font-medium text-ink">{t("pay.railStalledBody")}</p>
+
+        <div className="mt-4 flex items-center justify-between rounded-xl border border-line bg-surface px-4 py-3">
+          <div className="flex items-center gap-2.5">
+            <span className="grid h-9 w-9 place-items-center rounded-full bg-brand text-white">
+              <Wallet className="h-4.5 w-4.5" />
+            </span>
+            <div>
+              <div className="text-sm font-semibold text-ink">{t("pay.walletTitle")}</div>
+              <div className="text-xs text-ink-faint">
+                {formatFare(walletBalance)} {t("pay.available")}
+              </div>
+            </div>
+          </div>
+          <div className="text-right">
+            <div className="text-[0.7rem] font-medium uppercase tracking-wide text-ink-faint">
+              {t("pay.estFare")}
+            </div>
+            <div className="tabular text-[0.95rem] font-semibold text-brand-ink">
+              {formatFare(stall.amount)}
+            </div>
+          </div>
+        </div>
+
+        {stall.covers ? (
+          auto ? (
+            <div className="mt-4 flex items-center gap-2.5 rounded-xl bg-brand/10 px-4 py-3 text-sm font-medium text-brand-ink">
+              <Loader2 className="h-4 w-4 animate-spin" />
+              {t("pay.autoRecovering")}
+            </div>
+          ) : (
+            <Button
+              size="lg"
+              className="mt-4 w-full bg-gradient-to-r from-brand to-brand-strong text-white shadow-[var(--shadow-brand)] hover:opacity-95"
+              onClick={onRecover}
+              disabled={stall.recovering}
+            >
+              {stall.recovering ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin" /> {t("pay.recovering")}
+                </>
+              ) : (
+                <>
+                  <Wallet className="h-5 w-5" /> {t("pay.payWithWallet")} · {formatFare(stall.amount)}
+                </>
+              )}
+            </Button>
+          )
+        ) : (
+          <div className="mt-4 flex items-start gap-2 rounded-xl border border-caution/30 bg-caution-soft/50 p-3 text-xs font-medium text-caution">
+            <AlertTriangle className="h-4 w-4 shrink-0" />
+            <span>{t("pay.cannotCover")}</span>
+          </div>
+        )}
+      </Card>
+    </motion.div>
+  );
+}
+
 function Confirmation({ plan, travellers }: { plan: Trip; travellers: import("@/types").Traveller[] }) {
   const record = plan.booking!;
+  const { t } = useLang();
   return (
     <div className="mx-auto max-w-xl">
       <div className="text-center">
@@ -1081,10 +1235,17 @@ function Confirmation({ plan, travellers }: { plan: Trip; travellers: import("@/
         </motion.div>
         <div className="mt-4 flex items-center justify-center gap-2">
           <Chip tone="confirm">Confirmed</Chip>
+          {record.paidVia === "wallet" && (
+            <Chip tone="brand">
+              <Wallet className="h-3.5 w-3.5" /> {t("pay.paidViaWallet")}
+            </Chip>
+          )}
           <DemoBadge />
         </div>
         <h2 className="mt-3 text-headline">{record.recovered ? "Your backup secured the seat." : "You're booked."}</h2>
-        <p className="mt-2 text-lg text-ink-soft">This is what being prepared looks like.</p>
+        <p className="mt-2 text-lg text-ink-soft">
+          {record.paidVia === "wallet" ? t("pay.walletCovered") : "This is what being prepared looks like."}
+        </p>
       </div>
 
       <Card className="mt-7 overflow-hidden p-0">

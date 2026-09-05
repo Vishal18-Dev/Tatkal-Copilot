@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import {
   ShieldCheck,
   Check,
@@ -16,16 +16,30 @@ import {
   Bookmark,
   Mail,
   AlertTriangle,
+  Wallet,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { StepShell } from "@/components/step-shell";
 import { DemoBadge } from "@/components/app/ui";
 import { AuthModal } from "@/components/auth/auth-modal";
+import { IdentityModal } from "@/components/readiness/identity-modal";
+import { WalletCard } from "@/components/readiness/wallet-card";
 import { useJourney } from "@/lib/journey";
 import { useStore } from "@/lib/store";
+import { useLang } from "@/lib/i18n";
 import { cn, formatFare } from "@/lib/utils";
 import type { StrategySnapshot, StrategyOption } from "@/types";
+
+interface ChecklistItem {
+  id: string;
+  label: string;
+  ready: boolean;
+  detail: string;
+  icon: React.ReactNode;
+  action?: boolean;
+  onAction?: () => void;
+}
 
 function snapshot(o: StrategyOption): StrategySnapshot {
   return {
@@ -44,13 +58,15 @@ function snapshot(o: StrategyOption): StrategySnapshot {
 export function AuthorizeScreen() {
   const { plan, chosenOption, recoveryOption, selectedPassengers, mode, setMode } =
     useJourney();
-  const { user, isAuthed, updateProfile, saveJourney, addTrip, logActivity, pushNotification } = useStore();
+  const { user, isAuthed, identity, wallet, updateProfile, saveJourney, addTrip, logActivity, pushNotification } = useStore();
+  const { t } = useLang();
   const [saveJ, setSaveJ] = useState(true);
   const [prefInApp, setPrefInApp] = useState(true);
   const [prefEmail, setPrefEmail] = useState(true);
   const [prefWhatsapp, setPrefWhatsapp] = useState(false);
   const [userEmail, setUserEmail] = useState(user?.email || "");
   const [authOpen, setAuthOpen] = useState(false);
+  const [identityOpen, setIdentityOpen] = useState(false);
   const router = useRouter();
 
   if (!plan || !chosenOption) return null;
@@ -61,10 +77,23 @@ export function AuthorizeScreen() {
   // this wizard.
   const travellerNames = selectedPassengers.map((p) => p.name.split(" ")[0]);
   const notifyReady = prefEmail ? !!userEmail.trim() : prefInApp || prefWhatsapp;
-  const checklist = [
+  const identityReady = identity.status === "verified";
+  const paymentReady = wallet.balance >= total;
+  const checklist: ChecklistItem[] = [
+    {
+      id: "identity",
+      label: t("readiness.identity"),
+      ready: identityReady,
+      detail: identityReady
+        ? identity.maskedRef ?? t("id.readyLabel")
+        : t("id.notStarted"),
+      icon: <ShieldCheck className="h-4 w-4" />,
+      action: !identityReady,
+      onAction: () => setIdentityOpen(true),
+    },
     {
       id: "travellers",
-      label: "Travellers ready",
+      label: t("readiness.travellers"),
       ready: selectedPassengers.length > 0,
       detail:
         selectedPassengers.length > 0
@@ -73,29 +102,38 @@ export function AuthorizeScreen() {
       icon: <Users className="h-4 w-4" />,
     },
     {
+      id: "payment",
+      label: t("readiness.payment"),
+      ready: paymentReady,
+      detail: paymentReady
+        ? `${t("pay.walletTitle")} · ${formatFare(wallet.balance)}`
+        : t("pay.notEnough"),
+      icon: <Wallet className="h-4 w-4" />,
+    },
+    {
       id: "primary",
-      label: "Primary train selected",
+      label: t("readiness.primary"),
       ready: true,
       detail: `${chosenOption.title} · ${chosenOption.travelClass}`,
       icon: <TrainFront className="h-4 w-4" />,
     },
     {
       id: "backup",
-      label: "Backup strategy",
+      label: t("readiness.backup"),
       ready: !!recoveryOption,
       detail: recoveryOption ? recoveryOption.title : "No backup selected — optional, but recommended",
       icon: <Split className="h-4 w-4" />,
     },
     {
       id: "boarding",
-      label: "Boarding station confirmed",
+      label: t("readiness.boarding"),
       ready: true,
       detail: chosenOption.boardingStationName,
       icon: <MapPin className="h-4 w-4" />,
     },
     {
       id: "notify",
-      label: "How we'll reach you",
+      label: t("readiness.notify"),
       ready: notifyReady,
       detail: notifyReady
         ? prefEmail && userEmail
@@ -186,7 +224,7 @@ export function AuthorizeScreen() {
   return (
     <StepShell wide>
       {/* Hero readiness banner */}
-      <div className="flex flex-col gap-4 rounded-[var(--radius-lg)] border border-line bg-brand-ink px-6 py-6 text-white sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex flex-col gap-4 rounded-[var(--radius-lg)] border border-line bg-brand px-6 py-6 text-white sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-headline text-white">Prepare for tomorrow</h1>
           <p className="mt-1.5 max-w-md text-[0.95rem] text-white/75">
@@ -241,14 +279,24 @@ export function AuthorizeScreen() {
                     )}
                   </div>
                   <p className="mt-0.5 truncate text-[0.83rem] text-ink-soft">{c.detail}</p>
+                  {c.action && c.onAction && (
+                    <button
+                      onClick={c.onAction}
+                      className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-caution px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:brightness-95"
+                    >
+                      <ShieldCheck className="h-3.5 w-3.5" />
+                      {t("id.complete")}
+                    </button>
+                  )}
                 </div>
               </motion.li>
             ))}
           </ul>
         </Card>
 
-        {/* Delegation choice + guarantee */}
+        {/* Wallet + delegation choice + guarantee */}
         <div className="flex flex-col gap-4 lg:col-span-5">
+          <WalletCard estimatedFare={total} />
           <Card className="p-6">
             <h3 className="text-sm font-semibold uppercase tracking-wide text-brand">
               Your booking strategy
@@ -399,6 +447,10 @@ export function AuthorizeScreen() {
         title="Save this journey"
         reason="Sign in so Copilot can remember your plan and keep watching the clock until Tatkal opens."
       />
+
+      <AnimatePresence>
+        {identityOpen && <IdentityModal key="identity-modal" onClose={() => setIdentityOpen(false)} />}
+      </AnimatePresence>
     </StepShell>
   );
 }

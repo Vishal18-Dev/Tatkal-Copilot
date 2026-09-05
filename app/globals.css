@@ -30,6 +30,11 @@
   --color-brand-soft: #e5ecf7;
   --color-brand-ink: #002046; /* headline emphasis on light */
 
+  /* Modal/sheet backdrop — always a darkening scrim, independent of --color-ink
+     (which flips to near-white in dark mode and would otherwise wash the
+     backdrop out instead of dimming it). */
+  --color-scrim: rgba(10, 14, 21, 0.45);
+
   /* Semantic */
   --color-confirm: #059669; /* station-signal green / success */
   --color-confirm-soft: #e2f2ea;
@@ -61,7 +66,76 @@
 }
 
 :root {
-  color-scheme: light;
+  color-scheme: light dark;
+}
+
+/* ============================================================
+   Dark theme — same navy/terracotta identity, re-tuned for a
+   dark ground: brand blue and the semantic accents are brightened
+   so they still read on near-black; nothing is a naive invert.
+   Two triggers, so both directions of an explicit choice win over
+   the OS: the media query (OS says dark, no explicit override),
+   and the [data-theme="dark"] attribute (explicit toggle wins
+   over OS light).
+   ============================================================ */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --color-canvas: #0a0e15;
+    --color-surface: #12161f;
+    --color-surface-muted: #1a1f2b;
+
+    --color-ink: #eef1f6;
+    --color-ink-soft: #a9b1c2;
+    --color-ink-faint: #6b7383;
+
+    --color-line: #232a37;
+    --color-line-strong: #333c4d;
+
+    --color-brand: #4d7cc7;
+    --color-brand-strong: #6b93d3;
+    --color-brand-soft: #1a2c47;
+    --color-brand-ink: #a9c6f2;
+
+    --color-confirm: #3ecf8e;
+    --color-confirm-soft: #123527;
+    --color-caution: #e08a4f;
+    --color-caution-soft: #3a2416;
+    --color-danger: #e2685a;
+    --color-danger-soft: #3a1e1a;
+
+    --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.3), 0 10px 26px -14px rgba(0, 0, 0, 0.5);
+    --shadow-lift: 0 2px 6px rgba(0, 0, 0, 0.35), 0 22px 48px -20px rgba(0, 0, 0, 0.6);
+    --shadow-brand: 0 10px 26px -12px rgba(77, 124, 199, 0.45);
+  }
+}
+
+:root[data-theme="dark"] {
+  --color-canvas: #0a0e15;
+  --color-surface: #12161f;
+  --color-surface-muted: #1a1f2b;
+
+  --color-ink: #eef1f6;
+  --color-ink-soft: #a9b1c2;
+  --color-ink-faint: #6b7383;
+
+  --color-line: #232a37;
+  --color-line-strong: #333c4d;
+
+  --color-brand: #4d7cc7;
+  --color-brand-strong: #6b93d3;
+  --color-brand-soft: #1a2c47;
+  --color-brand-ink: #a9c6f2;
+
+  --color-confirm: #3ecf8e;
+  --color-confirm-soft: #123527;
+  --color-caution: #e08a4f;
+  --color-caution-soft: #3a2416;
+  --color-danger: #e2685a;
+  --color-danger-soft: #3a1e1a;
+
+  --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.3), 0 10px 26px -14px rgba(0, 0, 0, 0.5);
+  --shadow-lift: 0 2px 6px rgba(0, 0, 0, 0.35), 0 22px 48px -20px rgba(0, 0, 0, 0.6);
+  --shadow-brand: 0 10px 26px -12px rgba(77, 124, 199, 0.45);
 }
 
 * {

@@ -186,7 +186,7 @@ export function StrategyScreen() {
             exit={{ opacity: 0 }}
           >
             <div
-              className="absolute inset-0 bg-ink/40 backdrop-blur-sm"
+              className="absolute inset-0 bg-scrim backdrop-blur-sm"
               onClick={() => setPendingId(null)}
             />
             <motion.div

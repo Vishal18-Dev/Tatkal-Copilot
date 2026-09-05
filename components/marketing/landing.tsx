@@ -22,6 +22,7 @@ import {
 } from "lucide-react";
 import { Logo } from "@/components/brand/logo";
 import { LanguageToggle } from "@/components/brand/language-toggle";
+import { ThemeToggle } from "@/components/brand/theme-toggle";
 import { AuthModal } from "@/components/auth/auth-modal";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -73,6 +74,7 @@ export function Landing() {
           </nav>
           <div className="flex items-center gap-2">
             <LanguageToggle />
+            <ThemeToggle />
             <Button
               size="sm"
               variant={isAuthed ? "secondary" : "primary"}

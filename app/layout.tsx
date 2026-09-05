@@ -3,6 +3,7 @@ import { Manrope, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
 import { LanguageProvider } from "@/lib/i18n";
 import { StoreProvider } from "@/lib/store";
+import { ThemeProvider, ThemeScript } from "@/lib/theme";
 
 // V2 design system — Manrope carries all product copy; JetBrains Mono is
 // reserved for railway data (PNR, train numbers, countdowns, coach/berth).
@@ -27,7 +28,10 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: "#f5f6fa",
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: "#f5f6fa" },
+    { media: "(prefers-color-scheme: dark)", color: "#0a0e15" },
+  ],
   width: "device-width",
   initialScale: 1,
   maximumScale: 1,
@@ -42,11 +46,17 @@ export default function RootLayout({
     <html
       lang="en"
       className={`${manrope.variable} ${jetbrainsMono.variable} antialiased`}
+      suppressHydrationWarning
     >
+      <head>
+        <ThemeScript />
+      </head>
       <body className="min-h-full">
-        <LanguageProvider>
-          <StoreProvider>{children}</StoreProvider>
-        </LanguageProvider>
+        <ThemeProvider>
+          <LanguageProvider>
+            <StoreProvider>{children}</StoreProvider>
+          </LanguageProvider>
+        </ThemeProvider>
       </body>
     </html>
   );

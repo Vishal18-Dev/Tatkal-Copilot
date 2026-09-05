@@ -274,6 +274,11 @@ export interface BookingRecord {
   waitlistNumber?: number;
   /** Whether the booking landed via the backup strategy. */
   recovered: boolean;
+  /**
+   * Which rail actually completed the payment. "wallet" means the primary bank
+   * gateway stalled and the Rail Wallet covered the booking (the recovery rail).
+   */
+  paidVia?: "bank" | "wallet";
   primaryTrainName: string;
   finalTrainName: string;
   reason?: string;
