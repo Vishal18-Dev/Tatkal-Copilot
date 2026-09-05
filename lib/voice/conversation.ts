@@ -36,7 +36,7 @@ const nextId = () => `turn_${Date.now()}_${turnSeq++}`;
  * this file for "onConfirm" — that is the ONLY way state leaves this module,
  * and it is a plain callback, not a call into the booking agent or store.
  */
-export function useVoiceConversation({ lang, onConfirm }: VoiceConversationOptions) {
+export function useVoiceConversation({ voiceLang, onConfirm, onDetectLang }: VoiceConversationOptions) {
   const [state, setState] = useState<VoiceState>("idle");
   const [errorKind, setErrorKind] = useState<VoiceErrorKind | null>(null);
   const [turns, setTurns] = useState<VoiceTurn[]>([]);
@@ -187,7 +187,7 @@ export function useVoiceConversation({ lang, onConfirm }: VoiceConversationOptio
     try {
       const form = new FormData();
       form.append("audio", blob, "clip.webm");
-      form.append("lang", lang);
+      form.append("voiceLang", voiceLang);
       const res = await fetch("/api/voice/transcribe", {
         method: "POST",
         body: form,
@@ -200,7 +200,7 @@ export function useVoiceConversation({ lang, onConfirm }: VoiceConversationOptio
         fail(body.errorKind ?? "stt_error");
         return;
       }
-      const data = (await res.json()) as { transcript: string };
+      const data = (await res.json()) as { transcript: string; languageCode?: string | null };
       const text = data.transcript?.trim();
 
       if (!text) {
@@ -208,6 +208,8 @@ export function useVoiceConversation({ lang, onConfirm }: VoiceConversationOptio
         return;
       }
 
+      // Follow the speaker's detected language (unless they've locked one).
+      if (data.languageCode) onDetectLang?.(data.languageCode);
       pushTurn("user", text);
 
       if (!resultRef.current) {
@@ -222,7 +224,7 @@ export function useVoiceConversation({ lang, onConfirm }: VoiceConversationOptio
       clearTimeout(timer);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [lang, pushTurn]);
+  }, [voiceLang, pushTurn, onDetectLang]);
 
   const requestPlan = useCallback(
     async (goal: string, myGen: number) => {
@@ -235,7 +237,7 @@ export function useVoiceConversation({ lang, onConfirm }: VoiceConversationOptio
         const res = await fetch("/api/voice/respond", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ transcript: goal, lang }),
+          body: JSON.stringify({ transcript: goal, voiceLang }),
           signal: controller.signal,
         });
         if (myGen !== requestGenRef.current) return;
@@ -262,7 +264,7 @@ export function useVoiceConversation({ lang, onConfirm }: VoiceConversationOptio
       }
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [lang, pushTurn]
+    [voiceLang, pushTurn]
   );
 
   /** TTS is best-effort: a playback failure still leaves the text result on screen. */
@@ -295,41 +297,54 @@ export function useVoiceConversation({ lang, onConfirm }: VoiceConversationOptio
     if (resultRef.current) setState("result");
   }, []);
 
-  /** Voice one grounded line the client already composed (not a re-plan). */
-  const speakText = useCallback(async (text: string, myGen: number) => {
-    setState("speaking");
-    try {
-      const res = await fetch("/api/voice/speak", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text, lang }),
-      });
-      const data = (await res.json().catch(() => ({}))) as { audioBase64?: string; audioCodec?: string };
-      if (myGen !== requestGenRef.current) return;
-      if (data.audioBase64) {
-        const audio = new Audio(`data:audio/${data.audioCodec ?? "mp3"};base64,${data.audioBase64}`);
-        audioElRef.current = audio;
-        await new Promise<void>((resolve) => {
-          audio.onended = () => resolve();
-          audio.onerror = () => resolve();
-          audio.play().catch(() => resolve());
+  /**
+   * Voice one grounded line the client composed (in English) — the speak route
+   * renders it into the active language, and we show THAT translated text in
+   * the transcript so the words on screen match the words spoken. Best-effort:
+   * translation/TTS failure falls back to the English text, caption-only.
+   */
+  const respondLine = useCallback(
+    async (english: string, myGen: number) => {
+      setState("speaking");
+      try {
+        const res = await fetch("/api/voice/speak", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ text: english, voiceLang }),
         });
+        const data = (await res.json().catch(() => ({}))) as {
+          text?: string;
+          audioBase64?: string;
+          audioCodec?: string;
+        };
+        if (myGen !== requestGenRef.current) return;
+        pushTurn("agent", data.text ?? english);
+        if (data.audioBase64) {
+          const audio = new Audio(`data:audio/${data.audioCodec ?? "mp3"};base64,${data.audioBase64}`);
+          audioElRef.current = audio;
+          await new Promise<void>((resolve) => {
+            audio.onended = () => resolve();
+            audio.onerror = () => resolve();
+            audio.play().catch(() => resolve());
+          });
+        }
+      } finally {
+        if (myGen === requestGenRef.current) setState("result");
       }
-    } finally {
-      if (myGen === requestGenRef.current) setState("result");
-    }
-  }, [lang]);
+    },
+    [voiceLang, pushTurn]
+  );
 
   /** Answer a spoken question from grounded plan data, staying on the pick. */
   const answerQuestion = useCallback(
     async (question: string, myGen: number) => {
       const r = resultRef.current;
       if (!r) return;
-      const answer = composeAnswer(r.plan, r.recommended, question, lang);
-      pushTurn("agent", answer);
-      await speakText(answer, myGen);
+      // Compose in English; respondLine translates for display + TTS.
+      const answer = composeAnswer(r.plan, r.recommended, question, "en");
+      await respondLine(answer, myGen);
     },
-    [lang, pushTurn, speakText]
+    [respondLine]
   );
 
   /** Apply an adjustment by recomposing the goal and re-running the planner. */
@@ -341,7 +356,7 @@ export function useVoiceConversation({ lang, onConfirm }: VoiceConversationOptio
       await requestPlan(goal, myGen); // re-plans + speaks the new recommendation
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [lang]
+    [voiceLang]
   );
 
   const handleFollowUp = useCallback(

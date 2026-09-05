@@ -1,5 +1,6 @@
 import type { Plan, StrategyOption } from "@/types";
 import type { Lang } from "@/lib/i18n";
+import type { VoiceLang } from "./languages";
 
 /**
  * The visible states the voice UI walks through. Named to match the app's
@@ -57,6 +58,8 @@ export interface VoiceRespondResult {
   /** base64-encoded audio (whatever codec was requested) — absent if TTS failed or was skipped. */
   audioBase64?: string;
   audioCodec?: string;
+  /** The language the responseText + audio are rendered in. */
+  voiceLang?: VoiceLang;
 }
 
 /** What /api/voice/transcribe hands back to the client. */
@@ -79,10 +82,13 @@ export interface VoiceCommand {
 }
 
 export interface VoiceConversationOptions {
-  lang: Lang;
+  /** The active spoken language (one of the 10). Sent to STT/respond/speak. */
+  voiceLang: VoiceLang;
   /** Called once the user confirms the recommended option — routes into the
    *  existing /app/plan wizard. Never books anything itself. */
   onConfirm: (goal: string, plan: Plan) => void;
+  /** Fired with Sarvam's detected BCP-47 code so the UI can follow the speaker. */
+  onDetectLang?: (bcp47: string) => void;
 }
 
 /** Sarvam BCP-47 language codes we actually use (subset of the full list). */

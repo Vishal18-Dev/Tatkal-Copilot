@@ -4,6 +4,7 @@ import "./globals.css";
 import { LanguageProvider } from "@/lib/i18n";
 import { StoreProvider } from "@/lib/store";
 import { ThemeProvider, ThemeScript } from "@/lib/theme";
+import { VoiceLangProvider } from "@/lib/voice/voice-lang";
 
 // V2 design system — Manrope carries all product copy; JetBrains Mono is
 // reserved for railway data (PNR, train numbers, countdowns, coach/berth).
@@ -54,7 +55,9 @@ export default function RootLayout({
       <body className="min-h-full">
         <ThemeProvider>
           <LanguageProvider>
-            <StoreProvider>{children}</StoreProvider>
+            <VoiceLangProvider>
+              <StoreProvider>{children}</StoreProvider>
+            </VoiceLangProvider>
           </LanguageProvider>
         </ThemeProvider>
       </body>

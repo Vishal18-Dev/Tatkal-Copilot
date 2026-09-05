@@ -100,6 +100,38 @@ export async function transcribeAudio(
   };
 }
 
+const DEFAULT_TRANSLATE_MODEL = process.env.SARVAM_TRANSLATE_MODEL || "sarvam-translate:v1";
+
+export interface TranslateTextOptions {
+  targetLanguageCode: string; // e.g. "ta-IN"
+  sourceLanguageCode?: string; // default "auto" — let Sarvam detect
+  model?: string;
+  signal?: AbortSignal;
+}
+
+/**
+ * Translate a short piece of text into the target language. Used to render the
+ * Copilot's (English-composed, grounded) response into the user's active
+ * language for both the transcript and TTS — so all 10 languages are genuinely
+ * supported without a planner per language. Best-effort: callers fall back to
+ * the original English text if this throws.
+ */
+export async function translateText(text: string, opts: TranslateTextOptions): Promise<string> {
+  const res = await getClient().text.translate(
+    {
+      input: text.slice(0, 1900),
+      source_language_code: (opts.sourceLanguageCode ?? "auto") as never,
+      target_language_code: opts.targetLanguageCode as never,
+      model: (opts.model ?? DEFAULT_TRANSLATE_MODEL) as never,
+    },
+    {
+      timeoutInSeconds: Math.ceil(VOICE_REQUEST_TIMEOUT_MS / 1000),
+      abortSignal: opts.signal,
+    }
+  );
+  return res.translated_text ?? text;
+}
+
 export interface SynthesizeOptions {
   languageCode: string; // e.g. "en-IN"
   speaker?: string;

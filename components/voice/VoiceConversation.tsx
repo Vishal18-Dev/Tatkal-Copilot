@@ -20,8 +20,10 @@ import {
 import { useVoiceConversation } from "@/lib/voice/conversation";
 import { adjustmentLabel, suggestedQuestions } from "@/lib/voice/adjustments";
 import { useLang } from "@/lib/i18n";
+import { useVoiceLang } from "@/lib/voice/voice-lang";
 import { cn, formatFare } from "@/lib/utils";
 import { VoiceWaveform } from "./VoiceWaveform";
+import { VoiceLangSelect } from "./VoiceLangSelect";
 
 const FALLBACK_ERRORS = new Set(["mic_permission_denied", "mic_unsupported"]);
 
@@ -34,12 +36,14 @@ const FALLBACK_ERRORS = new Set(["mic_permission_denied", "mic_unsupported"]);
  */
 export function VoiceConversation({ onClose }: { onClose: () => void }) {
   const { t, lang } = useLang();
+  const { voiceLang, observeDetected } = useVoiceLang();
   const router = useRouter();
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
 
   const convo = useVoiceConversation({
-    lang,
+    voiceLang,
+    onDetectLang: observeDetected,
     onConfirm: (goal) => {
       router.push(`/app/plan?goal=${encodeURIComponent(goal)}`);
       onClose();
@@ -133,13 +137,16 @@ export function VoiceConversation({ onClose }: { onClose: () => void }) {
             <div className="text-[0.7rem] text-ink-faint">{t("voice.subtitle")}</div>
           </div>
         </div>
-        <button
-          onClick={handleClose}
-          aria-label={t("voice.close")}
-          className="grid h-9 w-9 place-items-center rounded-full text-ink-faint transition-colors hover:bg-surface-muted hover:text-ink"
-        >
-          <X className="h-5 w-5" />
-        </button>
+        <div className="flex items-center gap-2">
+          <VoiceLangSelect />
+          <button
+            onClick={handleClose}
+            aria-label={t("voice.close")}
+            className="grid h-9 w-9 place-items-center rounded-full text-ink-faint transition-colors hover:bg-surface-muted hover:text-ink"
+          >
+            <X className="h-5 w-5" />
+          </button>
+        </div>
       </div>
 
       {/* Body */}
