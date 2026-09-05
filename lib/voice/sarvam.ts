@@ -104,7 +104,12 @@ const DEFAULT_TRANSLATE_MODEL = process.env.SARVAM_TRANSLATE_MODEL || "sarvam-tr
 
 export interface TranslateTextOptions {
   targetLanguageCode: string; // e.g. "ta-IN"
-  sourceLanguageCode?: string; // default "auto" — let Sarvam detect
+  /**
+   * Source language. Defaults to "en-IN" because the Copilot always composes
+   * its responses in English before translating. (Sarvam rejects "auto" for
+   * this endpoint despite the SDK enum listing it.)
+   */
+  sourceLanguageCode?: string;
   model?: string;
   signal?: AbortSignal;
 }
@@ -120,7 +125,7 @@ export async function translateText(text: string, opts: TranslateTextOptions): P
   const res = await getClient().text.translate(
     {
       input: text.slice(0, 1900),
-      source_language_code: (opts.sourceLanguageCode ?? "auto") as never,
+      source_language_code: (opts.sourceLanguageCode ?? "en-IN") as never,
       target_language_code: opts.targetLanguageCode as never,
       model: (opts.model ?? DEFAULT_TRANSLATE_MODEL) as never,
     },

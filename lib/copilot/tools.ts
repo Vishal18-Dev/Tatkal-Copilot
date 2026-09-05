@@ -76,7 +76,8 @@ export function getBackupOption(ctx: CopilotContext): ToolResult {
     };
   }
   const b = trip.backup;
-  const via = b.via ? ` via ${b.via}` : "";
+  // Don't say "via X" when the train name already spells the route out.
+  const via = b.via && !b.trainName.toLowerCase().includes(b.via.toLowerCase()) ? ` via ${b.via}` : "";
   return {
     ok: true,
     speak: `Your backup is ${b.trainName}${via}, held ready in case the primary doesn't confirm. Confidence ${b.level}.`,

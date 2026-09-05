@@ -135,6 +135,20 @@ describe("Question router maps spoken questions to tools (language-independent)"
   it("returns null for an unrelated utterance (stays on the pick, no guessing)", () => {
     expect(answerWithTools("banana bread recipe", ctx)).toBeNull();
   });
+
+  // Guards the Mission Control CopilotVoiceDock prompts — none may be a dead end.
+  it.each([
+    ["What's happening with my journey?", "get_journey_context"],
+    ["Is my train confirmed?", "get_booking_status"],
+    ["Show me my backup", "get_backup_option"],
+    ["Is my payment ready?", "get_wallet_balance"],
+    ["Am I ready?", "get_readiness"],
+  ])("dock prompt %s routes to %s and answers", (question, tool) => {
+    const a = answerWithTools(question, ctx);
+    expect(a?.tool).toBe(tool);
+    expect(a?.result.ok).toBe(true);
+    expect(a?.result.speak.length).toBeGreaterThan(0);
+  });
 });
 
 describe("Action tools never bypass the action-validator", () => {

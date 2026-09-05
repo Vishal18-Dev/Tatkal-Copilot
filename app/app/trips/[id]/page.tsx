@@ -41,6 +41,8 @@ import { useStore } from "@/lib/store";
 import { useLang } from "@/lib/i18n";
 import { providers, type OrchestratorStep } from "@/lib/providers";
 import { paymentProvider } from "@/lib/payments";
+import { CopilotVoiceDock, type CopilotPrompt } from "@/components/copilot/CopilotVoiceDock";
+import type { CopilotContext } from "@/lib/copilot";
 import {
   statusMeta,
   coachFor,
@@ -101,14 +103,27 @@ export default function PlanMissionPage({
 }
 
 function PlanMission({ plan }: { plan: Trip }) {
-  const { updateTrip, logActivity, pushNotification, travellers, wallet, debitWallet } = useStore();
-  const { t } = useLang();
+  const { updateTrip, logActivity, pushNotification, travellers, wallet, debitWallet, identity } = useStore();
+  const { t, lang } = useLang();
   const state = plan.agentState;
   const meta = statusMeta(state);
   const beat = beatFor(state);
   const detailedReadiness = calculateReadiness(plan);
   const [expandedCheckId, setExpandedCheckId] = useState<string | null>(null);
   const bookedTravellers = travellers.filter((t) => plan.travellerIds.includes(t.id));
+
+  // Contextual Copilot voice — the shared tool layer pointed at THIS trip.
+  const getCopilotContext = useCallback(
+    (): CopilotContext => ({ lang, trip: plan, travellers: bookedTravellers, wallet, identity }),
+    [lang, plan, bookedTravellers, wallet, identity]
+  );
+  const copilotPrompts: CopilotPrompt[] = [
+    { key: "status", label: t("copilot.p.status"), question: "What's happening with my journey?" },
+    { key: "confirmed", label: t("copilot.p.confirmed"), question: "Is my train confirmed?" },
+    { key: "backup", label: t("copilot.p.backup"), question: "Show me my backup" },
+    { key: "payment", label: t("copilot.p.payment"), question: "Is my payment ready?" },
+    { key: "ready", label: t("copilot.p.ready"), question: "Am I ready?" },
+  ];
 
   const [busy, setBusy] = useState(false);
   const [log, setLog] = useState<OrchestratorStep[]>([]);
@@ -882,8 +897,11 @@ function PlanMission({ plan }: { plan: Trip }) {
             )}
           </div>
 
-          {/* RIGHT: readiness + plan + notifications */}
+          {/* RIGHT: contextual voice + readiness + plan + notifications */}
           <div className="space-y-4">
+            {/* Contextual Copilot voice — ask about THIS journey, in any of 10 languages */}
+            <CopilotVoiceDock getContext={getCopilotContext} prompts={copilotPrompts} />
+
             {/* Readiness Card with deterministic Readiness Engine & Why? expand */}
             <Card className="p-5">
               <div className="mb-2 flex items-center justify-between">
