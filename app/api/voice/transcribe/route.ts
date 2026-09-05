@@ -52,7 +52,7 @@ export async function POST(req: Request) {
     });
 
     console.info(
-      `[api/voice/transcribe] ok lang=${lang ?? "auto"} ms=${Date.now() - startedAt} len=${result.transcript.length}`
+      `[api/voice/transcribe] ok detected=${result.language_code ?? "?"} ms=${Date.now() - startedAt} len=${result.transcript.length} audio=${audio.size}B/${audio.type} heard="${result.transcript.slice(0, 200)}"`
     );
 
     return NextResponse.json({

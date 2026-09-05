@@ -69,16 +69,19 @@ export async function transcribeAudio(
     abortSignal: opts.signal,
   };
 
-  // Sarvam validates the content-type with an EXACT string match against its
-  // allow-list, which contains "audio/webm" but not "audio/webm;codecs=opus".
-  // MediaRecorder always appends the codec parameter, so strip it — otherwise
-  // every real clip is rejected with a 400 "Invalid file type".
+  // Sarvam validates the file's content-type with an EXACT string match against
+  // its allow-list, which contains "audio/webm" but not "audio/webm;codecs=opus".
+  // MediaRecorder always tags the Blob with the codec parameter, and the SDK
+  // uses the Blob's OWN .type (not the contentType field) when building the
+  // upload — so we must RE-WRAP the Blob with the stripped base type, or every
+  // real clip is rejected with a 400 "Invalid file type".
   const contentType = (audio.type || "audio/webm").split(";")[0].trim();
+  const file = audio.type === contentType ? audio : new Blob([audio], { type: contentType });
 
   if (mode === "translate") {
     const res = await getClient().speechToText.translate(
       {
-        file: { data: audio, filename, contentType },
+        file: { data: file, filename, contentType },
         model: model as never,
       },
       requestOptions
@@ -92,7 +95,7 @@ export async function transcribeAudio(
 
   const res = await getClient().speechToText.transcribe(
     {
-      file: { data: audio, filename, contentType },
+      file: { data: file, filename, contentType },
       model: model as never,
       mode: mode as never,
       language_code: (opts.languageCode ?? "unknown") as never,
