@@ -24,6 +24,7 @@ import { useVoiceLang } from "@/lib/voice/voice-lang";
 import { cn, formatFare } from "@/lib/utils";
 import { VoiceWaveform } from "./VoiceWaveform";
 import { VoiceLangSelect } from "./VoiceLangSelect";
+import type { Plan } from "@/types";
 
 const FALLBACK_ERRORS = new Set(["mic_permission_denied", "mic_unsupported"]);
 
@@ -34,7 +35,18 @@ const FALLBACK_ERRORS = new Set(["mic_permission_denied", "mic_unsupported"]);
  * Deliberately theme-aware (it's an app surface, not a phone call) and free
  * of the mockup's fake telemetry (no "IRCTC NLP Engine", no live atomic clock).
  */
-export function VoiceConversation({ onClose }: { onClose: () => void }) {
+export function VoiceConversation({
+  onClose,
+  onConfirmGoal,
+}: {
+  onClose: () => void;
+  /**
+   * When provided (e.g. mounted inside the /app/plan wizard), the confirmed
+   * goal is handed back in-place instead of navigating — so speaking a journey
+   * flows straight into the current wizard. Defaults to routing to /app/plan.
+   */
+  onConfirmGoal?: (goal: string, plan: Plan) => void;
+}) {
   const { t, lang } = useLang();
   const { voiceLang, observeDetected } = useVoiceLang();
   const router = useRouter();
@@ -44,8 +56,9 @@ export function VoiceConversation({ onClose }: { onClose: () => void }) {
   const convo = useVoiceConversation({
     voiceLang,
     onDetectLang: observeDetected,
-    onConfirm: (goal) => {
-      router.push(`/app/plan?goal=${encodeURIComponent(goal)}`);
+    onConfirm: (goal, plan) => {
+      if (onConfirmGoal) onConfirmGoal(goal, plan);
+      else router.push(`/app/plan?goal=${encodeURIComponent(goal)}`);
       onClose();
     },
   });
