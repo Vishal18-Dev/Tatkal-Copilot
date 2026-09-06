@@ -12,6 +12,7 @@ import {
   Info,
   LogOut,
   Play,
+  Accessibility,
 } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -19,6 +20,7 @@ import { PageHeader, DemoBadge } from "@/components/app/ui";
 import { AuthModal } from "@/components/auth/auth-modal";
 import { useStore } from "@/lib/store";
 import { useLang } from "@/lib/i18n";
+import { useInteractionMode, type InteractionMode } from "@/lib/interaction-mode";
 import { stations } from "@/lib/data";
 import { cn } from "@/lib/utils";
 import type { ConfirmationPriority, TravelClass } from "@/types";
@@ -26,6 +28,7 @@ import type { ConfirmationPriority, TravelClass } from "@/types";
 export default function SettingsPage() {
   const { isAuthed, user, preferences, updatePreferences, updateProfile, logout, seedDemoPlan } = useStore();
   const { t } = useLang();
+  const { mode: interactionMode, setMode: setInteractionMode } = useInteractionMode();
   const [authOpen, setAuthOpen] = useState(false);
   const router = useRouter();
 
@@ -52,6 +55,20 @@ export default function SettingsPage() {
             <Button size="sm" onClick={() => setAuthOpen(true)}>{t("shell.signin")}</Button>
           </Row>
         )}
+      </Section>
+
+      <Section icon={<Accessibility className="h-4 w-4" />} title={t("a11y.settingsTitle")}>
+        <Row label={t("a11y.chooserTitle")} hint={t("a11y.settingsSub")}>
+          <Segmented<InteractionMode>
+            options={[
+              { v: "visual", l: t("a11y.visual") },
+              { v: "voice", l: t("a11y.voice") },
+              { v: "accessible", l: t("a11y.accessible") },
+            ]}
+            value={interactionMode}
+            onChange={(v) => setInteractionMode(v)}
+          />
+        </Row>
       </Section>
 
       <Section icon={<Route className="h-4 w-4" />} title={t("set.travelPrefs")}>
