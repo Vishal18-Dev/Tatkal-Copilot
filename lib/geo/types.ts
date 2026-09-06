@@ -32,6 +32,13 @@ export interface CandidateStation {
   note?: string;
 }
 
+export interface JourneyProvenance {
+  discoverySource: "railradar" | "catalogue" | "demo";
+  stationSource: "google" | "railradar" | "catalogue" | "demo" | "gps" | "user";
+  enrichmentSource: "railradar" | "catalogue" | "demo";
+  mode: "LIVE" | "DEMO";
+}
+
 export interface RankedJourneyOption {
   optionId: string;
   train: Train;
@@ -51,6 +58,7 @@ export interface RankedJourneyOption {
   reason: string;
   isPrimary: boolean;
   isBackup: boolean;
+  provenance?: JourneyProvenance;
 }
 
 export interface JourneyResolutionResult {
@@ -63,6 +71,8 @@ export interface JourneyResolutionResult {
   backup: RankedJourneyOption | null;
   explanation: string;
   clarificationNeeded?: string;
+  hasNoValidJourney?: boolean;
+  conflictExplanation?: string;
 }
 
 export interface ExtractedTravelQuery {

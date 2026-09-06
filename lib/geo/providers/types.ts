@@ -1,4 +1,4 @@
-import type { ResolvedLocation, GeoCoordinates, CandidateStation } from "../types";
+import type { ResolvedLocation, GeoCoordinates, CandidateStation, JourneyProvenance } from "../types";
 import type { Train } from "@/types";
 
 export interface StationGeoRecord {
@@ -41,6 +41,7 @@ export interface JourneyCandidate {
   totalEstimatedDurationMins: number;
   score: JourneyScore;
   rankingReasons: string[];
+  provenance?: JourneyProvenance;
 }
 
 export interface DiscoveredTrain {

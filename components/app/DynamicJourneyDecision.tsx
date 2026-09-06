@@ -233,11 +233,19 @@ export function DynamicJourneyDecision({
 
       {/* Rationale & Explanation Banner */}
       {resolution?.explanation && (
-        <div className="flex items-start gap-3 rounded-xl bg-brand-soft/60 p-4 border border-brand/20">
-          <Sparkles className="h-5 w-5 text-brand shrink-0 mt-0.5" />
+        <div
+          className={`flex items-start gap-3 rounded-xl p-4 border ${
+            resolution.hasNoValidJourney
+              ? "bg-red-500/10 border-red-500/30 text-red-700"
+              : "bg-brand-soft/60 border-brand/20 text-ink"
+          }`}
+        >
+          <Sparkles className={`h-5 w-5 shrink-0 mt-0.5 ${resolution.hasNoValidJourney ? "text-red-500" : "text-brand"}`} />
           <div>
-            <div className="text-xs font-bold uppercase tracking-wider text-brand">Copilot Journey Recommendation Rationale</div>
-            <p className="mt-0.5 text-sm text-ink font-medium leading-relaxed">{resolution.explanation}</p>
+            <div className={`text-xs font-bold uppercase tracking-wider ${resolution.hasNoValidJourney ? "text-red-600" : "text-brand"}`}>
+              {resolution.hasNoValidJourney ? "Constraint Conflict — No Valid Journey" : "Copilot Journey Recommendation Rationale"}
+            </div>
+            <p className="mt-0.5 text-sm font-medium leading-relaxed">{resolution.explanation}</p>
           </div>
         </div>
       )}

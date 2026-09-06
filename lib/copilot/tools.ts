@@ -313,6 +313,10 @@ export function resolveJourney(
     boardingStationPreference: journeyState?.boardingStationPreference,
     excludeStationCode: journeyState?.excludeStationCode,
     preferredClass: journeyState?.travelClass,
+    allowClassDowngrade: journeyState?.allowClassDowngrade,
+    maxStationDistanceKm: journeyState?.maxStationDistanceKm,
+    timeConstraint: journeyState?.timeConstraint,
+    directOnly: journeyState?.directOnly,
     priority: journeyState?.priority,
   });
   return {
@@ -372,6 +376,10 @@ export async function resolveJourneyAsync(
     boardingStationPreference: journeyState?.boardingStationPreference,
     excludeStationCode: journeyState?.excludeStationCode,
     preferredClass: journeyState?.travelClass,
+    allowClassDowngrade: journeyState?.allowClassDowngrade,
+    maxStationDistanceKm: journeyState?.maxStationDistanceKm,
+    timeConstraint: journeyState?.timeConstraint,
+    directOnly: journeyState?.directOnly,
     priority: journeyState?.priority,
   });
 

@@ -68,6 +68,12 @@ export interface ConversationalJourneyState {
   passengerCount?: number;
   /** Preferred travel class (e.g. "3A", "SL"). */
   travelClass?: string;
+  /** Whether class downgrade is explicitly permitted ("any class fine"). */
+  allowClassDowngrade?: boolean;
+  /** Max acceptable distance to station in km ("within 15 km"). */
+  maxStationDistanceKm?: number;
+  /** Whether direct train only is required ("no transfers"). */
+  directOnly?: boolean;
   /** Pending clarification field requested by Copilot ("origin" | "destination"). */
   pendingClarification?: "origin" | "destination";
   /**
@@ -75,7 +81,7 @@ export interface ConversationalJourneyState {
    *
    * Changes whenever origin, destination, travelDate, timeConstraint,
    * passengerCount, travelClass, boardingStationPreference, excludeStationCode,
-   * or priority change.
+   * priority, allowClassDowngrade, maxStationDistanceKm, or directOnly change.
    *
    * RULE: A primary/backup recommendation is valid ONLY for the
    * resolutionId under which it was produced.  A caller must re-resolve
@@ -100,6 +106,9 @@ export interface ExtractedJourneyConstraints {
   timeConstraint?: JourneyTimeConstraint;
   passengerCount?: number;
   travelClass?: string;
+  allowClassDowngrade?: boolean;
+  maxStationDistanceKm?: number;
+  directOnly?: boolean;
   /** True when the utterance opens with a correction phrase. */
   isCorrection: boolean;
   /** Which semantic fields were explicitly addressed. */
@@ -143,6 +152,9 @@ export function computeResolutionId(
     (state.boardingStationPreference ?? "").toLowerCase().trim(),
     (state.excludeStationCode ?? state.excludeStationText ?? "").toLowerCase().trim(),
     (state.priority ?? "").toLowerCase().trim(),
+    String(state.allowClassDowngrade ?? false),
+    String(state.maxStationDistanceKm ?? ""),
+    String(state.directOnly ?? false),
   ];
   return parts.join("|");
 }
@@ -226,6 +238,12 @@ const EXCLUDE_STATION_RE =
 const PRIORITY_FASTEST_RE = /\b(fastest|quickest|fastest option|quickest option|speed|faster)\b/i;
 const PRIORITY_CHEAPEST_RE = /\b(cheaper|cheapest|cheaper option|cheapest option|budget|lowest fare|less fare)\b/i;
 const PRIORITY_SAFEST_RE = /\b(safest|safest option|highest confirmation|best chance|highest probability)\b/i;
+
+const ALLOW_CLASS_DOWNGRADE_RE = /\b(any class|all classes|any class is fine|open to any class|sl is fine|sleeper is fine|any class fine|any class okay)\b/i;
+const MAX_DISTANCE_RE = /\b(?:within|max|maximum|under|less than|no more than)\s+(\d+)\s*km\b/i;
+const DIRECT_ONLY_RE = /\b(direct train|direct only|no connection|no transfers|no connecting train|without connection)\b/i;
+const PREFER_STATION_RE =
+  /\b(?:prefer|preferring|rather|use)\s+(?:to\s+use\s+|to\s+board\s+from\s+|from\s+)?([a-zA-Z][a-zA-Z\s]+?)\s*(?:station|jn|junction)?(?:\s+|$|\.|,)/i;
 
 /* ------------------------------------------------------------------ */
 /* Time parsing                                                        */
@@ -317,6 +335,9 @@ export function extractJourneyConstraints(
   let timeConstraint: JourneyTimeConstraint | undefined;
   let passengerCount: number | undefined;
   let travelClass: string | undefined;
+  let allowClassDowngrade: boolean | undefined;
+  let maxStationDistanceKm: number | undefined;
+  let directOnly: boolean | undefined;
 
   // ── Pending clarification contextual resolution ───────────────────
   // When Copilot explicitly asked "Where are you starting from?" or "Where would you like to travel?",
@@ -368,8 +389,24 @@ export function extractJourneyConstraints(
     correctedFields.push("priority");
   }
 
+  if (ALLOW_CLASS_DOWNGRADE_RE.test(text)) {
+    allowClassDowngrade = true;
+    correctedFields.push("allowClassDowngrade");
+  }
+
+  const distM = text.match(MAX_DISTANCE_RE);
+  if (distM) {
+    maxStationDistanceKm = parseInt(distM[1], 10);
+    correctedFields.push("maxStationDistanceKm");
+  }
+
+  if (DIRECT_ONLY_RE.test(text)) {
+    directOnly = true;
+    correctedFields.push("directOnly");
+  }
+
   // ── Boarding preference (check before residential so "board from X" wins)
-  const boardM = text.match(BOARD_FROM_RE);
+  const boardM = text.match(BOARD_FROM_RE) ?? text.match(PREFER_STATION_RE);
   if (boardM) {
     boardingStationPreference = boardM[1].trim();
     correctedFields.push("boardingStationPreference");
@@ -383,11 +420,15 @@ export function extractJourneyConstraints(
   }
 
   // ── Explicit "from X to Y" or "to Y from X" patterns
-  const fromToM = text.match(
-    /(?:from|starting\s+from|start\s+from)\s+([a-zA-Z][a-zA-Z\s]+?)\s+(?:to|reach|for)\s+([a-zA-Z][a-zA-Z\s]+?)(?:\s+(?:tomorrow|today|kal|by|before|in|at)|\.|,|$)/i
-  );
+  const fromToM =
+    text.match(
+      /\b(?:from|starting\s+from|start\s+from)\s+([a-zA-Z][a-zA-Z\s]+?)\s+(?:to|reach|for)\s+([a-zA-Z][a-zA-Z\s]+?)(?:\s+(?:tomorrow|today|kal|by|before|in|at)|\.|,|$)/i
+    ) ??
+    text.match(
+      /^\s*(?:actually|no,?\s*|make\s+it)?\s*([A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)\s+to\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)(?:\s+(?:tomorrow|today|kal|by|before|in|at)|\.|,|$)/
+    );
   if (fromToM) {
-    originText = fromToM[1].trim();
+    originText = fromToM[1].replace(/^(?:actually|no|make\s+it)\s+/i, "").trim();
     destinationText = fromToM[2].trim();
     if (!correctedFields.includes("origin")) correctedFields.push("origin");
     if (!correctedFields.includes("destination")) correctedFields.push("destination");
@@ -507,6 +548,9 @@ export function extractJourneyConstraints(
     timeConstraint,
     passengerCount,
     travelClass,
+    allowClassDowngrade,
+    maxStationDistanceKm,
+    directOnly,
     isCorrection,
     correctedFields,
   };
@@ -608,6 +652,15 @@ export function mergeJourneyConstraints(
       next.excludeStationText = extracted.excludeStationText;
       changedFields.push("excludeStation");
     }
+    // Conflict override: If excludeStation matches active boardingStationPreference, clear boardingStationPreference
+    if (
+      next.boardingStationPreference &&
+      (code.includes(next.boardingStationPreference.toUpperCase().trim()) ||
+        next.boardingStationPreference.toUpperCase().trim().includes(code))
+    ) {
+      next.boardingStationPreference = undefined;
+      changedFields.push("boardingStationPreference");
+    }
   }
 
   // 6. Optimization priority ("fastest option", "cheaper option")
@@ -650,6 +703,24 @@ export function mergeJourneyConstraints(
   if (extracted.travelClass && extracted.travelClass !== existing.travelClass) {
     next.travelClass = extracted.travelClass;
     changedFields.push("travelClass");
+  }
+
+  // 11. Allow class downgrade
+  if (extracted.allowClassDowngrade !== undefined && extracted.allowClassDowngrade !== existing.allowClassDowngrade) {
+    next.allowClassDowngrade = extracted.allowClassDowngrade;
+    changedFields.push("allowClassDowngrade");
+  }
+
+  // 12. Max station distance
+  if (extracted.maxStationDistanceKm !== undefined && extracted.maxStationDistanceKm !== existing.maxStationDistanceKm) {
+    next.maxStationDistanceKm = extracted.maxStationDistanceKm;
+    changedFields.push("maxStationDistanceKm");
+  }
+
+  // 13. Direct only
+  if (extracted.directOnly !== undefined && extracted.directOnly !== existing.directOnly) {
+    next.directOnly = extracted.directOnly;
+    changedFields.push("directOnly");
   }
 
   // Recompute resolutionId
