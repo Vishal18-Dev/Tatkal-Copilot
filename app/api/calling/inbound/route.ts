@@ -35,19 +35,19 @@ export async function POST(req: Request) {
       ? `नमस्ते, मैं आपका तत्काल कोपायलट हूँ। आपकी ${session.trip?.from ?? "यात्रा"} से ${session.trip?.to ?? "गंतव्य"} की यात्रा तैयार है। मैं आपकी क्या मदद कर सकता हूँ?`
       : "नमस्ते, मैं आपका तत्काल कोपायलट हूँ। अभी आपकी कोई सक्रिय यात्रा नहीं मिली है। आप कहाँ से कहाँ जाना चाहते हैं?");
 
-  // TwiML response: Speak greeting and listen for caller response via conversational Gather
+  // TwiML response: Speak greeting inside Gather so caller can barge in and respond naturally
   const host = req.headers.get("host") || "localhost:3000";
   const protocol = host.includes("localhost") ? "http" : "https";
 
   const actionUrl = `${protocol}://${host}/api/calling/respond?callSid=${encodeURIComponent(callSid)}`;
 
-  const speechHints = "Pune, Mumbai, Delhi, Tatkal, AC 3 Tier, Rajdhani, confirm, train, booking, strategy, yes, no, haan, nahi";
+  const speechHints = "Pune, Mumbai, Delhi, Tatkal, AC 3 Tier, Rajdhani, confirm, train, booking, strategy, yes, no, haan, nahi, fastest, cheapest, backup";
+  const twilioLang = session.language === "hi" ? "hi-IN" : "en-IN";
 
   const twiml = `<?xml version="1.0" encoding="UTF-8"?>
 <Response>
-  <Say language="hi-IN" voice="Polly.Aditi">${escapeXml(greeting)}</Say>
-  <Gather input="speech" action="${escapeXml(actionUrl)}" method="POST" language="hi-IN" speechTimeout="auto" hints="${escapeXml(speechHints)}" speechModel="experimental_conversations">
-    <Say language="hi-IN" voice="Polly.Aditi">मैं सुन रहा हूँ।</Say>
+  <Gather input="speech" action="${escapeXml(actionUrl)}" method="POST" language="${twilioLang}" timeout="8" speechTimeout="auto" hints="${escapeXml(speechHints)}" speechModel="experimental_conversations">
+    <Say language="${twilioLang}" voice="Polly.Aditi">${escapeXml(greeting)}</Say>
   </Gather>
   <Redirect method="POST">${escapeXml(actionUrl)}</Redirect>
 </Response>`;

@@ -326,8 +326,8 @@ const mockTrip = createMockTrip("assisted");
 
       const res = await respondHandler(req);
       const twiml = await res.text();
-      expect(twiml).toContain("दोहरा सकते हैं");
       expect(twiml).toContain("<Gather");
+      expect(twiml).toContain("रणनीति");
     });
   });
 

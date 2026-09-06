@@ -43,20 +43,34 @@ export async function POST(req: Request) {
   const session = getOrCreatePhoneSession(callSid);
   updatePhoneSessionActivity(callSid);
 
+  // Auto-detect language if script is Latin vs Devanagari
+  let detectedLang: VoiceLang = fromBcp47(detectedLangCode) ?? session.language;
+  if (userText) {
+    if (/^[a-zA-Z0-9\s.,?!'-]+$/.test(userText)) {
+      detectedLang = "en";
+    } else if (/[\u0900-\u097F]/.test(userText)) {
+      detectedLang = "hi";
+    }
+  }
+  session.language = detectedLang;
+
   // If no speech was captured (silence or timeout)
   if (!userText) {
-    const retryTwiml = buildTwimlResponse(
-      callSid,
-      "माफ़ कीजिए, मैं सुन नहीं सका। क्या आप दोहरा सकते हैं?",
-      session.language,
-      req
-    );
+    let contextualSilencePrompt =
+      session.language === "hi"
+        ? "मैं आपकी तत्काल यात्रा सहायता के लिए यहाँ हूँ। क्या आपका कोई सवाल है?"
+        : "I am here to help with your Tatkal journey. Do you have any questions or preference changes?";
+
+    if (session.trip) {
+      contextualSilencePrompt =
+        session.language === "hi"
+          ? `मैं सुन रहा हूँ। आपकी ${session.trip.from} से ${session.trip.to} की यात्रा के लिए क्या मैं रणनीति समझाऊँ?`
+          : `I am listening. Would you like me to walk you through your Tatkal strategy for ${session.trip.from} to ${session.trip.to}?`;
+    }
+
+    const retryTwiml = buildTwimlResponse(callSid, contextualSilencePrompt, session.language, req);
     return new Response(retryTwiml, { headers: { "Content-Type": "text/xml; charset=utf-8" } });
   }
-
-  // Follow detected language if provided
-  const detectedLang: VoiceLang = fromBcp47(detectedLangCode) ?? session.language;
-  session.language = detectedLang;
 
   console.info(
     `[calling/respond] turn callSid=${callSid} user="${userText}" lang=${detectedLang} conf=${confidence}`
@@ -103,8 +117,8 @@ function buildTwimlResponse(callSid: string, speakText: string, lang: VoiceLang,
 
   return `<?xml version="1.0" encoding="UTF-8"?>
 <Response>
-  <Say language="${twilioLang}" voice="Polly.Aditi">${escapeXml(speakText)}</Say>
-  <Gather input="speech" action="${escapeXml(actionUrl)}" method="POST" language="${twilioLang}" speechTimeout="auto" hints="${escapeXml(speechHints)}" speechModel="experimental_conversations">
+  <Gather input="speech" action="${escapeXml(actionUrl)}" method="POST" language="${twilioLang}" timeout="8" speechTimeout="auto" hints="${escapeXml(speechHints)}" speechModel="experimental_conversations">
+    <Say language="${twilioLang}" voice="Polly.Aditi">${escapeXml(speakText)}</Say>
   </Gather>
   <Redirect method="POST">${escapeXml(actionUrl)}</Redirect>
 </Response>`;
