@@ -6,7 +6,9 @@ import type { VoiceErrorKind, VoiceState } from "@/lib/voice/types";
 
 const STATE_KEY: Record<VoiceState, string> = {
   idle: "voice.tapToSpeak",
+  connecting: "voice.listening",
   listening: "voice.listening",
+  rest_listening: "voice.listening",
   transcribing: "voice.transcribing",
   thinking: "voice.thinking",
   result: "voice.resultReady",
@@ -62,6 +64,6 @@ export function VoiceStatus({
 function cnState(state: VoiceState) {
   const base = "text-center text-[0.98rem] font-medium";
   if (state === "error") return `${base} text-danger`;
-  if (state === "listening" || state === "speaking") return `${base} text-brand`;
+  if (state === "listening" || state === "speaking" || state === "connecting" || state === "rest_listening") return `${base} text-brand`;
   return `${base} text-ink-soft`;
 }

@@ -33,6 +33,7 @@ import {
   UserX,
   Wallet,
   Landmark,
+  Zap,
 } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -106,6 +107,7 @@ function PlanMission({ plan }: { plan: Trip }) {
   const { updateTrip, logActivity, pushNotification, travellers, wallet, debitWallet, identity } = useStore();
   const { t, lang } = useLang();
   const state = plan.agentState;
+  const isAssisted = plan.mode === "assisted";
   const meta = statusMeta(state);
   const beat = beatFor(state);
   const detailedReadiness = calculateReadiness(plan);
@@ -402,11 +404,18 @@ function PlanMission({ plan }: { plan: Trip }) {
     }], plan.id);
 
     // Mode A (Assisted) demo flow boundary:
-    // If Tatkal window opens in Assisted mode, pause demo clock and wait for user to click [Start booking]
+    // 1. If Tatkal window opens in Assisted mode, pause demo clock and wait for user to click [Start booking]
     if (isAssisted && envBeat.event === "tatkal_window_open") {
       clockRef.current?.pause();
       setDemoStatus("paused");
       updateTrip(plan.id, { agentState: "window_open" });
+    }
+
+    // 2. If primary becomes unavailable in Assisted mode, pause demo clock and wait for user to click [Use backup]
+    if (isAssisted && (envBeat.event === "primary_unavailable" || envBeat.primaryAvailable === false)) {
+      clockRef.current?.pause();
+      setDemoStatus("paused");
+      updateTrip(plan.id, { agentState: "backup_recommended" });
     }
   }, [plan.id, plan.mode, logActivity, updateTrip]);
 
@@ -526,15 +535,53 @@ function PlanMission({ plan }: { plan: Trip }) {
     }
   }
 
-  async function startBooking() {
+  const startBooking = useCallback(async () => {
     if (busy) return;
+
+    // Action Validator is the authoritative authorization boundary
+    const proposedDecision: ProposedAgentDecision = {
+      action: "open_booking_flow",
+      reason: "Passenger explicitly initiated booking flow via Mission Control",
+      toolCall: { name: "openBookingFlow", arguments: {} },
+      source: "local",
+    };
+
+    const validation = validateAgentDecision(proposedDecision, plan, new Set(), true);
+    if (!validation.valid) {
+      logActivity([{ kind: "agent_reasoning", text: `Booking rejected by Action Validator: ${validation.reason}` }], plan.id);
+      return;
+    }
+
+    const timeStr = new Date().toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+    setDecisionTrace((prev) => [
+      ...prev,
+      {
+        id: `trace_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+        timestamp: timeStr,
+        observed: "Tatkal window open · Passenger clicked Start booking",
+        decision: "open_booking_flow",
+        why: "User explicitly authorized booking in Assisted mode",
+        action: "openBookingFlow()",
+        result: "Booking flow opened by user",
+        source: "local",
+        valid: true,
+      },
+    ]);
+
+    // Resume demo clock if paused
+    if (demoStatus === "paused") {
+      clockRef.current?.resume();
+      setDemoStatus("running");
+    }
+
     await executePrimaryBooking();
-  }
+  }, [busy, plan, demoStatus, logActivity, executePrimaryBooking]);
 
   const [backupLoading, setBackupLoading] = useState(false);
   const [backupError, setBackupError] = useState<string | null>(null);
 
   const canUseBackup =
+    isAssisted &&
     !!plan.backup &&
     (state === "primary_failed" || state === "backup_recommended" || plan.booking?.status === "failed") &&
     state !== "backup_attempt" &&
@@ -577,6 +624,12 @@ function PlanMission({ plan }: { plan: Trip }) {
       },
     ]);
 
+    // Resume demo clock if paused
+    if (demoStatus === "paused") {
+      clockRef.current?.resume();
+      setDemoStatus("running");
+    }
+
     try {
       await executeBackupBooking();
     } catch {
@@ -584,7 +637,7 @@ function PlanMission({ plan }: { plan: Trip }) {
     } finally {
       setBackupLoading(false);
     }
-  }, [busy, backupLoading, plan, executeBackupBooking]);
+  }, [busy, backupLoading, plan, demoStatus, executeBackupBooking]);
 
   function finishConfirmed(record: Trip["booking"], steps: OrchestratorStep[]) {
     if (!record) return;
@@ -667,6 +720,30 @@ function PlanMission({ plan }: { plan: Trip }) {
         </span>
       </div>
 
+      {/* Mission Control Mode Indicator per Section 10A D */}
+      <div className="mb-5 flex items-center justify-between gap-3 rounded-xl border border-line bg-surface-muted/60 px-4 py-2.5">
+        <div className="flex items-center gap-2 text-sm">
+          {isAssisted ? (
+            <>
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-brand-soft px-2.5 py-0.5 font-semibold text-xs text-brand">
+                🤝 Assisted
+              </span>
+              <span className="text-ink-soft text-xs sm:text-sm">Copilot will ask before taking action</span>
+            </>
+          ) : (
+            <>
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-brand-soft px-2.5 py-0.5 font-semibold text-xs text-brand">
+                ⚡ Permissioned
+              </span>
+              <span className="text-ink-soft text-xs sm:text-sm">Copilot can act automatically</span>
+            </>
+          )}
+        </div>
+        <span className="text-[0.75rem] font-medium text-ink-faint">
+          {isAssisted ? "Keep me in control" : "Let Copilot act"}
+        </span>
+      </div>
+
       {state === "confirmed" ? (
         <Confirmation plan={plan} travellers={bookedTravellers} />
       ) : (
@@ -674,6 +751,47 @@ function PlanMission({ plan }: { plan: Trip }) {
           {/* LEFT: countdown + coach + booking action + decision trace */}
           <div className="space-y-4">
             <CountdownCard state={state} beat={beat} tatkalLabel={plan.tatkalOpensAtLabel} />
+
+            {/* Assisted Mode — Tatkal Window Open CTA per Section 10A E */}
+            {state === "window_open" && isAssisted && (
+              <Card className="border-brand/40 bg-brand-soft/20 p-5 shadow-sm">
+                <div className="flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-2 text-brand font-semibold">
+                    <Ticket className="h-5 w-5" />
+                    <h4 className="text-sm font-semibold uppercase tracking-wide">Tatkal Window Open</h4>
+                  </div>
+                  <span className="rounded-full bg-brand px-2.5 py-0.5 text-xs font-semibold text-white">Window Open</span>
+                </div>
+                <p className="mt-2 text-base font-semibold text-ink">Your booking plan is ready.</p>
+                <p className="mt-1 text-sm text-ink-soft">Copilot is waiting for your go-ahead.</p>
+                <Button
+                  size="lg"
+                  className="mt-4 w-full"
+                  onClick={startBooking}
+                  disabled={busy}
+                >
+                  <Ticket className="h-5 w-5" /> Start booking
+                </Button>
+                <p className="mt-2 text-center text-xs text-ink-faint">
+                  You&apos;re in Assisted mode. Copilot won&apos;t start booking without you.
+                </p>
+              </Card>
+            )}
+
+            {/* Permissioned Mode — Tatkal Window Open Status per Section 10A F */}
+            {state === "window_open" && !isAssisted && (
+              <Card className="border-brand/40 bg-brand-soft/10 p-5 shadow-sm">
+                <div className="flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-2 text-brand font-semibold">
+                    <Zap className="h-5 w-5" />
+                    <h4 className="text-sm font-semibold uppercase tracking-wide">Tatkal Window Open</h4>
+                  </div>
+                  <span className="rounded-full bg-confirm-soft px-2.5 py-0.5 text-xs font-semibold text-confirm">Permissioned mode</span>
+                </div>
+                <p className="mt-2 text-base font-semibold text-ink">Copilot is starting your prepared booking strategy.</p>
+                <p className="mt-1 text-xs text-ink-soft">Can act automatically · Executing prepared strategy</p>
+              </Card>
+            )}
 
             {/* AI Coach — interactive chat */}
             <CoachCard
@@ -724,17 +842,19 @@ function PlanMission({ plan }: { plan: Trip }) {
               />
             )}
 
+            {/* Assisted Mode — Primary Failure CTA per Section 10A G */}
             {canUseBackup && !busy && (
               <Card className="border-caution/40 bg-caution-soft/40 p-5 shadow-sm">
                 <div className="flex items-center justify-between gap-3">
                   <div className="flex items-center gap-2 text-caution font-semibold">
                     <Split className="h-5 w-5" />
-                    <h4 className="text-sm font-semibold uppercase tracking-wide">{t("mc.primaryFailed")}</h4>
+                    <h4 className="text-sm font-semibold uppercase tracking-wide">Primary Option Unavailable</h4>
                   </div>
                   <Chip tone="caution">Backup Ready</Chip>
                 </div>
-                <p className="mt-2 text-[0.95rem] text-ink font-medium">
-                  {plan.primary.trainName} is no longer available. Your backup strategy ({plan.backup?.trainName}) is ready for instant booking.
+                <p className="mt-2 text-base font-semibold text-ink">Your backup is ready.</p>
+                <p className="mt-1 text-sm text-ink-soft">
+                  Copilot found the prepared recovery option and is waiting for your approval.
                 </p>
 
                 {backupError && (
@@ -756,10 +876,32 @@ function PlanMission({ plan }: { plan: Trip }) {
                     </>
                   ) : (
                     <>
-                      <Split className="h-5 w-5" /> {t("mc.useBackup")} · {plan.backup?.trainName}
+                      <Split className="h-5 w-5" /> Use backup · {plan.backup?.trainName}
                     </>
                   )}
                 </Button>
+                <p className="mt-2 text-center text-xs text-ink-faint">
+                  You&apos;re in Assisted mode. Copilot won&apos;t switch automatically.
+                </p>
+              </Card>
+            )}
+
+            {/* Permissioned Mode — Primary Failure Automated Recovery per Section 10A H */}
+            {!isAssisted && (state === "primary_failed" || state === "backup_recommended" || state === "backup_attempt") && (
+              <Card className="border-caution/40 bg-caution-soft/20 p-5 shadow-sm">
+                <div className="flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-2 text-caution font-semibold">
+                    <Split className="h-5 w-5" />
+                    <h4 className="text-sm font-semibold uppercase tracking-wide">Primary Option Unavailable</h4>
+                  </div>
+                  <span className="rounded-full bg-brand-soft px-2.5 py-0.5 text-xs font-semibold text-brand">
+                    Copilot is recovering your journey
+                  </span>
+                </div>
+                <p className="mt-2 text-base font-semibold text-ink">Switching to your prepared backup.</p>
+                <p className="mt-1 text-xs text-ink-soft">
+                  Permissioned mode · Recovering via {plan.backup?.trainName} automatically.
+                </p>
               </Card>
             )}
 

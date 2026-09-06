@@ -27,7 +27,8 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Chip } from "@/components/app/ui";
 import { CallButton } from "@/components/calling/CallButton";
-import { VoiceConversation } from "@/components/voice/VoiceConversation";
+import { CopilotWorkspace } from "@/components/copilot/CopilotWorkspace";
+import { JourneyProvider } from "@/lib/journey";
 import { useStore } from "@/lib/store";
 import { useLang } from "@/lib/i18n";
 import { useInteractionMode } from "@/lib/interaction-mode";
@@ -39,10 +40,6 @@ export default function HomePage() {
   const { t } = useLang();
   const { mode: interactionMode } = useInteractionMode();
   const router = useRouter();
-  const [goal, setGoal] = useState("");
-  const [voiceOpen, setVoiceOpen] = useState(false);
-
-  const voiceFirst = interactionMode === "voice" || interactionMode === "accessible";
 
   const upcoming = trips.filter((tr) => tr.agentState !== "confirmed");
   const booked = trips.filter((tr) => tr.agentState === "confirmed");
@@ -53,11 +50,6 @@ export default function HomePage() {
     if (h < 12) return t("home.greetMorning");
     if (h < 17) return t("home.greetAfternoon");
     return t("home.greetEvening");
-  }
-
-  function plan(g?: string) {
-    const q = (g ?? goal).trim();
-    router.push(q ? `/app/plan?goal=${encodeURIComponent(q)}` : "/app/plan");
   }
 
   const travWord = (n: number) => (n > 1 ? t("common.travellers") : t("common.traveller"));
@@ -103,52 +95,10 @@ export default function HomePage() {
         </Link>
       </motion.div>
 
-      {/* Prominent Goal Entry */}
-      <motion.div
-        initial={{ opacity: 0, y: 10 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.05 }}
-        className="rounded-[var(--radius-lg)] border border-line-strong bg-surface p-3 shadow-[var(--shadow-card)] focus-within:border-brand focus-within:ring-4 focus-within:ring-brand/10"
-      >
-        <div className="flex items-center gap-2">
-          <Sparkles className="ml-2 h-5 w-5 shrink-0 text-brand" />
-          <input
-            value={goal}
-            onChange={(e) => setGoal(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && plan()}
-            placeholder={t("home.placeholderNext")}
-            className="w-full bg-transparent px-1 py-2 text-[1.02rem] text-ink placeholder:text-ink-faint focus:outline-none"
-          />
-          {/* Speak this journey — leads with brand emphasis when voice is the chosen mode. */}
-          <button
-            onClick={() => setVoiceOpen(true)}
-            aria-label={t("goal.speakTitle")}
-            aria-haspopup="dialog"
-            className={
-              voiceFirst
-                ? "grid h-10 w-10 shrink-0 place-items-center rounded-full bg-brand text-white shadow-[var(--shadow-brand)] transition hover:opacity-90"
-                : "grid h-10 w-10 shrink-0 place-items-center rounded-full border border-line-strong bg-surface text-ink-soft transition-colors hover:border-brand hover:text-brand"
-            }
-          >
-            <Mic className="h-5 w-5" />
-          </button>
-          <button
-            onClick={() => plan()}
-            aria-label={t("nav.plan")}
-            className={
-              voiceFirst
-                ? "grid h-10 w-10 shrink-0 place-items-center rounded-full border border-line-strong bg-surface text-ink-soft transition-colors hover:border-brand hover:text-brand"
-                : "grid h-10 w-10 shrink-0 place-items-center rounded-full bg-brand text-white shadow-[var(--shadow-brand)] transition-colors hover:bg-[#4338ca]"
-            }
-          >
-            <ArrowRight className="h-5 w-5" />
-          </button>
-        </div>
-      </motion.div>
-
-      <AnimatePresence>
-        {voiceOpen && <VoiceConversation key="home-voice" onClose={() => setVoiceOpen(false)} />}
-      </AnimatePresence>
+      {/* Hero Tatkal Copilot Workspace */}
+      <JourneyProvider>
+        <CopilotWorkspace />
+      </JourneyProvider>
 
       {/* Primary Section: Active Tatkal Plan or Empty State */}
       {hydrated && activeTrip ? (
@@ -266,7 +216,7 @@ export default function HomePage() {
             {savedJourneys.slice(0, 4).map((j) => (
               <button
                 key={j.id}
-                onClick={() => plan(`${j.from} to ${j.to}`)}
+                onClick={() => router.push(`/app/plan?goal=${encodeURIComponent(`${j.from} to ${j.to}`)}`)}
                 className="flex items-center gap-3 rounded-2xl border border-line bg-surface px-4 py-3 text-left transition-colors hover:border-brand/40"
               >
                 <Bookmark className="h-4 w-4 shrink-0 text-brand" />

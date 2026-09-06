@@ -54,6 +54,8 @@ export interface CopilotContext {
   travellers?: Traveller[];
   wallet?: WalletState;
   identity?: IdentityReadiness;
+  /** Browser or GPS geolocation coordinates */
+  geolocation?: { latitude: number; longitude: number };
   /** Injectable for deterministic tests; defaults to now. */
   now?: Date;
 }

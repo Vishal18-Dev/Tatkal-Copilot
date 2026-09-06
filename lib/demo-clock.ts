@@ -142,6 +142,10 @@ export class DemoClock {
     this.setStatus("paused");
   }
 
+  resume(): void {
+    this.start();
+  }
+
   reset(): void {
     this.clearTimer();
     this.beatIndex = 0;

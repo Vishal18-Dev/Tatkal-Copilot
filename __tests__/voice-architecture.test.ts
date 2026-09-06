@@ -42,14 +42,13 @@ describe("Voice layer architecture boundary", () => {
     }
   });
 
-  it("reuses the existing planner rather than reimplementing intent parsing", () => {
+  it("uses the Unified Copilot Brain executeCopilotTurn rather than legacy local planner", () => {
     const respondRoute = readFileSync(
       join(process.cwd(), "app", "api", "voice", "respond", "route.ts"),
       "utf8"
     );
-    expect(respondRoute).toContain("parseIntentLocally");
-    expect(respondRoute).toContain("buildPlanLocally");
-    expect(respondRoute).toContain(ALLOWED_GROUNDED_IMPORT);
+    expect(respondRoute).toContain("executeCopilotTurn");
+    expect(respondRoute).toContain("@/lib/copilot/unified-agent");
   });
 
   it("keeps the Sarvam API key server-only (never imported by a client component)", () => {

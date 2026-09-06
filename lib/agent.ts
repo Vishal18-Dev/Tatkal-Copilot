@@ -173,7 +173,10 @@ export function coachFor(state: AgentState, plan: Trip): string {
     case "t_minus_10":
       return `Ten minutes to go. Keep your payment app and the authorized booking channel ready — I'll tell you the moment it opens.`;
     case "window_open":
-      return `Tatkal is open. Start with ${primary}. I'm holding ${backup ?? "your backup"} ready in case it doesn't confirm.`;
+      if (plan.mode === "assisted") {
+        return "The window is open. Your plan is ready. Tap Start booking when you're ready.";
+      }
+      return "The window is open. I'm starting your prepared booking strategy now.";
     case "user_action_required":
       return `The window is open and you haven't started yet. Don't rush the search — your plan is prepared. Tap Start booking.`;
     case "booking_in_progress":
@@ -183,7 +186,10 @@ export function coachFor(state: AgentState, plan: Trip): string {
       if (!plan.backup) {
         return `${primary} is no longer available and no backup strategy is configured for this journey.`;
       }
-      return `${primary} is no longer available. Don't restart the search${via ? ` — your backup via ${via} is ready` : ""}. Tap Use backup.`;
+      if (plan.mode === "assisted") {
+        return "Your primary option is unavailable. Your backup is ready.";
+      }
+      return "Your primary option is unavailable. Copilot is switching to your prepared backup.";
     case "backup_attempt":
       return `Booking ${backup ?? "your backup"} now.`;
     case "confirmed":

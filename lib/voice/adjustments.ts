@@ -1,5 +1,6 @@
 import type { Plan, StrategyOption, TravelClass, TravelIntent } from "@/types";
 import type { Lang } from "@/lib/i18n";
+import { parseVoiceCommand } from "./commands";
 
 /**
  * The turn-taking brain of the voice conversation. Once a recommendation is
@@ -46,6 +47,10 @@ function normalize(text: string): string {
 }
 
 export function parseFollowUp(text: string): FollowUp {
+  const cmd = parseVoiceCommand(text);
+  if (cmd.intent === "cheaper" || cmd.kind === "cheaper") {
+    return { kind: "adjust", adjustment: "cheaper", raw: text };
+  }
   const norm = normalize(text);
   if (norm && CHEAPER_WORDS.some((w) => norm.includes(w))) {
     return { kind: "adjust", adjustment: "cheaper", raw: text };

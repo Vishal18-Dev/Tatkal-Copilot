@@ -17,6 +17,7 @@ import {
   Mail,
   AlertTriangle,
   Wallet,
+  X,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -304,22 +305,28 @@ export function AuthorizeScreen() {
             <p className="mt-1 text-[0.85rem] text-ink-soft">
               Choose how tomorrow at 10:00 AM should play out.
             </p>
-            <div className="mt-4 space-y-2.5" role="radiogroup" aria-label="Booking mode">
+            <div className="mt-4 space-y-3" role="radiogroup" aria-label="Booking mode">
               <ModeCard
                 active={mode === "assisted"}
                 onClick={() => setMode("assisted")}
-                icon={<Bell className="h-5 w-5" />}
-                title="🤝 Assisted"
-                badgeLabel="Keep me in control"
-                body="Prepare everything, watch the clock, and make sure I'm there when Tatkal opens. I'll make the final booking decision."
+                icon={<ShieldCheck className="h-5 w-5" />}
+                title="Assisted"
+                subtitle="Keep me in control"
+                description="Copilot prepares your journey, watches the clock, and asks before taking booking or recovery actions."
+                allowed={["Prepare", "Monitor", "Recommend", "Notify"]}
+                disallowed={["Book without asking", "Switch to backup without asking"]}
+                consequence="Copilot will stop and ask you before booking or switching to your backup."
               />
               <ModeCard
                 active={mode === "auto"}
                 onClick={() => setMode("auto")}
                 icon={<Zap className="h-5 w-5" />}
-                title="⚡ Permissioned"
-                badgeLabel="Let Copilot act"
-                body="Prepare everything and execute my booking strategy when Tatkal opens, including switching to my backup if needed."
+                title="Permissioned"
+                subtitle="Let Copilot act"
+                description="Copilot can execute your prepared booking strategy and switch to your backup when needed."
+                allowed={["Prepare", "Monitor", "Recommend", "Notify", "Start booking automatically", "Activate backup automatically"]}
+                disallowed={[]}
+                consequence="Copilot can book and switch to your backup automatically when your plan requires it."
                 demo
               />
             </div>
@@ -460,7 +467,11 @@ function ModeCard({
   onClick,
   icon,
   title,
-  body,
+  subtitle,
+  description,
+  allowed,
+  disallowed,
+  consequence,
   badgeLabel,
   demo,
 }: {
@@ -468,22 +479,48 @@ function ModeCard({
   onClick: () => void;
   icon: React.ReactNode;
   title: string;
-  body: string;
+  subtitle: string;
+  description: string;
+  allowed: string[];
+  disallowed?: string[];
+  consequence: string;
   badgeLabel?: string;
   demo?: boolean;
 }) {
   return (
-    <button onClick={onClick} className="block w-full text-left" role="radio" aria-checked={active}>
+    <button
+      onClick={onClick}
+      className="block w-full text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-brand rounded-2xl"
+      role="radio"
+      aria-checked={active}
+      aria-label={`${title} mode: ${subtitle}. ${description}`}
+    >
       <Card
         className={cn(
-          "border-2 p-4 transition-colors",
-          active ? "border-brand shadow-[var(--shadow-card)]" : "border-line hover:border-line-strong"
+          "border-2 p-5 transition-all",
+          active
+            ? "border-brand bg-brand-soft/20 shadow-[var(--shadow-card)]"
+            : "border-line bg-surface hover:border-line-strong"
         )}
       >
         <div className="flex items-center justify-between">
-          <span className={cn("grid h-9 w-9 place-items-center rounded-lg", active ? "bg-brand text-white" : "bg-brand-soft text-brand")}>
-            {icon}
-          </span>
+          <div className="flex items-center gap-3">
+            <span
+              className={cn(
+                "grid h-10 w-10 place-items-center rounded-xl",
+                active ? "bg-brand text-white shadow-sm" : "bg-brand-soft text-brand"
+              )}
+            >
+              {icon}
+            </span>
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="font-semibold text-ink text-base">{title}</span>
+                {active && <Check className="h-4 w-4 text-brand" strokeWidth={3} />}
+              </div>
+              <p className="text-xs font-medium text-brand">{subtitle}</p>
+            </div>
+          </div>
           <div className="flex items-center gap-1.5">
             {demo && <DemoBadge />}
             {badgeLabel && (
@@ -493,12 +530,34 @@ function ModeCard({
             )}
           </div>
         </div>
-        <div className="mt-2.5 flex items-center gap-2">
-          <span className="font-semibold text-ink">{title}</span>
-          {active && <Check className="h-4 w-4 text-brand" strokeWidth={3} />}
+
+        <p className="mt-3 text-xs leading-relaxed text-ink-soft">{description}</p>
+
+        {/* Behavior summary checklist */}
+        <div className="mt-3.5 space-y-1.5 rounded-xl border border-line/60 bg-surface/80 p-2.5">
+          {allowed.map((item) => (
+            <div key={item} className="flex items-center gap-2 text-xs text-ink">
+              <Check className="h-3.5 w-3.5 shrink-0 text-confirm" strokeWidth={2.5} />
+              <span>{item}</span>
+            </div>
+          ))}
+          {disallowed && disallowed.length > 0 && disallowed.map((item) => (
+            <div key={item} className="flex items-center gap-2 text-xs text-ink-faint">
+              <X className="h-3.5 w-3.5 shrink-0 text-warn" strokeWidth={2.5} />
+              <span className="line-through decoration-line-strong">{item}</span>
+            </div>
+          ))}
         </div>
-        <p className="mt-1 text-sm leading-relaxed text-ink-soft">{body}</p>
+
+        {/* Consequence note */}
+        <div className={cn(
+          "mt-3 rounded-lg px-2.5 py-1.5 text-[0.78rem] font-medium leading-snug",
+          active ? "bg-brand-soft text-brand-dark" : "bg-surface-muted text-ink-faint"
+        )}>
+          {consequence}
+        </div>
       </Card>
     </button>
   );
 }
+

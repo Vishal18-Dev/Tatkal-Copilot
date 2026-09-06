@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { useVoiceLang } from "@/lib/voice/voice-lang";
 import {
   VOICE_MAX_AUDIO_BYTES,
@@ -8,18 +8,18 @@ import {
   VOICE_MIN_RECORDING_MS,
   VOICE_REQUEST_TIMEOUT_MS,
 } from "@/lib/voice/types";
-import { answerWithTools } from "./router";
+import { executeCopilotTurn } from "./unified-agent";
 import type { CopilotContext } from "./types";
 
 /* ============================================================
    useCopilotAsk — contextual Q&A over a REAL journey.
 
-   The same brain as browser voice, pointed at a live Trip: a
-   question routes through the Copilot tools (grounded, read-only),
-   the English answer is translated + voiced in the active language,
-   and both sides land in a small transcript. Type/tap always work;
-   the mic is best-effort and degrades to text on any failure
-   (spec §27). Nothing here books or mutates — answers only.
+   Powered by the Unified Copilot Brain (executeCopilotTurn),
+   pointed at a live Trip: every question routes through the
+   canonical agent, the answer is translated + voiced in the
+   active language, and both sides land in a small transcript.
+   Type/tap always work; the mic is best-effort and degrades
+   to text on any failure (spec §27).
    ============================================================ */
 
 export interface CopilotTurn {
@@ -36,11 +36,24 @@ const nextId = () => `ask_${Date.now()}_${seq++}`;
 const FALLBACK =
   "I can tell you about your journey, the recommended train, your backup, readiness, wallet, or booking status.";
 
+const emptySubscribe = () => () => {};
+function getMicSnapshot(): boolean {
+  return (
+    typeof navigator !== "undefined" &&
+    !!navigator.mediaDevices?.getUserMedia &&
+    typeof MediaRecorder !== "undefined" &&
+    (typeof window === "undefined" || window.isSecureContext)
+  );
+}
+function getServerSnapshot(): boolean {
+  return false;
+}
+
 export function useCopilotAsk(getContext: () => CopilotContext) {
   const { voiceLang, observeDetected } = useVoiceLang();
   const [state, setState] = useState<AskState>("idle");
   const [turns, setTurns] = useState<CopilotTurn[]>([]);
-  const [micSupported, setMicSupported] = useState(false);
+  const micSupported = useSyncExternalStore(emptySubscribe, getMicSnapshot, getServerSnapshot);
   const [micError, setMicError] = useState(false);
 
   const genRef = useRef(0);
@@ -52,12 +65,6 @@ export function useCopilotAsk(getContext: () => CopilotContext) {
   const maxTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
-    setMicSupported(
-      typeof navigator !== "undefined" &&
-        !!navigator.mediaDevices?.getUserMedia &&
-        typeof MediaRecorder !== "undefined" &&
-        (typeof window === "undefined" || window.isSecureContext)
-    );
     return () => cleanup();
   }, []);
 
@@ -107,7 +114,7 @@ export function useCopilotAsk(getContext: () => CopilotContext) {
     [voiceLang, push]
   );
 
-  /** Answer a typed/tapped/spoken question from the Copilot tools. */
+  /** Answer a typed/tapped/spoken question through the Unified Copilot Brain. */
   const ask = useCallback(
     async (question: string, opts?: { alreadyPushed?: boolean }) => {
       const q = question.trim();
@@ -115,11 +122,20 @@ export function useCopilotAsk(getContext: () => CopilotContext) {
       const myGen = genRef.current;
       if (!opts?.alreadyPushed) push("user", q);
       setState("thinking");
-      const routed = answerWithTools(q, getContext());
-      const english = routed?.result.speak ?? FALLBACK;
+      const ctx = getContext();
+      const turnResult = await executeCopilotTurn({
+        channel: "visual",
+        text: q,
+        trip: ctx.trip,
+        travellers: ctx.travellers,
+        wallet: ctx.wallet,
+        identity: ctx.identity,
+        language: voiceLang,
+      });
+      const english = turnResult.speakEnglish || FALLBACK;
       await respond(english, myGen);
     },
-    [getContext, push, respond]
+    [getContext, push, respond, voiceLang]
   );
 
   /** Start a mic capture; on stop it transcribes then asks. Best-effort. */
@@ -217,7 +233,6 @@ export function useCopilotAsk(getContext: () => CopilotContext) {
     } finally {
       clearTimeout(timer);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [voiceLang, observeDetected, push, ask]);
 
   const reset = useCallback(() => {

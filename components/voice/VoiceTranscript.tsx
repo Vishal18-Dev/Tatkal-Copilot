@@ -5,24 +5,32 @@ import { motion } from "framer-motion";
 import { cn } from "@/lib/utils";
 import { useLang } from "@/lib/i18n";
 import type { VoiceTurn } from "@/lib/voice/types";
+import type { ConversationMessage } from "@/lib/conversation/types";
+import { toVoiceTurn } from "@/lib/conversation/adapters";
 
 /** The call-log style transcript — user lines right-aligned, agent lines left. */
 export function VoiceTranscript({
   turns,
+  messages,
+  interimTranscript,
   highlightTerms,
   highlightTurnId,
 }: {
-  turns: VoiceTurn[];
+  turns?: VoiceTurn[];
+  messages?: ConversationMessage[];
+  /** Ephemeral in-flight speech recognition (not persisted). */
+  interimTranscript?: string | null;
   /** Words/phrases (from the grounded plan intent) to visually call out — never invented. */
   highlightTerms?: string[];
   /** Only this turn gets highlighted — the original goal utterance, not later yes/no replies. */
   highlightTurnId?: string;
 }) {
   const { t } = useLang();
-  if (turns.length === 0) return null;
+  const displayTurns = turns ?? (messages ? messages.map(toVoiceTurn) : []);
+  if (displayTurns.length === 0 && !interimTranscript) return null;
   return (
     <div className="flex w-full flex-col gap-2" role="log" aria-label={t("voice.transcriptLabel")}>
-      {turns.map((turn) => (
+      {displayTurns.map((turn) => (
         <motion.div
           key={turn.id}
           initial={{ opacity: 0, y: 6 }}
@@ -43,6 +51,18 @@ export function VoiceTranscript({
           </span>
         </motion.div>
       ))}
+      {interimTranscript && (
+        <motion.div
+          key="interim_transcript"
+          initial={{ opacity: 0, y: 4 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="flex justify-end"
+        >
+          <span className="max-w-[85%] rounded-[var(--radius)] px-3.5 py-2 text-[0.92rem] leading-snug bg-brand/80 text-white italic animate-pulse border border-white/20">
+            {interimTranscript}
+          </span>
+        </motion.div>
+      )}
     </div>
   );
 }

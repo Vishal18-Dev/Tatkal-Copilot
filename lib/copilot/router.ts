@@ -8,6 +8,7 @@ import {
   getRecommendations,
   getTatkalStatus,
   getWalletBalance,
+  explainBookingAuthority,
 } from "./tools";
 
 /* ============================================================
@@ -29,6 +30,7 @@ const RULES: { test: RegExp; tool: string; run: Reader }[] = [
   { test: /\b(ready|prepared|missing|what.*(need|left)|am i set|everything set)\b/i, tool: "get_readiness", run: getReadiness },
   { test: /\b(identity|aadhaar|aadhar|verified|verification|kyc)\b/i, tool: "get_identity_status", run: getIdentityStatus },
   { test: /\b(tatkal|window|when.*open|what time|opens?|how long)\b/i, tool: "get_tatkal_status", run: getTatkalStatus },
+  { test: /\b(book it|book now|start booking|can you book|will you book)\b/i, tool: "explain_booking_authority", run: explainBookingAuthority },
   { test: /\b(booked|confirmed|pnr|booking status|is it done|status)\b/i, tool: "get_booking_status", run: getBookingStatus },
   { test: /\b(why this|which train|recommend|best option|best train|primary|fare|price|cost)\b/i, tool: "get_recommendations", run: getRecommendations },
   { test: /\b(journey|trip|where.*going|my plan|route)\b/i, tool: "get_journey_context", run: getJourneyContext },
