@@ -39,6 +39,9 @@ export function useCallConversation(
     })
   );
 
+  const stateRef = useRef(state);
+  stateRef.current = state;
+
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const genRef = useRef(0);
   const activeLangRef = useRef<VoiceLang>(isVoiceLang(lang) ? lang : "en");
@@ -114,6 +117,7 @@ export function useCallConversation(
   const speakText = useCallback(
     async (text: string, myGen: number, onFinished?: () => void) => {
       cleanupAudio();
+      cleanupMic();
       setState("speaking");
       setInterimText(null);
 
@@ -144,7 +148,7 @@ export function useCallConversation(
         }
       }
     },
-    [cleanupAudio]
+    [cleanupAudio, cleanupMic]
   );
 
   /** Process a completed spoken or typed user turn through Unified Copilot Brain */
@@ -199,7 +203,7 @@ export function useCallConversation(
 
         // 4. Speak response, then automatically return to listening (Hands-free loop!)
         await speakText(reply, myGen, () => {
-          if (myGen === genRef.current && state !== "ended") {
+          if (myGen === genRef.current && stateRef.current !== "ended") {
             setState("listening");
           }
         });
@@ -208,13 +212,13 @@ export function useCallConversation(
         const fallbackMsg = "I had trouble processing that. Could you repeat?";
         setLines((prev) => [...prev, { id: `err_${Date.now()}`, role: "agent", text: fallbackMsg }]);
         await speakText(fallbackMsg, myGen, () => {
-          if (myGen === genRef.current && state !== "ended") {
+          if (myGen === genRef.current && stateRef.current !== "ended") {
             setState("listening");
           }
         });
       }
     },
-    [speakText, geolocation, cleanupMic, state]
+    [speakText, geolocation, cleanupMic]
   );
 
   /** Continuous Hands-free Listening loop with Voice Activity Detection (VAD) */
