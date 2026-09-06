@@ -62,6 +62,7 @@ const en: Dict = {
   // Voice agent
   "voice.title": "Voice Copilot",
   "voice.openLabel": "Talk to Copilot",
+  "voice.speakShort": "Speak",
   "voice.subtitle": "Tell me where you're headed.",
   "voice.heroHint": "Speak naturally in English, Hindi or Hinglish — I'll sort out the route, quota and timing.",
   "voice.refineLabel": "Refine by voice or tap",
@@ -79,6 +80,8 @@ const en: Dict = {
   "voice.stopPlayback": "Stop playback",
   "voice.close": "Close",
   "voice.languageLabel": "Conversation language",
+  "voice.langAuto": "Auto-detect",
+  "voice.autoHint": "I'll reply in whatever language you speak. Pick one to lock it.",
   "copilot.dockTitle": "Talk to your Copilot",
   "copilot.transcriptLabel": "Copilot conversation",
   "copilot.thinking": "Thinking…",
@@ -704,6 +707,7 @@ const hi: Dict = {
   // Voice agent
   "voice.title": "वॉइस कोपायलट",
   "voice.openLabel": "कोपायलट से बात करें",
+  "voice.speakShort": "बोलें",
   "voice.subtitle": "बताइए आपको कहाँ जाना है।",
   "voice.heroHint": "अंग्रेज़ी, हिंदी या हिंग्लिश में सहज बोलिए — रूट, कोटा और समय मैं सँभाल लूँगा।",
   "voice.refineLabel": "बोलकर या टैप करके बदलें",
@@ -721,6 +725,8 @@ const hi: Dict = {
   "voice.stopPlayback": "आवाज़ रोकें",
   "voice.close": "बंद करें",
   "voice.languageLabel": "बातचीत की भाषा",
+  "voice.langAuto": "स्वतः पहचान",
+  "voice.autoHint": "आप जिस भाषा में बोलेंगे, मैं उसी में जवाब दूँगा। लॉक करने के लिए कोई भाषा चुनें।",
   "copilot.dockTitle": "अपने कोपायलट से बात करें",
   "copilot.transcriptLabel": "कोपायलट बातचीत",
   "copilot.thinking": "सोच रहा हूँ…",

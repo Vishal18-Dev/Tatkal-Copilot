@@ -23,6 +23,8 @@ interface VoiceLangCtx {
   locked: boolean;
   /** Explicit user choice — locks the language. */
   setVoiceLang: (l: VoiceLang) => void;
+  /** Return to automatic detection — the agent follows the language you speak. */
+  setAuto: () => void;
   /** Feed a Sarvam-detected BCP-47 code; updates only while unlocked. */
   observeDetected: (bcp47: string | null | undefined) => void;
   langs: typeof VOICE_LANGS;
@@ -57,6 +59,15 @@ export function VoiceLangProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
+  const setAuto = useCallback(() => {
+    setLocked(false);
+    try {
+      localStorage.removeItem(LOCK_KEY);
+    } catch {
+      /* ignore */
+    }
+  }, []);
+
   const observeDetected = useCallback(
     (bcp47: string | null | undefined) => {
       if (locked) return; // user's explicit choice wins
@@ -73,8 +84,8 @@ export function VoiceLangProvider({ children }: { children: React.ReactNode }) {
   );
 
   const value = useMemo(
-    () => ({ voiceLang, locked, setVoiceLang, observeDetected, langs: VOICE_LANGS }),
-    [voiceLang, locked, setVoiceLang, observeDetected]
+    () => ({ voiceLang, locked, setVoiceLang, setAuto, observeDetected, langs: VOICE_LANGS }),
+    [voiceLang, locked, setVoiceLang, setAuto, observeDetected]
   );
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
