@@ -15,26 +15,48 @@ export function Logo({
     <div className={cn("flex items-center gap-2.5", className)}>
       <span className="grid h-9 w-9 place-items-center rounded-[11px] bg-brand shadow-[var(--shadow-brand)]">
         <svg
-          width="20"
-          height="20"
+          width="22"
+          height="22"
           viewBox="0 0 24 24"
           fill="none"
           aria-hidden="true"
         >
-          {/* signal / rising-confidence mark */}
+          {/* Orbital network ring (IRCTC style) */}
           <path
-            d="M4 17.5C7 13 10 15 13.5 9.5C15.5 6.4 18 5 20 5"
+            d="M 3.5 13 A 8.5 8.5 0 1 1 18.5 17.5"
             stroke="white"
-            strokeWidth="2.2"
+            strokeWidth="1.6"
             strokeLinecap="round"
+            strokeOpacity="0.85"
+          />
+          {/* Train locomotive front engine */}
+          <path
+            d="M 8.5 16.5 V 10.8 C 8.5 8.2 10.1 6.5 12 6.5 C 13.9 6.5 15.5 8.2 15.5 10.8 V 16.5 Z"
+            stroke="white"
+            strokeWidth="1.8"
             strokeLinejoin="round"
           />
-          <circle cx="20" cy="5" r="2.2" fill="white" />
+          {/* Windshield */}
           <path
-            d="M4 20h16"
+            d="M 10 9.8 H 14"
             stroke="white"
-            strokeOpacity="0.5"
-            strokeWidth="2.2"
+            strokeWidth="1.5"
+            strokeLinecap="round"
+          />
+          {/* Central headlight */}
+          <circle cx="12" cy="13.5" r="1.1" fill="white" />
+          {/* Converging railway tracks */}
+          <path
+            d="M 6.5 20 L 9 16.5 M 17.5 20 L 15 16.5"
+            stroke="white"
+            strokeWidth="1.8"
+            strokeLinecap="round"
+          />
+          {/* Speed swoosh arc */}
+          <path
+            d="M 3 11 C 5 6.2 10.5 3.8 16.5 4.8 C 19.5 5.3 21.5 7.2 21.5 8.2"
+            stroke="white"
+            strokeWidth="1.8"
             strokeLinecap="round"
           />
         </svg>
