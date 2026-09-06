@@ -24,7 +24,7 @@ const jetbrainsMono = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Tatkal Copilot — Stop Guessing. Start Winning Tatkal.",
+  title: "Tatkal Copilot — An IRCTC Demo Product",
   description:
     "Your AI travel agent prepares your complete Tatkal strategy before booking begins. Never automates booking. Just makes you dramatically better prepared.",
 };
