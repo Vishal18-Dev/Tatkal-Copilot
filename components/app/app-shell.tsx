@@ -10,21 +10,24 @@ import {
   Ticket,
   Users,
   Activity as ActivityIcon,
-  Settings,
-  LifeBuoy,
   Bell,
-  LogOut,
   User as UserIcon,
   Plus,
+  LifeBuoy,
 } from "lucide-react";
 import { Logo } from "@/components/brand/logo";
 import { LanguageToggle } from "@/components/brand/language-toggle";
+import { ThemeToggle } from "@/components/brand/theme-toggle";
 import { AuthModal } from "@/components/auth/auth-modal";
+import { VoiceButton } from "@/components/voice/VoiceButton";
 import { useStore } from "@/lib/store";
 import { useLang } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 
-const PRIMARY = [
+// Figma V2 shell — a calm horizontal top nav in place of the sidebar.
+// Items are the app's real destinations (the journey stages Options/Prepare/
+// Book live inside the /app/plan wizard's own progress, not as routes).
+const NAV = [
   { href: "/app", label: "nav.home", icon: Home, exact: true },
   { href: "/app/plan", label: "nav.plan", icon: Sparkles },
   { href: "/app/trips", label: "nav.trips", icon: Ticket },
@@ -32,173 +35,148 @@ const PRIMARY = [
   { href: "/app/activity", label: "nav.activity", icon: ActivityIcon },
 ];
 
-const SECONDARY = [
-  { href: "/app/settings", label: "nav.settings", icon: Settings },
-  { href: "/app/help", label: "nav.help", icon: LifeBuoy },
-];
-
 function isActive(pathname: string, href: string, exact?: boolean) {
-  return exact ? pathname === href : pathname === href || pathname.startsWith(href + "/");
+  return exact
+    ? pathname === href
+    : pathname === href || pathname.startsWith(href + "/");
 }
 
 export function AppShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
-  const { user, isAuthed, notifications, unreadCount } = useStore();
+  const { notifications, unreadCount, isAuthed, user } = useStore();
   const { t } = useLang();
   const [authOpen, setAuthOpen] = useState(false);
 
   return (
-    <div className="min-h-full lg:grid lg:grid-cols-[264px_1fr]">
-      {/* ---------- Desktop sidebar ---------- */}
-      <aside className="sticky top-0 hidden h-screen flex-col border-r border-line bg-surface/60 px-4 py-5 lg:flex">
-        <Link href="/app" className="px-2">
-          <Logo />
-        </Link>
+    <div className="flex min-h-full flex-col">
+      {/* ---------- Top navigation ---------- */}
+      <header className="sticky top-0 z-40 border-b border-line bg-canvas/85 backdrop-blur-xl">
+        <div className="mx-auto flex h-16 max-w-6xl items-center justify-between gap-3 px-4 lg:px-6">
+          {/* Brand lockup */}
+          <Link href="/app" className="flex shrink-0 items-center gap-2.5">
+            <Logo showWord={false} />
+            <span className="hidden flex-col leading-tight sm:flex">
+              <span className="text-[0.95rem] font-semibold tracking-tight text-ink">
+                {t("brand")}
+              </span>
+              <span className="text-[0.72rem] text-ink-faint">
+                {t("brand.tagline")}
+              </span>
+            </span>
+          </Link>
 
-        <nav className="mt-7 flex-1 space-y-0.5">
-          {PRIMARY.map((item) => (
-            <NavLink key={item.href} href={item.href} icon={item.icon} label={t(item.label)} active={isActive(pathname, item.href, item.exact)} />
-          ))}
-          <div className="my-4 border-t border-line" />
-          {SECONDARY.map((item) => (
-            <NavLink key={item.href} href={item.href} icon={item.icon} label={t(item.label)} active={isActive(pathname, item.href)} />
-          ))}
-        </nav>
+          {/* Center nav (desktop) */}
+          <nav className="hidden items-center gap-1 lg:flex">
+            {NAV.map((item) => (
+              <TopNavLink
+                key={item.href}
+                href={item.href}
+                label={t(item.label)}
+                active={isActive(pathname, item.href, item.exact)}
+              />
+            ))}
+          </nav>
 
-        <ProfileCard onSignIn={() => setAuthOpen(true)} />
-      </aside>
+          {/* Right controls */}
+          <div className="flex shrink-0 items-center gap-1.5">
+            <Link
+              href="/app/help"
+              className="hidden items-center gap-1.5 rounded-[var(--radius)] px-3 py-2 text-sm font-medium text-ink-soft transition-colors hover:bg-surface-muted hover:text-ink md:inline-flex"
+            >
+              <LifeBuoy className="h-4 w-4" />
+              {t("nav.help")}
+            </Link>
+            <LanguageToggle />
+            <ThemeToggle />
+            <VoiceButton />
+            <NotificationsButton count={unreadCount} notifications={notifications} />
+            <ProfilePill
+              isAuthed={isAuthed}
+              name={user?.name}
+              onSignIn={() => setAuthOpen(true)}
+            />
+          </div>
+        </div>
+      </header>
 
       {/* ---------- Content ---------- */}
-      <div className="flex min-h-full flex-col">
-        {/* Top bar */}
-        <header className="sticky top-0 z-40 border-b border-line bg-canvas/80 backdrop-blur-xl">
-          <div className="flex items-center justify-between px-4 py-3 lg:px-8">
-            <Link href="/app" className="lg:hidden">
-              <Logo />
-            </Link>
-            <div className="hidden lg:block" />
-            <div className="flex items-center gap-2">
-              <LanguageToggle />
-              <NotificationsButton
-                count={unreadCount}
-                notifications={notifications}
-              />
-              {!isAuthed && (
-                <button
-                  onClick={() => setAuthOpen(true)}
-                  className="hidden rounded-full bg-brand px-4 h-9 text-sm font-medium text-white shadow-[var(--shadow-brand)] hover:bg-[#4338ca] sm:inline-flex sm:items-center"
-                >
-                  {t("shell.signin")}
-                </button>
-              )}
-            </div>
-          </div>
-        </header>
-
-        <main className="flex-1 px-4 pb-24 pt-6 lg:px-8 lg:pb-10">{children}</main>
-      </div>
+      <main className="mx-auto w-full max-w-6xl flex-1 px-4 pb-24 pt-6 lg:px-6 lg:pb-12">
+        {children}
+      </main>
 
       {/* ---------- Mobile bottom nav ---------- */}
-      <MobileNav pathname={pathname} isAuthed={isAuthed} user={user} onProfile={() => setAuthOpen(true)} />
+      <MobileNav
+        pathname={pathname}
+        isAuthed={isAuthed}
+        user={user}
+        onProfile={() => setAuthOpen(true)}
+      />
 
       <AuthModal open={authOpen} onClose={() => setAuthOpen(false)} />
     </div>
   );
 }
 
-function NavLink({
+function TopNavLink({
   href,
   label,
-  icon: Icon,
   active,
 }: {
   href: string;
   label: string;
-  icon: typeof Home;
   active: boolean;
 }) {
   return (
     <Link
       href={href}
+      aria-current={active ? "page" : undefined}
       className={cn(
-        "flex items-center gap-3 rounded-xl px-3 py-2.5 text-[0.95rem] font-medium transition-colors",
+        "rounded-[var(--radius)] px-3.5 py-2 text-sm font-medium transition-colors",
         active
           ? "bg-brand-soft text-brand-ink"
           : "text-ink-soft hover:bg-surface-muted hover:text-ink"
       )}
     >
-      <Icon className={cn("h-[18px] w-[18px]", active ? "text-brand" : "text-ink-faint")} />
       {label}
     </Link>
   );
 }
 
-function ProfileCard({ onSignIn }: { onSignIn: () => void }) {
-  const { isAuthed, user, logout } = useStore();
+function ProfilePill({
+  isAuthed,
+  name,
+  onSignIn,
+}: {
+  isAuthed: boolean;
+  name?: string;
+  onSignIn: () => void;
+}) {
   const { t } = useLang();
-  const [open, setOpen] = useState(false);
-
   if (!isAuthed) {
     return (
       <button
         onClick={onSignIn}
-        className="flex items-center gap-3 rounded-xl border border-line bg-surface px-3 py-2.5 text-left transition-colors hover:border-line-strong"
+        className="inline-flex items-center gap-2 rounded-full border border-line-strong bg-surface px-2 py-1.5 text-sm font-medium text-ink transition-colors hover:bg-surface-muted"
       >
-        <span className="grid h-9 w-9 place-items-center rounded-full bg-surface-muted text-ink-soft">
+        <span className="grid h-7 w-7 place-items-center rounded-full bg-surface-muted text-ink-soft">
           <UserIcon className="h-4 w-4" />
         </span>
-        <div>
-          <div className="text-sm font-semibold text-ink">{t("shell.signin")}</div>
-          <div className="text-xs text-ink-faint">{t("shell.signinSub")}</div>
-        </div>
+        <span className="hidden pr-1 sm:inline">{t("shell.signin")}</span>
       </button>
     );
   }
-
   return (
-    <div className="relative">
-      <button
-        onClick={() => setOpen((o) => !o)}
-        className="flex w-full items-center gap-3 rounded-xl border border-line bg-surface px-3 py-2.5 text-left transition-colors hover:border-line-strong"
-      >
-        <span className="grid h-9 w-9 place-items-center rounded-full bg-brand text-sm font-semibold text-white">
-          {(user?.name ?? "You").slice(0, 1).toUpperCase()}
-        </span>
-        <div className="min-w-0 flex-1">
-          <div className="truncate text-sm font-semibold text-ink">
-            {user?.name ?? t("shell.account")}
-          </div>
-          <div className="truncate text-xs text-ink-faint">+91 {user?.phone}</div>
-        </div>
-      </button>
-      <AnimatePresence>
-        {open && (
-          <motion.div
-            initial={{ opacity: 0, y: 6 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: 6 }}
-            className="absolute bottom-full left-0 mb-2 w-full overflow-hidden rounded-xl border border-line bg-surface shadow-[var(--shadow-lift)]"
-          >
-            <Link
-              href="/app/settings"
-              onClick={() => setOpen(false)}
-              className="flex items-center gap-2.5 px-3.5 py-2.5 text-sm text-ink-soft hover:bg-surface-muted"
-            >
-              <Settings className="h-4 w-4" /> {t("nav.settings")}
-            </Link>
-            <button
-              onClick={() => {
-                logout();
-                setOpen(false);
-              }}
-              className="flex w-full items-center gap-2.5 px-3.5 py-2.5 text-sm text-danger hover:bg-danger-soft"
-            >
-              <LogOut className="h-4 w-4" /> {t("shell.signout")}
-            </button>
-          </motion.div>
-        )}
-      </AnimatePresence>
-    </div>
+    <Link
+      href="/app/settings"
+      className="inline-flex items-center gap-2 rounded-full border border-line-strong bg-surface px-2 py-1.5 text-sm font-medium text-ink transition-colors hover:bg-surface-muted"
+    >
+      <span className="grid h-7 w-7 place-items-center rounded-full bg-brand text-xs font-semibold text-white">
+        {(name ?? "You").slice(0, 1).toUpperCase()}
+      </span>
+      <span className="hidden max-w-[9rem] truncate pr-1 sm:inline">
+        {name ?? t("shell.account")}
+      </span>
+    </Link>
   );
 }
 
@@ -235,7 +213,7 @@ function NotificationsButton({
             initial={{ opacity: 0, y: 6 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: 6 }}
-            className="absolute right-0 top-full mt-2 w-80 overflow-hidden rounded-xl border border-line bg-surface shadow-[var(--shadow-lift)]"
+            className="absolute right-0 top-full mt-2 w-80 overflow-hidden rounded-[var(--radius-lg)] border border-line bg-surface shadow-[var(--shadow-lift)]"
           >
             <div className="border-b border-line px-4 py-2.5 text-sm font-semibold text-ink">
               {t("shell.notifications")}
@@ -287,7 +265,7 @@ function MobileNav({
           if (it.primary) {
             return (
               <Link key={it.href} href={it.href} className="flex items-center justify-center py-1.5">
-                <span className="grid h-12 w-12 -translate-y-3 place-items-center rounded-2xl bg-brand text-white shadow-[var(--shadow-brand)]">
+                <span className="grid h-12 w-12 -translate-y-3 place-items-center rounded-[var(--radius-lg)] bg-brand text-white shadow-[var(--shadow-brand)]">
                   <it.icon className="h-6 w-6" />
                 </span>
               </Link>

@@ -2,31 +2,44 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import {
   ShieldCheck,
   Check,
   Users,
   TrainFront,
-  Ticket,
   Split,
-  CreditCard,
+  MapPin,
   Bell,
   Zap,
   Info,
   Bookmark,
-  Eye,
   Mail,
+  AlertTriangle,
+  Wallet,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { StepShell, Eyebrow } from "@/components/step-shell";
+import { StepShell } from "@/components/step-shell";
 import { DemoBadge } from "@/components/app/ui";
 import { AuthModal } from "@/components/auth/auth-modal";
+import { IdentityModal } from "@/components/readiness/identity-modal";
+import { WalletCard } from "@/components/readiness/wallet-card";
 import { useJourney } from "@/lib/journey";
 import { useStore } from "@/lib/store";
+import { useLang } from "@/lib/i18n";
 import { cn, formatFare } from "@/lib/utils";
 import type { StrategySnapshot, StrategyOption } from "@/types";
+
+interface ChecklistItem {
+  id: string;
+  label: string;
+  ready: boolean;
+  detail: string;
+  icon: React.ReactNode;
+  action?: boolean;
+  onAction?: () => void;
+}
 
 function snapshot(o: StrategyOption): StrategySnapshot {
   return {
@@ -45,17 +58,93 @@ function snapshot(o: StrategyOption): StrategySnapshot {
 export function AuthorizeScreen() {
   const { plan, chosenOption, recoveryOption, selectedPassengers, mode, setMode } =
     useJourney();
-  const { user, isAuthed, updateProfile, saveJourney, addTrip, logActivity, pushNotification } = useStore();
+  const { user, isAuthed, identity, wallet, updateProfile, saveJourney, addTrip, logActivity, pushNotification } = useStore();
+  const { t } = useLang();
   const [saveJ, setSaveJ] = useState(true);
   const [prefInApp, setPrefInApp] = useState(true);
   const [prefEmail, setPrefEmail] = useState(true);
   const [prefWhatsapp, setPrefWhatsapp] = useState(false);
-  const [userEmail, setUserEmail] = useState(user?.email || "vishal@example.com");
+  const [userEmail, setUserEmail] = useState(user?.email || "");
   const [authOpen, setAuthOpen] = useState(false);
+  const [identityOpen, setIdentityOpen] = useState(false);
   const router = useRouter();
 
   if (!plan || !chosenOption) return null;
   const total = chosenOption.fare * Math.max(1, selectedPassengers.length);
+
+  // Local, honest readiness read-out for this in-progress plan — no live
+  // system is queried; every item reflects what's already been chosen in
+  // this wizard.
+  const travellerNames = selectedPassengers.map((p) => p.name.split(" ")[0]);
+  const notifyReady = prefEmail ? !!userEmail.trim() : prefInApp || prefWhatsapp;
+  const identityReady = identity.status === "verified";
+  const paymentReady = wallet.balance >= total;
+  const checklist: ChecklistItem[] = [
+    {
+      id: "identity",
+      label: t("readiness.identity"),
+      ready: identityReady,
+      detail: identityReady
+        ? identity.maskedRef ?? t("id.readyLabel")
+        : t("id.notStarted"),
+      icon: <ShieldCheck className="h-4 w-4" />,
+      action: !identityReady,
+      onAction: () => setIdentityOpen(true),
+    },
+    {
+      id: "travellers",
+      label: t("readiness.travellers"),
+      ready: selectedPassengers.length > 0,
+      detail:
+        selectedPassengers.length > 0
+          ? travellerNames.join(", ")
+          : "No travellers added yet",
+      icon: <Users className="h-4 w-4" />,
+    },
+    {
+      id: "payment",
+      label: t("readiness.payment"),
+      ready: paymentReady,
+      detail: paymentReady
+        ? `${t("pay.walletTitle")} · ${formatFare(wallet.balance)}`
+        : t("pay.notEnough"),
+      icon: <Wallet className="h-4 w-4" />,
+    },
+    {
+      id: "primary",
+      label: t("readiness.primary"),
+      ready: true,
+      detail: `${chosenOption.title} · ${chosenOption.travelClass}`,
+      icon: <TrainFront className="h-4 w-4" />,
+    },
+    {
+      id: "backup",
+      label: t("readiness.backup"),
+      ready: !!recoveryOption,
+      detail: recoveryOption ? recoveryOption.title : "No backup selected — optional, but recommended",
+      icon: <Split className="h-4 w-4" />,
+    },
+    {
+      id: "boarding",
+      label: t("readiness.boarding"),
+      ready: true,
+      detail: chosenOption.boardingStationName,
+      icon: <MapPin className="h-4 w-4" />,
+    },
+    {
+      id: "notify",
+      label: t("readiness.notify"),
+      ready: notifyReady,
+      detail: notifyReady
+        ? prefEmail && userEmail
+          ? userEmail
+          : "In-app notifications enabled"
+        : "Add an email or keep in-app alerts on",
+      icon: <Bell className="h-4 w-4" />,
+      action: !notifyReady,
+    },
+  ];
+  const readyCount = checklist.filter((c) => c.ready).length;
 
   function activate() {
     if (!plan || !chosenOption) return;
@@ -132,52 +221,140 @@ export function AuthorizeScreen() {
     else setAuthOpen(true);
   }
 
-  const scope = [
-    { icon: <Eye className="h-4 w-4" />, text: "Watch the journey and Tatkal countdown" },
-    { icon: <Users className="h-4 w-4" />, text: `Prepare ${selectedPassengers.length} traveller${selectedPassengers.length > 1 ? "s" : ""}` },
-    { icon: <TrainFront className="h-4 w-4" />, text: `Hold ${chosenOption.title} as the primary strategy` },
-    ...(recoveryOption ? [{ icon: <Split className="h-4 w-4" />, text: `Keep ${recoveryOption.title} ready as backup` }] : []),
-    { icon: <Bell className="h-4 w-4" />, text: "Notify you before and when the window opens" },
-    { icon: <Ticket className="h-4 w-4" />, text: "Route you into booking — you make the final call" },
-  ];
-
   return (
-    <StepShell>
-      <Eyebrow>Step 6 · Activate your agent</Eyebrow>
-      <h2 className="text-headline">Hand this to your Copilot</h2>
-      <p className="mt-3 text-lg text-ink-soft">
-        You stay in control. Choose how your agent should act, then activate the plan.
-      </p>
-
-      <div className="mt-7 grid gap-3 sm:grid-cols-2">
-        <ModeCard
-          active={mode === "assisted"}
-          onClick={() => setMode("assisted")}
-          icon={<Bell className="h-5 w-5" />}
-          title="🤝 Assisted"
-          badgeLabel="Keep me in control"
-          body="Prepare everything, watch the clock, and make sure I'm there when Tatkal opens. I'll make the final booking decision."
-        />
-        <ModeCard
-          active={mode === "auto"}
-          onClick={() => setMode("auto")}
-          icon={<Zap className="h-5 w-5" />}
-          title="⚡ Permissioned"
-          badgeLabel="Let Copilot act"
-          body="Prepare everything and execute my booking strategy when Tatkal opens, including switching to my backup if needed."
-          demo
-        />
+    <StepShell wide>
+      {/* Hero readiness banner */}
+      <div className="flex flex-col gap-4 rounded-[var(--radius-lg)] border border-line bg-brand px-6 py-6 text-white sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h1 className="text-headline text-white">Prepare for tomorrow</h1>
+          <p className="mt-1.5 max-w-md text-[0.95rem] text-white/75">
+            Everything gets staged now, so nothing is left to chance when the Tatkal window opens.
+          </p>
+        </div>
+        <div className="flex shrink-0 items-center gap-3 rounded-[var(--radius)] bg-white/10 px-4 py-3">
+          <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-white/15">
+            <ShieldCheck className="h-[18px] w-[18px]" />
+          </span>
+          <div>
+            <div className="text-[0.9rem] font-semibold">{readyCount} of {checklist.length} ready</div>
+            <div className="text-xs text-white/70">10:00 AM Tatkal window · tomorrow</div>
+          </div>
+        </div>
       </div>
 
-      {/* Notification Channel Preferences */}
-      <Card className="mt-4 p-6">
+      <div className="mt-5 grid gap-5 lg:grid-cols-12">
+        {/* Checklist */}
+        <Card className="p-6 lg:col-span-7">
+          <h3 className="text-sm font-semibold uppercase tracking-wide text-brand">
+            Readiness checklist
+          </h3>
+          <ul className="mt-3 space-y-2.5">
+            {checklist.map((c, i) => (
+              <motion.li
+                key={c.id}
+                initial={{ opacity: 0, x: -6 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ delay: 0.04 * i }}
+                className={cn(
+                  "flex items-start gap-3 rounded-[var(--radius)] border px-3.5 py-3",
+                  c.action ? "border-caution/30 bg-caution-soft/40" : "border-line bg-surface-muted/40"
+                )}
+              >
+                <span
+                  className={cn(
+                    "mt-0.5 grid h-7 w-7 shrink-0 place-items-center rounded-full",
+                    c.ready ? "bg-confirm-soft text-confirm" : "bg-caution-soft text-caution"
+                  )}
+                >
+                  {c.ready ? <Check className="h-4 w-4" strokeWidth={3} /> : <AlertTriangle className="h-4 w-4" />}
+                </span>
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-1.5 text-[0.9rem] font-semibold text-ink">
+                    {c.icon}
+                    {c.label}
+                    {c.action && (
+                      <span className="rounded-full bg-caution-soft px-2 py-0.5 text-[0.65rem] font-semibold text-caution">
+                        Action needed
+                      </span>
+                    )}
+                  </div>
+                  <p className="mt-0.5 truncate text-[0.83rem] text-ink-soft">{c.detail}</p>
+                  {c.action && c.onAction && (
+                    <button
+                      onClick={c.onAction}
+                      className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-caution px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:brightness-95"
+                    >
+                      <ShieldCheck className="h-3.5 w-3.5" />
+                      {t("id.complete")}
+                    </button>
+                  )}
+                </div>
+              </motion.li>
+            ))}
+          </ul>
+        </Card>
+
+        {/* Wallet + delegation choice + guarantee */}
+        <div className="flex flex-col gap-4 lg:col-span-5">
+          <WalletCard estimatedFare={total} />
+          <Card className="p-6">
+            <h3 className="text-sm font-semibold uppercase tracking-wide text-brand">
+              Your booking strategy
+            </h3>
+            <p className="mt-1 text-[0.85rem] text-ink-soft">
+              Choose how tomorrow at 10:00 AM should play out.
+            </p>
+            <div className="mt-4 space-y-2.5" role="radiogroup" aria-label="Booking mode">
+              <ModeCard
+                active={mode === "assisted"}
+                onClick={() => setMode("assisted")}
+                icon={<Bell className="h-5 w-5" />}
+                title="🤝 Assisted"
+                badgeLabel="Keep me in control"
+                body="Prepare everything, watch the clock, and make sure I'm there when Tatkal opens. I'll make the final booking decision."
+              />
+              <ModeCard
+                active={mode === "auto"}
+                onClick={() => setMode("auto")}
+                icon={<Zap className="h-5 w-5" />}
+                title="⚡ Permissioned"
+                badgeLabel="Let Copilot act"
+                body="Prepare everything and execute my booking strategy when Tatkal opens, including switching to my backup if needed."
+                demo
+              />
+            </div>
+          </Card>
+
+          <Card className="p-6">
+            <div className="flex items-center gap-2 text-brand">
+              <ShieldCheck className="h-5 w-5" />
+              <h3 className="text-sm font-semibold uppercase tracking-wide">Copilot's guarantee</h3>
+            </div>
+            <ul className="mt-3 space-y-2">
+              {[
+                "Never deducts money or enters a bank OTP without your approval",
+                "Every payment happens under your direct confirmation on your device",
+                "No standing auto-debit authority — nothing is ever open-ended",
+              ].map((g) => (
+                <li key={g} className="flex items-start gap-2 text-[0.85rem] text-ink">
+                  <Check className="mt-0.5 h-3.5 w-3.5 shrink-0 text-confirm" strokeWidth={3} />
+                  {g}
+                </li>
+              ))}
+            </ul>
+          </Card>
+        </div>
+      </div>
+
+      {/* Notification channel preferences */}
+      <Card className="mt-5 p-6">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2 text-brand">
-            <Bell className="h-5 w-5" />
+            <Mail className="h-5 w-5" />
             <h3 className="text-sm font-semibold uppercase tracking-wide">How should Copilot reach you?</h3>
           </div>
           <span className="rounded-full bg-confirm-soft px-2.5 py-0.5 text-xs font-semibold text-confirm">
-            Email + In-app Recommended
+            Email + in-app recommended
           </span>
         </div>
         <p className="mt-1 text-sm text-ink-soft">
@@ -187,23 +364,20 @@ export function AuthorizeScreen() {
         {prefEmail && (
           <div className="mt-3">
             <label className="mb-1 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-ink-faint">
-              <Mail className="h-3.5 w-3.5 text-brand" /> Notification Email Address
+              <Mail className="h-3.5 w-3.5 text-brand" /> Notification email address
             </label>
             <input
               type="email"
               value={userEmail}
               onChange={(e) => setUserEmail(e.target.value)}
-              placeholder="e.g. vishal@example.com"
+              placeholder="you@example.com"
               className="w-full rounded-xl border border-line bg-surface px-3.5 py-2.5 text-sm font-medium text-ink focus:border-brand focus:outline-none focus:ring-1 focus:ring-brand"
             />
-            <p className="mt-1 text-[0.78rem] text-ink-faint">
-              Real email alerts sent via Resend REST API or demo payload generated
-            </p>
           </div>
         )}
         <div className="mt-4 grid gap-2.5 sm:grid-cols-3">
           <label className="flex cursor-pointer items-center justify-between rounded-xl border border-line bg-surface p-3">
-            <span className="text-sm font-medium text-ink">In-app Notification</span>
+            <span className="text-sm font-medium text-ink">In-app notification</span>
             <input
               type="checkbox"
               checked={prefInApp}
@@ -212,7 +386,7 @@ export function AuthorizeScreen() {
             />
           </label>
           <label className="flex cursor-pointer items-center justify-between rounded-xl border border-line bg-surface p-3">
-            <span className="text-sm font-medium text-ink">Email Escalation</span>
+            <span className="text-sm font-medium text-ink">Email escalation</span>
             <input
               type="checkbox"
               checked={prefEmail}
@@ -221,7 +395,7 @@ export function AuthorizeScreen() {
             />
           </label>
           <label className="flex cursor-pointer items-center justify-between rounded-xl border border-line bg-surface p-3">
-            <span className="text-sm font-medium text-ink">WhatsApp (Demo)</span>
+            <span className="text-sm font-medium text-ink">WhatsApp <DemoBadge /></span>
             <input
               type="checkbox"
               checked={prefWhatsapp}
@@ -229,36 +403,6 @@ export function AuthorizeScreen() {
               className="h-4 w-4 rounded border-line-strong text-brand focus:ring-brand"
             />
           </label>
-        </div>
-      </Card>
-
-      <Card className="mt-4 p-6">
-        <div className="flex items-center gap-2 text-brand">
-          <ShieldCheck className="h-5 w-5" />
-          <h3 className="text-sm font-semibold uppercase tracking-wide">
-            Your agent will
-          </h3>
-        </div>
-        <ul className="mt-3 space-y-2">
-          {scope.map((s, i) => (
-            <motion.li
-              key={i}
-              initial={{ opacity: 0, x: -6 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ delay: 0.05 + i * 0.05 }}
-              className="flex items-center gap-2.5 text-[0.98rem] text-ink"
-            >
-              <span className="grid h-6 w-6 shrink-0 place-items-center rounded-full bg-confirm-soft text-confirm">
-                <Check className="h-3.5 w-3.5" strokeWidth={3} />
-              </span>
-              <span className="text-ink-faint">{s.icon}</span>
-              {s.text}
-            </motion.li>
-          ))}
-        </ul>
-        <div className="mt-3 rounded-xl bg-surface-muted px-3.5 py-2.5 text-[0.85rem] text-ink-soft">
-          It will never enter an OTP, make a real payment, or claim a booking happened
-          without you.
         </div>
 
         <label className="mt-4 flex cursor-pointer items-center gap-2.5 rounded-xl border border-line bg-surface-muted px-3.5 py-2.5">
@@ -303,6 +447,10 @@ export function AuthorizeScreen() {
         title="Save this journey"
         reason="Sign in so Copilot can remember your plan and keep watching the clock until Tatkal opens."
       />
+
+      <AnimatePresence>
+        {identityOpen && <IdentityModal key="identity-modal" onClose={() => setIdentityOpen(false)} />}
+      </AnimatePresence>
     </StepShell>
   );
 }
@@ -325,10 +473,10 @@ function ModeCard({
   demo?: boolean;
 }) {
   return (
-    <button onClick={onClick} className="text-left">
+    <button onClick={onClick} className="block w-full text-left" role="radio" aria-checked={active}>
       <Card
         className={cn(
-          "h-full border-2 p-5 transition-colors",
+          "border-2 p-4 transition-colors",
           active ? "border-brand shadow-[var(--shadow-card)]" : "border-line hover:border-line-strong"
         )}
       >
@@ -336,14 +484,16 @@ function ModeCard({
           <span className={cn("grid h-9 w-9 place-items-center rounded-lg", active ? "bg-brand text-white" : "bg-brand-soft text-brand")}>
             {icon}
           </span>
-          {demo && <DemoBadge />}
-          {badgeLabel && (
-            <span className="rounded-full bg-confirm-soft px-2 py-0.5 text-[0.66rem] font-semibold text-confirm">
-              {badgeLabel}
-            </span>
-          )}
+          <div className="flex items-center gap-1.5">
+            {demo && <DemoBadge />}
+            {badgeLabel && (
+              <span className="rounded-full bg-confirm-soft px-2 py-0.5 text-[0.66rem] font-semibold text-confirm">
+                {badgeLabel}
+              </span>
+            )}
+          </div>
         </div>
-        <div className="mt-3 flex items-center gap-2">
+        <div className="mt-2.5 flex items-center gap-2">
           <span className="font-semibold text-ink">{title}</span>
           {active && <Check className="h-4 w-4 text-brand" strokeWidth={3} />}
         </div>

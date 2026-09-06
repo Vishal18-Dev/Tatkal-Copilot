@@ -11,6 +11,12 @@ import {
   type ReactNode,
 } from "react";
 import { savedPassengers } from "@/lib/data";
+import {
+  identityProvider,
+  DEFAULT_IDENTITY,
+  type IdentityReadiness,
+} from "@/lib/identity";
+import { walletProvider, DEFAULT_WALLET, type WalletState } from "@/lib/payments";
 import type {
   User,
   Session,
@@ -42,6 +48,10 @@ interface UserData {
   trips: Trip[];
   activity: ActivityEvent[];
   notifications: AppNotification[];
+  /** Identity Readiness — added in the readiness phase; back-compat via merge. */
+  identity: IdentityReadiness;
+  /** Rail Wallet readiness — added in the readiness phase. */
+  wallet: WalletState;
 }
 
 const defaultPreferences: UserPreferences = {
@@ -65,6 +75,8 @@ function seedData(): UserData {
     trips: [],
     activity: [],
     notifications: [],
+    identity: { ...DEFAULT_IDENTITY },
+    wallet: { ...DEFAULT_WALLET, lastUpdated: new Date().toISOString() },
   };
 }
 
@@ -81,6 +93,8 @@ function loadData(id: string): UserData {
         trips: (parsed.trips ?? []).map(normalizeTrip),
         activity: parsed.activity ?? [],
         notifications: parsed.notifications ?? [],
+        identity: { ...DEFAULT_IDENTITY, ...parsed.identity },
+        wallet: { ...DEFAULT_WALLET, ...parsed.wallet },
       };
     }
   } catch {
@@ -171,6 +185,16 @@ interface StoreCtx {
   updateProfile: (patch: Partial<Pick<User, "name" | "email">>) => void;
   updatePreferences: (patch: Partial<UserPreferences>) => void;
 
+  // readiness: identity + rail wallet (demo, provider-backed)
+  identity: IdentityReadiness;
+  wallet: WalletState;
+  /** Run the simulated identity verification via the active provider. */
+  verifyIdentity: (holderName: string) => Promise<IdentityReadiness>;
+  setIdentity: (patch: Partial<IdentityReadiness>) => void;
+  resetIdentity: () => void;
+  /** Debit the Rail Wallet for a (simulated) booking — the recovery rail. */
+  debitWallet: (amount: number) => Promise<{ ok: boolean; newBalance: number }>;
+
   addTraveller: (t: Omit<Traveller, "id">) => Traveller;
   updateTraveller: (id: string, patch: Omit<Traveller, "id">) => void;
   deleteTraveller: (id: string) => void;
@@ -202,6 +226,13 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [, setSession] = useState<Session | null>(null);
   const [data, setData] = useState<UserData>(() => seedData());
+
+  // Live mirror of `data` so async actions (wallet debit) read the latest
+  // balance without a stale closure.
+  const dataRef = useRef(data);
+  useEffect(() => {
+    dataRef.current = data;
+  }, [data]);
 
   const identity = user?.id ?? "guest";
   const otpRef = useRef<OtpState | null>(null);
@@ -323,6 +354,9 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         trips: mergeById(target.trips, guest.trips),
         activity: [...guest.activity, ...target.activity],
         notifications: [...guest.notifications, ...target.notifications],
+        // Prefer the user's own verified identity; otherwise carry the guest's.
+        identity: target.identity.status === "verified" ? target.identity : guest.identity,
+        wallet: target.wallet,
       };
       saveData(u.id, merged);
       try {
@@ -392,6 +426,44 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const updatePreferences = useCallback(
     (p: Partial<UserPreferences>) =>
       patch((d) => ({ ...d, preferences: { ...d.preferences, ...p } })),
+    [patch]
+  );
+
+  const setIdentity = useCallback(
+    (p: Partial<IdentityReadiness>) =>
+      patch((d) => ({ ...d, identity: { ...d.identity, ...p } })),
+    [patch]
+  );
+
+  const verifyIdentity = useCallback(
+    async (holderName: string): Promise<IdentityReadiness> => {
+      // Simulated, provider-backed. No real ID ever leaves the device.
+      setIdentity({ status: "verifying", holderName });
+      await identityProvider.beginVerification({ holderName });
+      const result = await identityProvider.confirm({ holderName });
+      patch((d) => ({ ...d, identity: result }));
+      return result;
+    },
+    [patch, setIdentity]
+  );
+
+  const resetIdentity = useCallback(
+    () => patch((d) => ({ ...d, identity: { ...DEFAULT_IDENTITY } })),
+    [patch]
+  );
+
+  const debitWallet = useCallback(
+    async (amount: number) => {
+      const current = dataRef.current.wallet.balance;
+      const res = await walletProvider.debit(amount, current);
+      if (res.ok) {
+        patch((d) => ({
+          ...d,
+          wallet: { ...d.wallet, balance: res.newBalance, lastUpdated: new Date().toISOString() },
+        }));
+      }
+      return { ok: res.ok, newBalance: res.newBalance };
+    },
     [patch]
   );
 
@@ -600,6 +672,12 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       unreadCount,
       updateProfile,
       updatePreferences,
+      identity: data.identity,
+      wallet: data.wallet,
+      verifyIdentity,
+      setIdentity,
+      resetIdentity,
+      debitWallet,
       addTraveller,
       updateTraveller,
       deleteTraveller,
@@ -625,6 +703,10 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       unreadCount,
       updateProfile,
       updatePreferences,
+      verifyIdentity,
+      setIdentity,
+      resetIdentity,
+      debitWallet,
       addTraveller,
       updateTraveller,
       deleteTraveller,

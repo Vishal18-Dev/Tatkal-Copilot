@@ -18,7 +18,7 @@ function PlanStage() {
 
   return (
     <div className="mx-auto -mt-6 max-w-5xl lg:-mt-6">
-      <div className="sticky top-[57px] z-30 -mx-4 mb-2 h-[3px] bg-transparent lg:-mx-8">
+      <div className="sticky top-16 z-30 -mx-4 mb-2 h-[3px] bg-transparent lg:-mx-8">
         <motion.div
           className="h-full bg-brand"
           animate={{ width: `${Math.max(6, pct)}%` }}

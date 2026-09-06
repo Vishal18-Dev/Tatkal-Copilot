@@ -17,17 +17,22 @@ import {
   Plus,
   Compass,
   Radio,
+  MessageCircle,
+  ShieldCheck,
+  Wallet,
+  Check,
 } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Chip } from "@/components/app/ui";
+import { CallButton } from "@/components/calling/CallButton";
 import { useStore } from "@/lib/store";
 import { useLang } from "@/lib/i18n";
 import { readinessFor } from "@/lib/agent";
 import { formatFare } from "@/lib/utils";
 
 export default function HomePage() {
-  const { hydrated, user, trips, savedJourneys, travellers, activity } = useStore();
+  const { hydrated, user, trips, savedJourneys, travellers, activity, identity, wallet } = useStore();
   const { t } = useLang();
   const router = useRouter();
   const [goal, setGoal] = useState("");
@@ -169,6 +174,20 @@ export default function HomePage() {
                     {readinessFor(activeTrip).filter((r) => r.done).length}/{readinessFor(activeTrip).length} {t("home.ready")}
                   </span>
                 </div>
+
+                {/* Identity + Payment readiness — prepared before Tatkal */}
+                <div className="flex flex-wrap items-center gap-2 pt-1">
+                  <ReadinessChip
+                    ready={identity.status === "verified"}
+                    icon={<ShieldCheck className="h-3.5 w-3.5" />}
+                    label={t("readiness.identity")}
+                  />
+                  <ReadinessChip
+                    ready={wallet.balance >= activeTrip.fare * Math.max(1, activeTrip.travellerIds.length)}
+                    icon={<Wallet className="h-3.5 w-3.5" />}
+                    label={t("readiness.payment")}
+                  />
+                </div>
               </div>
 
               <div className="flex shrink-0 flex-col gap-2 sm:flex-row md:flex-col">
@@ -177,6 +196,7 @@ export default function HomePage() {
                     <Compass className="h-4 w-4" /> {t("home.viewMissionControl")}
                   </Button>
                 </Link>
+                <CallButton className="inline-flex w-full items-center justify-center gap-2 rounded-[var(--radius)] border border-line-strong bg-surface px-4 py-2.5 text-sm font-medium text-ink-soft transition-colors hover:bg-surface-muted hover:text-ink" />
               </div>
             </div>
           </Card>
@@ -201,11 +221,12 @@ export default function HomePage() {
       {/* Quick Actions Grid */}
       <section>
         <h2 className="mb-2.5 text-xs font-semibold uppercase tracking-wide text-ink-faint">{t("home.quickActions")}</h2>
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
           <QuickAction href="/app/plan" icon={<Sparkles className="h-5 w-5" />} label={t("nav.plan")} sub={t("home.newJourney")} />
           <QuickAction href="/app/trips" icon={<Ticket className="h-5 w-5" />} label={t("nav.trips")} sub={`${trips.length} ${t("home.saved")}`} />
           <QuickAction href="/app/travellers" icon={<Users className="h-5 w-5" />} label={t("nav.travellers")} sub={`${travellers.length} ${t("home.inVault")}`} />
           <QuickAction href="/app/activity" icon={<ActivityIcon className="h-5 w-5" />} label={t("nav.activity")} sub={`${activity.length} ${t("home.events")}`} />
+          <QuickAction href="/app/whatsapp" icon={<MessageCircle className="h-5 w-5" />} label={t("wa.pageTitle")} sub={t("home.demo")} />
         </div>
       </section>
 
@@ -288,6 +309,29 @@ function QuickAction({
         </div>
       </Card>
     </Link>
+  );
+}
+
+function ReadinessChip({
+  ready,
+  icon,
+  label,
+}: {
+  ready: boolean;
+  icon: React.ReactNode;
+  label: string;
+}) {
+  return (
+    <span
+      className={
+        "inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[0.72rem] font-medium " +
+        (ready ? "bg-confirm-soft text-confirm" : "bg-caution-soft text-caution")
+      }
+    >
+      {icon}
+      {label}
+      {ready && <Check className="h-3 w-3" strokeWidth={3} />}
+    </span>
   );
 }
 

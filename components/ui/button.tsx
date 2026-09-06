@@ -6,12 +6,12 @@ import { motion, type HTMLMotionProps } from "framer-motion";
 import { cn } from "@/lib/utils";
 
 const buttonVariants = cva(
-  "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-full font-medium transition-colors disabled:pointer-events-none disabled:opacity-40 select-none",
+  "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-[var(--radius)] font-semibold transition-colors disabled:pointer-events-none disabled:opacity-40 select-none",
   {
     variants: {
       variant: {
         primary:
-          "bg-brand text-white shadow-[var(--shadow-brand)] hover:bg-[#4338ca]",
+          "bg-brand text-white shadow-[var(--shadow-brand)] hover:bg-brand-strong",
         secondary:
           "bg-surface text-ink border border-line-strong hover:bg-surface-muted",
         ghost: "text-ink-soft hover:text-ink hover:bg-surface-muted",
@@ -20,7 +20,7 @@ const buttonVariants = cva(
       size: {
         sm: "h-9 px-4 text-sm",
         md: "h-11 px-5 text-[0.95rem]",
-        lg: "h-14 px-8 text-base",
+        lg: "h-14 px-7 text-base",
         xl: "h-16 px-10 text-lg",
       },
     },
