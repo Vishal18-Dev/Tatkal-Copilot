@@ -3,9 +3,10 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import {
   Sparkles,
+  Mic,
   ArrowRight,
   Ticket,
   Users,
@@ -26,16 +27,22 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Chip } from "@/components/app/ui";
 import { CallButton } from "@/components/calling/CallButton";
+import { VoiceConversation } from "@/components/voice/VoiceConversation";
 import { useStore } from "@/lib/store";
 import { useLang } from "@/lib/i18n";
+import { useInteractionMode } from "@/lib/interaction-mode";
 import { readinessFor } from "@/lib/agent";
 import { formatFare } from "@/lib/utils";
 
 export default function HomePage() {
   const { hydrated, user, trips, savedJourneys, travellers, activity, identity, wallet } = useStore();
   const { t } = useLang();
+  const { mode: interactionMode } = useInteractionMode();
   const router = useRouter();
   const [goal, setGoal] = useState("");
+  const [voiceOpen, setVoiceOpen] = useState(false);
+
+  const voiceFirst = interactionMode === "voice" || interactionMode === "accessible";
 
   const upcoming = trips.filter((tr) => tr.agentState !== "confirmed");
   const booked = trips.filter((tr) => tr.agentState === "confirmed");
@@ -112,15 +119,36 @@ export default function HomePage() {
             placeholder={t("home.placeholderNext")}
             className="w-full bg-transparent px-1 py-2 text-[1.02rem] text-ink placeholder:text-ink-faint focus:outline-none"
           />
+          {/* Speak this journey — leads with brand emphasis when voice is the chosen mode. */}
+          <button
+            onClick={() => setVoiceOpen(true)}
+            aria-label={t("goal.speakTitle")}
+            aria-haspopup="dialog"
+            className={
+              voiceFirst
+                ? "grid h-10 w-10 shrink-0 place-items-center rounded-full bg-brand text-white shadow-[var(--shadow-brand)] transition hover:opacity-90"
+                : "grid h-10 w-10 shrink-0 place-items-center rounded-full border border-line-strong bg-surface text-ink-soft transition-colors hover:border-brand hover:text-brand"
+            }
+          >
+            <Mic className="h-5 w-5" />
+          </button>
           <button
             onClick={() => plan()}
             aria-label={t("nav.plan")}
-            className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-brand text-white shadow-[var(--shadow-brand)] transition-colors hover:bg-[#4338ca]"
+            className={
+              voiceFirst
+                ? "grid h-10 w-10 shrink-0 place-items-center rounded-full border border-line-strong bg-surface text-ink-soft transition-colors hover:border-brand hover:text-brand"
+                : "grid h-10 w-10 shrink-0 place-items-center rounded-full bg-brand text-white shadow-[var(--shadow-brand)] transition-colors hover:bg-[#4338ca]"
+            }
           >
             <ArrowRight className="h-5 w-5" />
           </button>
         </div>
       </motion.div>
+
+      <AnimatePresence>
+        {voiceOpen && <VoiceConversation key="home-voice" onClose={() => setVoiceOpen(false)} />}
+      </AnimatePresence>
 
       {/* Primary Section: Active Tatkal Plan or Empty State */}
       {hydrated && activeTrip ? (

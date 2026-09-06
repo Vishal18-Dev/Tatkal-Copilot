@@ -48,13 +48,14 @@ export function VoiceConversation({
   onConfirmGoal?: (goal: string, plan: Plan) => void;
 }) {
   const { t, lang } = useLang();
-  const { voiceLang, observeDetected } = useVoiceLang();
+  const { voiceLang, locked, observeDetected } = useVoiceLang();
   const router = useRouter();
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
 
   const convo = useVoiceConversation({
     voiceLang,
+    locked,
     onDetectLang: observeDetected,
     onConfirm: (goal, plan) => {
       if (onConfirmGoal) onConfirmGoal(goal, plan);

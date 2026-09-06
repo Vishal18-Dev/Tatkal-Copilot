@@ -84,6 +84,13 @@ export interface VoiceCommand {
 export interface VoiceConversationOptions {
   /** The active spoken language (one of the 10). Sent to STT/respond/speak. */
   voiceLang: VoiceLang;
+  /**
+   * Whether the user has explicitly locked a language. When false (auto), the
+   * agent responds in the language Sarvam DETECTS from the speech, not the
+   * currently-selected one — so "speak Tamil, hear Tamil" works even if the
+   * selector still says English. When true, the chosen language always wins.
+   */
+  locked?: boolean;
   /** Called once the user confirms the recommended option — routes into the
    *  existing /app/plan wizard. Never books anything itself. */
   onConfirm: (goal: string, plan: Plan) => void;

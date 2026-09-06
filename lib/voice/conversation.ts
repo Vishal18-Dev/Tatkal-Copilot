@@ -15,6 +15,7 @@ import {
   VOICE_MIN_RECORDING_MS,
   VOICE_REQUEST_TIMEOUT_MS,
 } from "./types";
+import { fromBcp47, type VoiceLang } from "./languages";
 import type {
   VoiceConversationOptions,
   VoiceErrorKind,
@@ -36,7 +37,7 @@ const nextId = () => `turn_${Date.now()}_${turnSeq++}`;
  * this file for "onConfirm" — that is the ONLY way state leaves this module,
  * and it is a plain callback, not a call into the booking agent or store.
  */
-export function useVoiceConversation({ voiceLang, onConfirm, onDetectLang }: VoiceConversationOptions) {
+export function useVoiceConversation({ voiceLang, locked = false, onConfirm, onDetectLang }: VoiceConversationOptions) {
   const [state, setState] = useState<VoiceState>("idle");
   const [errorKind, setErrorKind] = useState<VoiceErrorKind | null>(null);
   const [turns, setTurns] = useState<VoiceTurn[]>([]);
@@ -57,6 +58,14 @@ export function useVoiceConversation({ voiceLang, onConfirm, onDetectLang }: Voi
   // knows its result is stale and must not overwrite newer UI state.
   const requestGenRef = useRef(0);
   const abortRef = useRef<AbortController | null>(null);
+
+  // The language the agent actually responds in. Held in a ref (not the
+  // voiceLang prop) so a language DETECTED mid-turn takes effect on the very
+  // same turn's response, instead of waiting a render for the prop to catch up.
+  const activeLangRef = useRef<VoiceLang>(voiceLang);
+  useEffect(() => {
+    activeLangRef.current = voiceLang;
+  }, [voiceLang]);
 
   useEffect(() => {
     setMicSupported(
@@ -209,7 +218,13 @@ export function useVoiceConversation({ voiceLang, onConfirm, onDetectLang }: Voi
       }
 
       // Follow the speaker's detected language (unless they've locked one).
-      if (data.languageCode) onDetectLang?.(data.languageCode);
+      // Set the active response language NOW so this turn's reply is spoken back
+      // in the language they actually used — not the one the selector shows.
+      if (data.languageCode) {
+        const detected = fromBcp47(data.languageCode);
+        if (detected && !locked) activeLangRef.current = detected;
+        onDetectLang?.(data.languageCode);
+      }
       pushTurn("user", text);
 
       if (!resultRef.current) {
@@ -224,7 +239,7 @@ export function useVoiceConversation({ voiceLang, onConfirm, onDetectLang }: Voi
       clearTimeout(timer);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [voiceLang, pushTurn, onDetectLang]);
+  }, [voiceLang, locked, pushTurn, onDetectLang]);
 
   const requestPlan = useCallback(
     async (goal: string, myGen: number) => {
@@ -237,7 +252,7 @@ export function useVoiceConversation({ voiceLang, onConfirm, onDetectLang }: Voi
         const res = await fetch("/api/voice/respond", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ transcript: goal, voiceLang }),
+          body: JSON.stringify({ transcript: goal, voiceLang: activeLangRef.current }),
           signal: controller.signal,
         });
         if (myGen !== requestGenRef.current) return;
@@ -310,7 +325,7 @@ export function useVoiceConversation({ voiceLang, onConfirm, onDetectLang }: Voi
         const res = await fetch("/api/voice/speak", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ text: english, voiceLang }),
+          body: JSON.stringify({ text: english, voiceLang: activeLangRef.current }),
         });
         const data = (await res.json().catch(() => ({}))) as {
           text?: string;
