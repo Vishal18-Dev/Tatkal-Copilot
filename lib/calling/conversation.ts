@@ -16,9 +16,9 @@ export interface CallLine {
   language?: string;
 }
 
-const VAD_RMS_THRESHOLD = 0.018;
-const VAD_SILENCE_DURATION_MS = 1300;
-const VAD_MIN_SPEECH_DURATION_MS = 350;
+const VAD_RMS_THRESHOLD = 0.005;
+const VAD_SILENCE_DURATION_MS = 900;
+const VAD_MIN_SPEECH_DURATION_MS = 200;
 
 export function useCallConversation(
   script: CallScript,
@@ -65,6 +65,8 @@ export function useCallConversation(
   const speechStartTimeRef = useRef(0);
   const silenceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  const speechRecRef = useRef<any>(null);
+
   const cleanupAudio = useCallback(() => {
     if (audioRef.current) {
       audioRef.current.pause();
@@ -73,6 +75,12 @@ export function useCallConversation(
   }, []);
 
   const cleanupMic = useCallback(() => {
+    if (speechRecRef.current) {
+      try {
+        speechRecRef.current.abort();
+      } catch {}
+      speechRecRef.current = null;
+    }
     if (silenceTimerRef.current) {
       clearTimeout(silenceTimerRef.current);
       silenceTimerRef.current = null;
@@ -243,6 +251,41 @@ export function useCallConversation(
       audioChunksRef.current = [];
       speechDetectedRef.current = false;
       speechStartTimeRef.current = 0;
+
+      // Web Speech API for instant zero-latency speech recognition if supported
+      if (typeof window !== "undefined") {
+        const SpeechRec = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+        if (SpeechRec) {
+          try {
+            const sr = new SpeechRec();
+            sr.continuous = false;
+            sr.interimResults = true;
+            sr.lang = activeLangRef.current === "hi" ? "hi-IN" : "en-IN";
+            sr.onresult = (ev: any) => {
+              const text = Array.from(ev.results)
+                .map((r: any) => r[0].transcript)
+                .join("");
+              if (text.trim()) {
+                speechDetectedRef.current = true;
+                setInterimText(`Listening: "${text.trim()}"`);
+                if (ev.results[0].isFinal) {
+                  try {
+                    sr.stop();
+                  } catch {}
+                  if (recorderRef.current && recorderRef.current.state === "recording") {
+                    recorderRef.current.stop();
+                  }
+                  void handleUserTurn(text.trim());
+                }
+              }
+            };
+            sr.start();
+            speechRecRef.current = sr;
+          } catch {
+            /* ignore browser speech rec errors */
+          }
+        }
+      }
 
       // Setup VAD AudioContext + Analyser
       const AudioCtx = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
