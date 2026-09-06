@@ -127,6 +127,7 @@ const en: Dict = {
   "call.accept": "Accept",
   "call.decline": "Decline",
   "call.hangUp": "Hang up",
+  "call.cannotPlace": "I couldn't place the call right now. Please try again later.",
   "call.endedNote": "The call has ended.",
   "call.simNote": "This is a simulated call for demo purposes — no real phone call is placed.",
 
@@ -772,6 +773,7 @@ const hi: Dict = {
   "call.accept": "स्वीकार करें",
   "call.decline": "अस्वीकार करें",
   "call.hangUp": "कॉल काटें",
+  "call.cannotPlace": "मैं अभी कॉल नहीं कर सका। कृपया बाद में फिर कोशिश करें।",
   "call.endedNote": "कॉल समाप्त हो गई है।",
   "call.simNote": "यह डेमो के लिए एक सिम्युलेटेड कॉल है — कोई असली फ़ोन कॉल नहीं की जाती।",
 

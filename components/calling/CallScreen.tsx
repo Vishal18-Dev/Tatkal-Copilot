@@ -10,14 +10,46 @@ import { useStore } from "@/lib/store";
 import { cn } from "@/lib/utils";
 import { buildCallScript } from "@/lib/calling/script";
 import { useCallConversation } from "@/lib/calling/conversation";
+import { callingProvider, type CallReason, type PlacedCall } from "@/lib/calling/provider";
+import type { CopilotContext } from "@/lib/copilot";
+import type { Trip } from "@/types";
 import { VoiceWaveform } from "@/components/voice/VoiceWaveform";
+
+function reasonFor(trip: Trip | null): CallReason {
+  if (!trip) return "no_trip";
+  const s = trip.agentState;
+  if (s === "primary_failed" || s === "backup_recommended" || s === "backup_attempt") return "primary_failed";
+  if (s === "confirmed") return "confirmed";
+  if (s === "window_open" || s === "user_action_required" || s === "booking_in_progress") return "check_in";
+  return "tatkal_open_soon";
+}
 
 export function CallScreen({ onClose }: { onClose: () => void }) {
   const { t, lang } = useLang();
   const router = useRouter();
-  const { trips, user } = useStore();
+  const { trips, user, wallet, identity, travellers } = useStore();
   const activeTrip = trips.find((tr) => tr.agentState !== "confirmed") ?? trips[0] ?? null;
-  const script = buildCallScript(activeTrip, user?.name, lang);
+
+  // One brain: the phone agent reads the journey through the same Copilot tools
+  // the browser voice agent uses.
+  const ctx: CopilotContext = { lang, trip: activeTrip ?? undefined, wallet, identity, travellers };
+  const script = buildCallScript(ctx, user?.name, lang);
+
+  // Telephony boundary: "place" the outbound call through the provider. The
+  // mock resolves immediately (the UI renders the ring/audio); a real provider
+  // would dial and report failure honestly instead of faking a call.
+  const [placed, setPlaced] = useState<PlacedCall | null>(null);
+  useEffect(() => {
+    let alive = true;
+    callingProvider
+      .placeCall({ toName: user?.name, reason: reasonFor(activeTrip), tripId: activeTrip?.id })
+      .then((r) => {
+        if (alive) setPlaced(r);
+      });
+    return () => {
+      alive = false;
+    };
+  }, [activeTrip, user?.name]);
 
   const { state, lines, currentStep, ring, accept, decline, reply } = useCallConversation(
     script,
@@ -35,9 +67,10 @@ export function CallScreen({ onClose }: { onClose: () => void }) {
   // "idle". Letting the effect re-run freely is safe — clearTimeout always
   // cancels the stale timer first, so `ring()` still fires exactly once.
   useEffect(() => {
+    if (!placed?.ok) return; // wait until the provider has placed the call
     const timer = setTimeout(ring, 500);
     return () => clearTimeout(timer);
-  }, [ring]);
+  }, [placed, ring]);
 
   useEffect(() => {
     if (state === "ended") {
@@ -61,6 +94,32 @@ export function CallScreen({ onClose }: { onClose: () => void }) {
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
   if (!mounted) return null;
+
+  // Honest failure: if the (real) telephony provider can't place the call, say
+  // so instead of faking a ring. The mock never hits this path.
+  if (placed && !placed.ok) {
+    return createPortal(
+      <motion.div
+        className="fixed inset-0 z-[70] flex flex-col items-center justify-center gap-4 bg-[#0b1626] px-6 text-center text-white"
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        role="dialog"
+        aria-modal="true"
+        aria-label={t("call.title")}
+      >
+        <PhoneOff className="h-10 w-10 text-white/70" />
+        <p className="max-w-sm text-white/80">{placed.error ?? t("call.cannotPlace")}</p>
+        <button
+          onClick={onClose}
+          className="rounded-full bg-white/10 px-5 py-2.5 text-sm font-medium text-white transition-colors hover:bg-white/20"
+        >
+          {t("call.hangUp")}
+        </button>
+      </motion.div>,
+      document.body
+    );
+  }
 
   return createPortal(
     <motion.div
@@ -96,7 +155,7 @@ export function CallScreen({ onClose }: { onClose: () => void }) {
         </motion.span>
         <div>
           <div className="text-xl font-semibold">{script.callerTitle}</div>
-          <div className="text-sm text-white/60">{script.callerSubtitle}</div>
+          <div className="text-sm text-white/60">{callingProvider.channelLabel(lang)}</div>
         </div>
       </div>
 

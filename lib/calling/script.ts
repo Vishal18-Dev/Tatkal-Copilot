@@ -1,20 +1,31 @@
 import type { Lang } from "@/lib/i18n";
-import type { Trip } from "@/types";
+import {
+  getBackupOption,
+  getJourneyContext,
+  getRecommendations,
+  getTatkalStatus,
+  getWalletBalance,
+  type CopilotContext,
+} from "@/lib/copilot";
 import type { CallScript } from "./types";
 
 /**
- * Builds the call script from real trip/agent state — never invents a train,
- * fare, PNR or booking outcome. Mirrors the same three proactive moments
- * described in the product vision (before Tatkal / during booking / a
- * primary failure), branching on the trip's actual `agentState` rather than
- * a fixed narrative. If there's no active trip, the call says so honestly
- * instead of pretending one exists.
+ * Builds the call script from the SHARED Copilot tool layer — the phone agent
+ * reasons about the journey through the exact same tools browser voice uses
+ * (get_journey_context, get_recommendations, get_tatkal_status,
+ * get_backup_option, get_wallet_balance), so a train, fare, window time or
+ * backup a caller hears is grounded, real journey data, never invented. The
+ * deterministic branching (before Tatkal / during booking / a primary failure
+ * / confirmed) keys off the trip's actual agentState. No active trip → the
+ * call says so honestly instead of pretending one exists.
  */
-export function buildCallScript(trip: Trip | null, userName: string | undefined, lang: Lang): CallScript {
+export function buildCallScript(ctx: CopilotContext, userName: string | undefined, lang: Lang): CallScript {
   const hi = lang === "hi";
   const name = userName ? `${hi ? "" : "Hi "}${userName}${hi ? " जी" : ""}` : hi ? "नमस्ते" : "Hi there";
   const callerTitle = hi ? "तत्काल कोपायलट" : "Tatkal Copilot";
   const callerSubtitle = hi ? "प्रोएक्टिव कॉल · डेमो" : "Proactive call · Demo";
+
+  const trip = ctx.trip ?? null;
 
   if (!trip) {
     return {
@@ -43,12 +54,32 @@ export function buildCallScript(trip: Trip | null, userName: string | undefined,
     };
   }
 
-  const primary = trip.primary.trainName;
-  const backupLine = trip.backup
-    ? hi
-      ? `आपका बैकअप ${trip.backup.trainName} भी तैयार है।`
-      : `Your backup, ${trip.backup.trainName}, is ready too.`
-    : "";
+  // ── One brain: pull the facts from the shared Copilot tools ──
+  const rec = getRecommendations(ctx).data as { trainName: string } | undefined;
+  const tatkal = getTatkalStatus(ctx).data as { opensAtLabel: string } | undefined;
+  const backup = getBackupOption(ctx).data as { hasBackup: boolean; trainName?: string } | undefined;
+  const journey = getJourneyContext(ctx).data as { from: string; to: string } | undefined;
+  const wallet = getWalletBalance(ctx).data as { covers: boolean | null } | undefined;
+
+  const primary = rec?.trainName ?? trip.primary.trainName;
+  const from = journey?.from ?? trip.from;
+  const to = journey?.to ?? trip.to;
+  const opensAt = tatkal?.opensAtLabel ?? trip.tatkalOpensAtLabel;
+
+  const backupLine =
+    backup?.hasBackup && backup.trainName
+      ? hi
+        ? `आपका बैकअप ${backup.trainName} भी तैयार है।`
+        : `Your backup, ${backup.trainName}, is ready too.`
+      : "";
+
+  // Fare transparency (spec §17): state up front whether the Rail Wallet covers it.
+  const paymentLine =
+    wallet?.covers === true
+      ? hi
+        ? "आपका रेल वॉलेट इस किराए को कवर करता है।"
+        : "Your Rail Wallet covers the fare."
+      : "";
 
   // Failure / recovery moment.
   if (trip.agentState === "primary_failed" || trip.agentState === "backup_recommended" || trip.agentState === "backup_attempt") {
@@ -108,8 +139,8 @@ export function buildCallScript(trip: Trip | null, userName: string | undefined,
         start: {
           id: "start",
           text: hi
-            ? `${name}, अच्छी खबर — आपकी ${trip.from} से ${trip.to} यात्रा कन्फर्म हो गई है।`
-            : `${name}, good news — your ${trip.from} to ${trip.to} journey is confirmed.`,
+            ? `${name}, अच्छी खबर — आपकी ${from} से ${to} यात्रा कन्फर्म हो गई है।`
+            : `${name}, good news — your ${from} to ${to} journey is confirmed.`,
           replies: [{ label: hi ? "टिकट देखें" : "Show me the ticket", next: "bye_trip", action: "open_trip" }],
         },
         bye_trip: {
@@ -128,8 +159,8 @@ export function buildCallScript(trip: Trip | null, userName: string | undefined,
       start: {
         id: "start",
         text: hi
-          ? `${name}, आपकी ${trip.to} यात्रा तैयार है। तत्काल ${trip.tatkalOpensAtLabel} पर खुलता है। आपका प्राथमिक ट्रेन ${primary} तैयार है। ${backupLine}`
-          : `${name}, your ${trip.to} journey is ready. Tatkal opens at ${trip.tatkalOpensAtLabel}. Your primary train, ${primary}, is prepared. ${backupLine}`,
+          ? `${name}, आपकी ${to} यात्रा तैयार है। तत्काल ${opensAt} पर खुलता है। आपका प्राथमिक ट्रेन ${primary} तैयार है। ${backupLine} ${paymentLine}`.trim()
+          : `${name}, your ${to} journey is ready. Tatkal opens at ${opensAt}. Your primary train, ${primary}, is prepared. ${backupLine} ${paymentLine}`.trim(),
         next: "confirm_proceed",
       },
       confirm_proceed: {
