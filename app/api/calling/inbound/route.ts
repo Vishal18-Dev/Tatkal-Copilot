@@ -11,14 +11,17 @@ export const runtime = "nodejs";
  * establishes the conversational loop.
  */
 export async function POST(req: Request) {
+  const url = new URL(req.url);
+  const queryCallSid = url.searchParams.get("callSid");
+
   const formData = await req.formData().catch(() => new FormData());
-  const callSid = (formData.get("CallSid") as string) || `inbound_${Date.now()}`;
+  const callSid = (formData.get("CallSid") as string) || queryCallSid || `inbound_${Date.now()}`;
   const from = (formData.get("From") as string) || "";
   const to = (formData.get("To") as string) || "";
 
   console.info(`[calling/inbound] received inbound callSid=${callSid} from=${maskPhoneNumber(from)}`);
 
-  // Initialize phone session
+  // Initialize/retrieve phone session
   const session = getOrCreatePhoneSession(callSid, {
     toNumber: to,
     fromNumber: from,
@@ -26,23 +29,24 @@ export async function POST(req: Request) {
   });
 
   const hasTrip = Boolean(session.trip);
-  const greeting = hasTrip
-    ? `नमस्ते, मैं आपका तत्काल कोपायलट हूँ। आपकी ${session.trip?.from ?? "यात्रा"} से ${session.trip?.to ?? "गंतव्य"} की यात्रा तैयार है। मैं आपकी क्या मदद कर सकता हूँ?`
-    : "नमस्ते, मैं आपका तत्काल कोपायलट हूँ। अभी आपकी कोई सक्रिय यात्रा नहीं मिली है। आप कहाँ से कहाँ जाना चाहते हैं?";
+  const greeting =
+    session.briefing ||
+    (hasTrip
+      ? `नमस्ते, मैं आपका तत्काल कोपायलट हूँ। आपकी ${session.trip?.from ?? "यात्रा"} से ${session.trip?.to ?? "गंतव्य"} की यात्रा तैयार है। मैं आपकी क्या मदद कर सकता हूँ?`
+      : "नमस्ते, मैं आपका तत्काल कोपायलट हूँ। अभी आपकी कोई सक्रिय यात्रा नहीं मिली है। आप कहाँ से कहाँ जाना चाहते हैं?");
 
   // TwiML response: Speak greeting and listen for caller response via conversational Gather
   const host = req.headers.get("host") || "localhost:3000";
   const protocol = host.includes("localhost") ? "http" : "https";
-  const wsProtocol = host.includes("localhost") ? "ws" : "wss";
 
   const actionUrl = `${protocol}://${host}/api/calling/respond?callSid=${encodeURIComponent(callSid)}`;
-  const statusCallback = `${protocol}://${host}/api/calling/status`;
-  const streamUrl = `${wsProtocol}://${host}/api/calling/stream?callSid=${encodeURIComponent(callSid)}`;
+
+  const speechHints = "Pune, Mumbai, Delhi, Tatkal, AC 3 Tier, Rajdhani, confirm, train, booking, strategy, yes, no, haan, nahi";
 
   const twiml = `<?xml version="1.0" encoding="UTF-8"?>
 <Response>
   <Say language="hi-IN" voice="Polly.Aditi">${escapeXml(greeting)}</Say>
-  <Gather input="speech" action="${escapeXml(actionUrl)}" method="POST" language="hi-IN" speechTimeout="auto" speechModel="experimental_conversations">
+  <Gather input="speech" action="${escapeXml(actionUrl)}" method="POST" language="hi-IN" speechTimeout="auto" hints="${escapeXml(speechHints)}" speechModel="experimental_conversations">
     <Say language="hi-IN" voice="Polly.Aditi">मैं सुन रहा हूँ।</Say>
   </Gather>
   <Redirect method="POST">${escapeXml(actionUrl)}</Redirect>

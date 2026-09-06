@@ -8,6 +8,8 @@ export interface PhoneSession {
   streamSid?: string;
   conversation: Conversation;
   trip?: Trip;
+  briefing?: string;
+  reason?: string;
   language: VoiceLang;
   status: "initiated" | "ringing" | "connected" | "active" | "ended";
   isSpeaking: boolean;
@@ -40,6 +42,8 @@ export function getOrCreatePhoneSession(
   callSid: string,
   options?: {
     trip?: Trip;
+    briefing?: string;
+    reason?: string;
     language?: VoiceLang;
     toNumber?: string;
     fromNumber?: string;
@@ -63,6 +67,8 @@ export function getOrCreatePhoneSession(
       callSid,
       conversation,
       trip: options?.trip,
+      briefing: options?.briefing,
+      reason: options?.reason,
       language,
       status: "initiated",
       isSpeaking: false,
@@ -80,10 +86,25 @@ export function getOrCreatePhoneSession(
     console.info(`[phone-session] created session callSid=${callSid} to=${maskPhoneNumber(options?.toNumber)}`);
   } else if (options) {
     if (options.trip) session.trip = options.trip;
+    if (options.briefing) session.briefing = options.briefing;
+    if (options.reason) session.reason = options.reason;
     if (options.language) session.language = options.language;
     session.lastActivity = Date.now();
   }
 
+  return session;
+}
+
+export function rekeyPhoneSession(oldCallSid: string, newCallSid: string): PhoneSession | undefined {
+  if (oldCallSid === newCallSid) return callSessions.get(oldCallSid);
+  const session = callSessions.get(oldCallSid);
+  if (!session) return undefined;
+
+  callSessions.delete(oldCallSid);
+  session.callSid = newCallSid;
+  session.conversation.id = newCallSid;
+  callSessions.set(newCallSid, session);
+  console.info(`[phone-session] rekeyed session oldSid=${oldCallSid} -> newSid=${newCallSid}`);
   return session;
 }
 

@@ -99,11 +99,12 @@ function buildTwimlResponse(callSid: string, speakText: string, lang: VoiceLang,
   const protocol = host.includes("localhost") ? "http" : "https";
   const actionUrl = `${protocol}://${host}/api/calling/respond?callSid=${encodeURIComponent(callSid)}`;
   const twilioLang = getTwilioLang(lang);
+  const speechHints = "Pune, Mumbai, Delhi, Tatkal, AC 3 Tier, Rajdhani, confirm, train, booking, strategy, yes, no, haan, nahi, fastest, cheapest, backup";
 
   return `<?xml version="1.0" encoding="UTF-8"?>
 <Response>
   <Say language="${twilioLang}" voice="Polly.Aditi">${escapeXml(speakText)}</Say>
-  <Gather input="speech" action="${escapeXml(actionUrl)}" method="POST" language="${twilioLang}" speechTimeout="auto" speechModel="experimental_conversations">
+  <Gather input="speech" action="${escapeXml(actionUrl)}" method="POST" language="${twilioLang}" speechTimeout="auto" hints="${escapeXml(speechHints)}" speechModel="experimental_conversations">
   </Gather>
   <Redirect method="POST">${escapeXml(actionUrl)}</Redirect>
 </Response>`;

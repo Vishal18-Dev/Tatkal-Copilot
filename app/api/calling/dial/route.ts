@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getOrCreatePhoneSession, maskPhoneNumber } from "@/lib/calling/session-manager";
+import { getOrCreatePhoneSession, maskPhoneNumber, rekeyPhoneSession } from "@/lib/calling/session-manager";
 
 export const runtime = "nodejs";
 
@@ -19,6 +19,7 @@ export async function POST(req: Request) {
 
   const to = (body.to ?? "").trim();
   const briefing = (body.briefing ?? "").trim().slice(0, 1000);
+  const reason = (body.reason ?? "").trim();
 
   if (!to || !/^\+?[0-9\s-]{8,15}$/.test(to)) {
     return NextResponse.json({ ok: false, reason: "invalid_number" }, { status: 400 });
@@ -36,43 +37,26 @@ export async function POST(req: Request) {
   const toE164 = to.startsWith("+") ? to.replace(/[\s-]/g, "") : `+91${to.replace(/[\s-]/g, "")}`;
   const host = req.headers.get("host") || "localhost:3000";
   const protocol = host.includes("localhost") ? "http" : "https";
-  const wsProtocol = host.includes("localhost") ? "ws" : "wss";
 
   const tempCallSid = `call_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
   const session = getOrCreatePhoneSession(tempCallSid, {
     toNumber: toE164,
     language: "hi",
+    briefing,
+    reason,
   });
 
-  const actionUrl = `${protocol}://${host}/api/calling/respond?callSid=${encodeURIComponent(tempCallSid)}`;
   const statusUrl = `${protocol}://${host}/api/calling/status`;
-  const streamUrl = `${wsProtocol}://${host}/api/calling/stream?callSid=${encodeURIComponent(tempCallSid)}`;
-
-  // Contextual Opening (Spec Requirement §8)
-  let openingGreeting = briefing;
-  if (!openingGreeting) {
-    if (session.trip) {
-      openingGreeting = `Hi, this is Tatkal Copilot. You asked me to help with your ${session.trip.from} to ${session.trip.to} Tatkal journey. I have your journey context ready. Would you like me to walk you through the options?`;
-    } else {
-      openingGreeting = "Hi, this is Tatkal Copilot. I'm ready to help plan your Tatkal journey. Where would you like to travel?";
-    }
-  }
-
-  // TwiML with bidirectional Media Stream (Spec Requirement §2)
-  const twiml = `<?xml version="1.0" encoding="UTF-8"?>
-<Response>
-  <Connect>
-    <Stream url="${escapeXml(streamUrl)}" />
-  </Connect>
-  <Say voice="Polly.Aditi">${escapeXml(openingGreeting)}</Say>
-  <Gather input="speech" action="${escapeXml(actionUrl)}" method="POST" language="hi-IN" speechTimeout="auto" speechModel="experimental_conversations">
-    <Say voice="Polly.Aditi">मैं सुन रहा हूँ। आप क्या करना चाहेंगे?</Say>
-  </Gather>
-  <Redirect method="POST">${escapeXml(actionUrl)}</Redirect>
-</Response>`;
 
   try {
     console.info(`[api/calling/dial] placing outbound call to=${maskPhoneNumber(toE164)}`);
+    const publicUrl = process.env.TWILIO_WEBHOOK_URL || process.env.PUBLIC_URL || process.env.NEXT_PUBLIC_APP_URL;
+
+    let targetCallbackBase = `${protocol}://${host}`;
+    if (publicUrl && !publicUrl.includes("localhost")) {
+      targetCallbackBase = publicUrl.replace(/\/$/, "");
+    }
+
     const formParams: Record<string, string> = {
       To: toE164,
       From: from,
@@ -80,17 +64,17 @@ export async function POST(req: Request) {
       StatusCallbackEvent: "completed",
     };
 
-    const publicUrl = process.env.TWILIO_WEBHOOK_URL || process.env.PUBLIC_URL || process.env.NEXT_PUBLIC_APP_URL;
-
     if (body.url) {
       formParams.Url = body.url;
-    } else if (publicUrl && !publicUrl.includes("localhost")) {
-      formParams.Url = `${publicUrl.replace(/\/$/, "")}/api/calling/inbound`;
     } else if (host.includes("localhost") || host.includes("127.0.0.1")) {
-      // Local development fallback — Twilio cloud servers cannot reach local host directly
-      formParams.Url = "https://webhooks.twilio.com/v1/Voice/Template/voice_speech_recognition";
+      if (publicUrl && !publicUrl.includes("localhost")) {
+        formParams.Url = `${publicUrl.replace(/\/$/, "")}/api/calling/inbound?callSid=${encodeURIComponent(tempCallSid)}`;
+      } else {
+        // Local development fallback — Twilio cloud servers cannot reach local host directly
+        formParams.Url = "https://webhooks.twilio.com/v1/Voice/Template/voice_speech_recognition";
+      }
     } else {
-      formParams.Url = `${protocol}://${host}/api/calling/inbound`;
+      formParams.Url = `${targetCallbackBase}/api/calling/inbound?callSid=${encodeURIComponent(tempCallSid)}`;
     }
 
     const form = new URLSearchParams(formParams);
@@ -115,6 +99,7 @@ export async function POST(req: Request) {
     }
 
     const realSid = data.sid || tempCallSid;
+    rekeyPhoneSession(tempCallSid, realSid);
     console.info(`[api/calling/dial] call started sid=${realSid} to=${maskPhoneNumber(toE164)}`);
 
     return NextResponse.json({ ok: true, sid: realSid, simulated: false });
