@@ -190,6 +190,30 @@ body {
   border-radius: 6px;
 }
 
+/* ── Accessible interaction mode (spec §19/§20) ──────────────
+   The same product, tuned for a different way of interacting:
+   larger type, a stronger focus ring, comfortable tap targets,
+   and calm motion regardless of the OS setting. Framer's
+   MotionConfig handles JS-driven motion; this handles CSS. */
+:root[data-interaction-mode="accessible"] {
+  font-size: 112.5%; /* ~18px base — scales the rem type scale up as one */
+}
+:root[data-interaction-mode="accessible"]
+  :where(a, button, [role="button"], input, textarea, [tabindex]):focus-visible {
+  outline-width: 3px;
+  outline-offset: 3px;
+}
+:root[data-interaction-mode="accessible"] :where(button, [role="button"]) {
+  min-height: 44px;
+}
+:root[data-interaction-mode="accessible"] *,
+:root[data-interaction-mode="accessible"] *::before,
+:root[data-interaction-mode="accessible"] *::after {
+  animation-duration: 0.01ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.01ms !important;
+}
+
 /* Subtle grid backdrop for hero / mission screens */
 .bg-grid {
   background-image: radial-gradient(

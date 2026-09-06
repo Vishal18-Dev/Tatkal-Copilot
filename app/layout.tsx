@@ -4,6 +4,7 @@ import "./globals.css";
 import { LanguageProvider } from "@/lib/i18n";
 import { StoreProvider } from "@/lib/store";
 import { ThemeProvider, ThemeScript } from "@/lib/theme";
+import { InteractionModeProvider, InteractionModeScript } from "@/lib/interaction-mode";
 import { VoiceLangProvider } from "@/lib/voice/voice-lang";
 
 // V2 design system — Manrope carries all product copy; JetBrains Mono is
@@ -51,14 +52,17 @@ export default function RootLayout({
     >
       <head>
         <ThemeScript />
+        <InteractionModeScript />
       </head>
       <body className="min-h-full">
         <ThemeProvider>
-          <LanguageProvider>
-            <VoiceLangProvider>
-              <StoreProvider>{children}</StoreProvider>
-            </VoiceLangProvider>
-          </LanguageProvider>
+          <InteractionModeProvider>
+            <LanguageProvider>
+              <VoiceLangProvider>
+                <StoreProvider>{children}</StoreProvider>
+              </VoiceLangProvider>
+            </LanguageProvider>
+          </InteractionModeProvider>
         </ThemeProvider>
       </body>
     </html>
