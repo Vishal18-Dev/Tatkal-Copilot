@@ -66,6 +66,8 @@ export function useCallConversation(
   const silenceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const speechRecRef = useRef<any>(null);
+  const speechHandledRef = useRef(false);
+  const isProcessingTurnRef = useRef(false);
 
   const cleanupAudio = useCallback(() => {
     if (audioRef.current) {
@@ -164,66 +166,72 @@ export function useCallConversation(
     async (userText: string) => {
       const trimmed = userText.trim();
       if (!trimmed) return;
+      if (isProcessingTurnRef.current) return;
+      isProcessingTurnRef.current = true;
 
-      genRef.current += 1;
-      const myGen = genRef.current;
-
-      // 1. Add user line to conversation log
-      setLines((prev) => [...prev, { id: `line_user_${Date.now()}`, role: "user", text: trimmed }]);
-      setInterimText(null);
-      setState("thinking");
-
-      // 2. Check farewell
-      if (/\b(bye|goodbye|alvida|tata|dhanyawad|shukriya|thanks|exit|quit|stop)\b/i.test(trimmed)) {
-        const farewell =
-          activeLangRef.current === "hi"
-            ? "तत्काल कोपायलट का उपयोग करने के लिए धन्यवाद। शुभ यात्रा!"
-            : "Thank you for using Tatkal Copilot. Have a safe journey!";
-        setLines((prev) => [...prev, { id: `farewell_${Date.now()}`, role: "agent", text: farewell }]);
-        await speakText(farewell, myGen, () => {
-          setState("ended");
-          cleanupMic();
-        });
-        return;
-      }
-
-      // 3. Execute Copilot Turn
       try {
-        const copilotResult = await executeCopilotTurn({
-          channel: "phone",
-          text: trimmed,
-          language: activeLangRef.current,
-          trip: tripRef.current ?? undefined,
-          conversation: conversationRef.current,
-          isUserInitiated: true,
-          geolocation,
-        });
+        genRef.current += 1;
+        const myGen = genRef.current;
 
-        if (myGen !== genRef.current) return;
+        // 1. Add user line to conversation log
+        setLines((prev) => [...prev, { id: `line_user_${Date.now()}`, role: "user", text: trimmed }]);
+        setInterimText(null);
+        setState("thinking");
 
-        setConversation(copilotResult.conversation);
-        if (copilotResult.trip) {
-          tripRef.current = copilotResult.trip;
+        // 2. Check farewell
+        if (/\b(bye|goodbye|alvida|tata|dhanyawad|shukriya|thanks|exit|quit|stop)\b/i.test(trimmed)) {
+          const farewell =
+            activeLangRef.current === "hi"
+              ? "तत्काल कोपायलट का उपयोग करने के लिए धन्यवाद। शुभ यात्रा!"
+              : "Thank you for using Tatkal Copilot. Have a safe journey!";
+          setLines((prev) => [...prev, { id: `farewell_${Date.now()}`, role: "agent", text: farewell }]);
+          await speakText(farewell, myGen, () => {
+            setState("ended");
+            cleanupMic();
+          });
+          return;
         }
 
-        const reply = copilotResult.assistantMessage.originalText;
-        setLines((prev) => [...prev, { id: `agent_${Date.now()}`, role: "agent", text: reply }]);
+        // 3. Execute Copilot Turn
+        try {
+          const copilotResult = await executeCopilotTurn({
+            channel: "phone",
+            text: trimmed,
+            language: activeLangRef.current,
+            trip: tripRef.current ?? undefined,
+            conversation: conversationRef.current,
+            isUserInitiated: true,
+            geolocation,
+          });
 
-        // 4. Speak response, then automatically return to listening (Hands-free loop!)
-        await speakText(reply, myGen, () => {
-          if (myGen === genRef.current && stateRef.current !== "ended") {
-            setState("listening");
+          if (myGen !== genRef.current) return;
+
+          setConversation(copilotResult.conversation);
+          if (copilotResult.trip) {
+            tripRef.current = copilotResult.trip;
           }
-        });
-      } catch (err) {
-        console.warn("[calling/conversation] turn error:", err);
-        const fallbackMsg = "I had trouble processing that. Could you repeat?";
-        setLines((prev) => [...prev, { id: `err_${Date.now()}`, role: "agent", text: fallbackMsg }]);
-        await speakText(fallbackMsg, myGen, () => {
-          if (myGen === genRef.current && stateRef.current !== "ended") {
-            setState("listening");
-          }
-        });
+
+          const reply = copilotResult.assistantMessage.originalText;
+          setLines((prev) => [...prev, { id: `agent_${Date.now()}`, role: "agent", text: reply }]);
+
+          // 4. Speak response, then automatically return to listening (Hands-free loop!)
+          await speakText(reply, myGen, () => {
+            if (myGen === genRef.current && stateRef.current !== "ended") {
+              setState("listening");
+            }
+          });
+        } catch (err) {
+          console.warn("[calling/conversation] turn error:", err);
+          const fallbackMsg = "I had trouble processing that. Could you repeat?";
+          setLines((prev) => [...prev, { id: `err_${Date.now()}`, role: "agent", text: fallbackMsg }]);
+          await speakText(fallbackMsg, myGen, () => {
+            if (myGen === genRef.current && stateRef.current !== "ended") {
+              setState("listening");
+            }
+          });
+        }
+      } finally {
+        isProcessingTurnRef.current = false;
       }
     },
     [speakText, geolocation, cleanupMic]
@@ -239,6 +247,7 @@ export function useCallConversation(
       }
 
       cleanupMic();
+      speechHandledRef.current = false;
 
       const stream = await navigator.mediaDevices.getUserMedia({
         audio: {
@@ -269,6 +278,8 @@ export function useCallConversation(
                 speechDetectedRef.current = true;
                 setInterimText(`Listening: "${text.trim()}"`);
                 if (ev.results[0].isFinal) {
+                  if (speechHandledRef.current) return;
+                  speechHandledRef.current = true;
                   try {
                     sr.stop();
                   } catch {}
@@ -306,13 +317,17 @@ export function useCallConversation(
       };
 
       recorder.onstop = async () => {
+        if (speechHandledRef.current) return;
+
         const blob = new Blob(audioChunksRef.current, { type: recorder.mimeType || "audio/webm" });
         if (blob.size === 0 || !speechDetectedRef.current) {
-          if (state !== "ended" && !isMutedRef.current) {
+          if (stateRef.current !== "ended" && !isMutedRef.current) {
             void startListening();
           }
           return;
         }
+
+        speechHandledRef.current = true;
 
         // Transcribe spoken audio
         setState("thinking");
@@ -332,7 +347,7 @@ export function useCallConversation(
           // Audio transcribe failed, recover to listening
         }
 
-        if (state !== "ended" && !isMutedRef.current) {
+        if (stateRef.current !== "ended" && !isMutedRef.current) {
           setState("listening");
           void startListening();
         }
