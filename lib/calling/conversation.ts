@@ -68,6 +68,7 @@ export function useCallConversation(
   const speechRecRef = useRef<any>(null);
   const speechHandledRef = useRef(false);
   const isProcessingTurnRef = useRef(false);
+  const latestWebSpeechTextRef = useRef<string>("");
 
   const cleanupAudio = useCallback(() => {
     if (audioRef.current) {
@@ -260,6 +261,7 @@ export function useCallConversation(
       audioChunksRef.current = [];
       speechDetectedRef.current = false;
       speechStartTimeRef.current = 0;
+      latestWebSpeechTextRef.current = "";
 
       // Web Speech API for instant zero-latency speech recognition if supported
       if (typeof window !== "undefined") {
@@ -275,6 +277,7 @@ export function useCallConversation(
                 .map((r: any) => r[0].transcript)
                 .join("");
               if (text.trim()) {
+                latestWebSpeechTextRef.current = text.trim();
                 speechDetectedRef.current = true;
                 setInterimText(`Listening: "${text.trim()}"`);
                 if (ev.results[0].isFinal) {
@@ -318,6 +321,15 @@ export function useCallConversation(
 
       recorder.onstop = async () => {
         if (speechHandledRef.current) return;
+
+        // If Web Speech API captured text (even interim) before VAD silence stopped recording
+        if (latestWebSpeechTextRef.current.trim()) {
+          speechHandledRef.current = true;
+          const capturedText = latestWebSpeechTextRef.current.trim();
+          latestWebSpeechTextRef.current = "";
+          void handleUserTurn(capturedText);
+          return;
+        }
 
         const blob = new Blob(audioChunksRef.current, { type: recorder.mimeType || "audio/webm" });
         if (blob.size === 0 || !speechDetectedRef.current) {
