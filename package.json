@@ -7,7 +7,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "test": "vitest run"
+    "test": "vitest run",
+    "i18n:check": "npx tsx scripts/i18n-check.ts"
   },
   "dependencies": {
     "class-variance-authority": "^0.7.1",

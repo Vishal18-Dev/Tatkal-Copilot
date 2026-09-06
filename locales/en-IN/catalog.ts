@@ -1,0 +1,240 @@
+export const enIN = {
+  // Navigation
+  "navigation.home": "Home",
+  "navigation.plan": "Plan a Journey",
+  "navigation.myTrips": "My Trips",
+  "navigation.missionControl": "Mission Control",
+  "navigation.account": "Account",
+  "nav.home": "Home",
+  "nav.plan": "Plan a Journey",
+  "nav.trips": "My Trips",
+  "nav.settings": "Settings",
+  "nav.travellers": "Saved Travellers",
+  "nav.activity": "Activity Log",
+  "nav.help": "Help & Support",
+  "shell.signin": "Sign In",
+  "shell.account": "Account",
+  "shell.signout": "Sign Out",
+
+  // Brand
+  brand: "Tatkal Copilot",
+  "brand.tagline": "An IRCTC Demo Subpage",
+  "lang.label": "English",
+  "lang.aria": "Switch language",
+  "theme.light": "Light mode — tap for dark",
+  "theme.dark": "Dark mode — tap for system",
+  "theme.system": "Matching device — tap for light",
+
+  // Hero & Landing
+  "hero.eyebrow": "Your AI Travel Agent for Tatkal",
+  "hero.title1": "Booking Tatkal shouldn't",
+  "hero.title2": "require a travel agent.",
+  "hero.subtitle":
+    "Tell us where you need to be. We'll help you prepare the smartest booking strategy — before Tatkal opens.",
+  "hero.trust": "We never book for you. We help you decide, then you book.",
+  "hero.journeyTitle": "How it works",
+  "map.understand": "Understand",
+  "map.recommend": "Recommend",
+  "map.prepare": "Prepare",
+  "map.book": "Book",
+  "map.travel": "Travel",
+
+  // Planning
+  "planning.whereToGo": "Where do you need to go?",
+  "planning.findBestTrain": "Find my best train",
+  "planning.tryAsking": "Try asking",
+  "planning.departure": "Departure",
+  "planning.arrival": "Arrival",
+  "planning.journey": "Journey",
+  "planning.origin": "Origin",
+  "planning.destination": "Destination",
+  "planning.boardingStation": "Boarding station",
+
+  // Search & Results
+  "results.eyebrow": "Step 3 · Choose your train",
+  "results.title": "Your best options",
+  "results.subtitlePrefix": "We checked trains on this route and found",
+  "results.subtitleSuffix": "worth considering.",
+  "results.windowLabel": "Tatkal window",
+  "results.windowNote": "We'll be ready together 5 mins before.",
+  "results.showOthersPrefix": "Show",
+  "results.showOthersSuffix": "other trains on this route",
+  "results.hideOthers": "Hide other trains",
+  "results.details": "Trade-offs & risks",
+  "results.travellers": "travellers",
+  "results.traveller": "traveller",
+  "results.by": "by",
+  "results.colTrain": "Train",
+  "results.colTiming": "Departure · Arrival",
+  "results.colFare": "Fare",
+  "results.colConfidence": "AI confidence",
+  "results.depart": "depart",
+  "results.arrive": "arrive",
+  "results.est": "est. fare",
+  "results.confidence": "confidence",
+
+  // Tatkal
+  "tatkal.title": "Tatkal",
+  "tatkal.opensAt": "Tatkal opens",
+  "tatkal.readiness": "Tatkal readiness",
+  "tatkal.confirmationSignal": "Confirmation signal",
+  "tatkal.primaryOption": "Primary option",
+  "tatkal.backupOption": "Backup option",
+  "tatkal.backupReady": "Backup ready",
+  "tatkal.strategy": "Tatkal strategy",
+
+  // Readiness
+  "readiness.identityReady": "Identity Ready",
+  "readiness.paymentReady": "Payment Ready",
+  "readiness.travellersReady": "Travellers ready",
+  "readiness.bookingReady": "Booking ready",
+
+  // Agent & Voice
+  "agent.copilot": "Tatkal Copilot",
+  "agent.talkToCopilot": "Talk to Copilot",
+  "agent.guide": "Copilot Guide",
+  "agent.activeReady": "Active & Ready",
+  "agent.listening": "Listening",
+  "agent.thinking": "Thinking…",
+  "agent.speaking": "Speaking…",
+  "agent.monitoring": "Monitoring",
+
+  "voice.title": "Voice Copilot",
+  "voice.openLabel": "Talk to Copilot",
+  "voice.speakShort": "Speak",
+  "voice.subtitle": "Tell me where you're headed.",
+  "voice.heroHint":
+    "Speak naturally in English, Hindi, Marathi, Tamil, Telugu, Kannada, Gujarati, Punjabi, Malayalam or Urdu — I'll sort out the route, quota and timing.",
+  "voice.refineLabel": "Refine by voice or tap",
+  "voice.refineHint":
+    "Say \"something cheaper\", \"make it 2A\", or ask \"why this train?\"",
+  "voice.askWhy": "Why this train?",
+  "voice.tapToSpeak": "Tap the mic and tell me where you're going",
+  "voice.listening": "I'm listening…",
+  "voice.paused": "Paused",
+  "voice.mute": "Mute the mic",
+  "voice.resume": "Resume listening",
+  "voice.pausedHint": "Paused — tap the mic to continue",
+  "voice.handsFreeHint": "Just speak — I'll pause when you do. Tap to mute.",
+  "voice.screenShare": "Share your screen for guided help",
+  "voice.screenShareHint": "You choose what to share, and can stop anytime.",
+  "voice.screenShareActive": "You're sharing — talk me through what you need.",
+  "voice.screenShareLive": "Sharing",
+  "voice.screenShareStop": "Stop sharing",
+  "voice.screenShareError":
+    "Couldn't start screen sharing. You can try again.",
+  "voice.transcribing": "Got it — one sec…",
+  "voice.thinking": "Finding your options…",
+  "voice.resultReady": "Here's what I found",
+  "voice.confirming": "Setting up your journey…",
+  "voice.speaking": "Speaking…",
+  "voice.autoStopSoon": "stopping soon",
+  "voice.stop": "Stop recording",
+  "voice.stopPlayback": "Stop playback",
+  "voice.close": "Close",
+  "voice.languageLabel": "Conversation language",
+  "voice.langAuto": "Auto-detect",
+  "voice.autoHint":
+    "I'll reply in whatever language you speak. Pick one to lock it.",
+
+  "copilot.dockTitle": "Talk to your Copilot",
+  "copilot.transcriptLabel": "Copilot conversation",
+  "copilot.thinking": "Thinking…",
+  "copilot.askPlaceholder": "Ask about your journey…",
+  "copilot.send": "Send",
+
+  // Calling
+  "calling.title": "Phone Agent",
+  "calling.active": "Phone call active",
+  "calling.ending": "Call ending…",
+
+  // Mission Control
+  "missionControl.title": "Mission Control",
+  "missionControl.monitoring": "Monitoring",
+  "missionControl.watchClock": "Watch the clock",
+  "missionControl.backupReady": "Backup ready",
+  "missionControl.inControl": "You're always in control",
+  "missionControl.startBooking": "Start booking",
+  "missionControl.useBackup": "Use backup",
+
+  "mc.heading": "Mission Control",
+  "mc.tagline":
+    "Your Tatkal window opens tomorrow at 10:00 AM. Copilot is monitoring train availability, payment readiness, and your backup strategy.",
+  "mc.sync": "Atomic clock synced",
+  "mc.opensIn": "Opens in {time}",
+  "mc.activeSector": "Active Sector Readiness",
+  "mc.corridor": "Western Rail Corridor · MMCT → NDLS",
+  "mc.confidenceBadge": "HIGH CONFIDENCE STRATEGY",
+
+  // Trips
+  "trips.title": "My Trips",
+  "trips.upcoming": "Upcoming",
+  "trips.past": "Past",
+  "trips.noTrips": "No upcoming journeys planned yet.",
+
+  // Errors & Recovery
+  "errors.noVerifiedTrains": "No verified trains found",
+  "errors.somethingWentWrong": "Something went wrong",
+  "errors.tryAnotherStation": "Try another station",
+  "errors.tryAnotherDate": "Try another date",
+  "errors.noLiveData": "No live data available",
+
+  // Goal & Form
+  "goal.orType": "or type it instead",
+  "goal.speakTitle": "Tap to speak your journey",
+  "goal.speakSub":
+    "Speak naturally in Hindi, Tamil, English and 7 more — I'll sort out the route, quota and timing.",
+  "goal.submit": "Plan my journey",
+  "goal.example1": "Reach Delhi before 8 tomorrow morning",
+  "goal.example2": "AC ticket to Bangalore tonight",
+  "goal.example3": "Cheapest confirmed ticket to Delhi",
+  "goal.example4": "Lower berth for my parents to Delhi",
+  "plan.watchTitle": "We watch the clock",
+  "plan.watchBody":
+    "No need to sit refreshing before 10 AM. We'll be ready the moment Tatkal opens.",
+  "plan.backupTitle": "A backup, ready",
+  "plan.backupBody":
+    "If your first choice fills up, we'll already have a strong second option lined up.",
+  "plan.controlTitle": "You stay in control",
+  "plan.controlBody":
+    "Everything is prepared for you — but nothing is ever booked without your go-ahead.",
+  "plan.form.origin": "Origin",
+  "plan.form.destination": "Destination",
+  "plan.form.swap": "Swap origin and destination",
+  "plan.form.originPh": "Departure station",
+  "plan.form.destPh": "Destination station",
+  "plan.form.date": "Date of travel",
+  "plan.form.dateVal": "Tomorrow",
+  "plan.form.passengers": "Passengers",
+  "plan.form.class": "Class",
+  "plan.form.classAny": "Any class",
+  "plan.form.pref": "Preference",
+  "plan.form.prefSeat": "Best chance of a seat",
+  "plan.form.prefSeatSub": "Recommended for Tatkal",
+  "plan.form.prefFast": "Fastest train",
+  "plan.form.prefFastSub": "Saves travel time",
+  "plan.form.prefCheap": "Cheapest option",
+  "plan.form.prefCheapSub": "Lowest overall fare",
+  "plan.form.quota": "Quota",
+  "plan.form.quotaTatkal": "Tatkal (opens 10 AM)",
+  "plan.form.quotaGeneral": "General",
+  "plan.form.submit": "Find my best train",
+
+  // Strategy Screen
+  "strategy.eyebrow": "Step 4 · Your Tatkal Game Plan",
+  "strategy.title": "Here is your Tatkal strategy",
+  "strategy.summary":
+    "We've picked your primary train and set up an automatic fallback so you don't lose a second when booking opens.",
+  "strategy.primaryTitle": "Primary choice",
+  "strategy.backupTitle": "Automatic backup",
+  "strategy.readinessTitle": "Pre-flight readiness checklist",
+  "strategy.cta": "I'm ready — set reminder",
+
+  // Terminology Preserved
+  "terminology.tatkal": "Tatkal",
+  "terminology.paymentReady": "Payment Ready",
+  "terminology.identityReady": "Identity Ready",
+  "terminology.backup": "Backup",
+} as const;
+
+export type CatalogKey = keyof typeof enIN;

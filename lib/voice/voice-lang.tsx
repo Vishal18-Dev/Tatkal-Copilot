@@ -2,17 +2,8 @@
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { fromBcp47, isVoiceLang, VOICE_LANGS, type VoiceLang } from "./languages";
-
-/* ============================================================
-   VoiceLang context — the active *spoken* language.
-
-   Separate from the app UI `Lang` (en/hi chrome). This is
-   conversation context: which of the 10 languages the user is
-   speaking/hearing right now. Persisted so a returning user keeps
-   their language, and auto-updated from Sarvam's detected language
-   UNLESS the user has explicitly chosen one (manual override wins —
-   spec §20: "Allow manual override").
-   ============================================================ */
+import { useLang } from "@/lib/i18n";
+import { toShortLang, toSupportedLanguage } from "@/lib/i18n/types";
 
 const STORAGE_KEY = "tatkal-voice-lang";
 const LOCK_KEY = "tatkal-voice-lang-locked";
@@ -33,23 +24,25 @@ interface VoiceLangCtx {
 const Ctx = createContext<VoiceLangCtx | null>(null);
 
 export function VoiceLangProvider({ children }: { children: React.ReactNode }) {
-  const [voiceLang, setState] = useState<VoiceLang>("en");
+  const { conversationLanguage, setConversationLanguage, setDetectedLanguage } = useLang();
   const [locked, setLocked] = useState(false);
   const hydrated = useRef(false);
 
   useEffect(() => {
     try {
       const saved = localStorage.getItem(STORAGE_KEY);
-      if (saved && isVoiceLang(saved)) setState(saved);
+      if (saved && isVoiceLang(saved)) {
+        setConversationLanguage(toSupportedLanguage(saved));
+      }
       if (localStorage.getItem(LOCK_KEY) === "1") setLocked(true);
     } catch {
-      /* storage unavailable — defaults are fine */
+      /* ignore */
     }
     hydrated.current = true;
-  }, []);
+  }, [setConversationLanguage]);
 
   const setVoiceLang = useCallback((l: VoiceLang) => {
-    setState(l);
+    setConversationLanguage(toSupportedLanguage(l));
     setLocked(true);
     try {
       localStorage.setItem(STORAGE_KEY, l);
@@ -57,7 +50,7 @@ export function VoiceLangProvider({ children }: { children: React.ReactNode }) {
     } catch {
       /* ignore */
     }
-  }, []);
+  }, [setConversationLanguage]);
 
   const setAuto = useCallback(() => {
     setLocked(false);
@@ -70,18 +63,20 @@ export function VoiceLangProvider({ children }: { children: React.ReactNode }) {
 
   const observeDetected = useCallback(
     (bcp47: string | null | undefined) => {
-      if (locked) return; // user's explicit choice wins
       const detected = fromBcp47(bcp47);
       if (!detected) return;
-      setState(detected);
+      setDetectedLanguage(toSupportedLanguage(detected));
+      if (locked) return; // user's explicit choice wins
       try {
         localStorage.setItem(STORAGE_KEY, detected);
       } catch {
         /* ignore */
       }
     },
-    [locked]
+    [locked, setDetectedLanguage]
   );
+
+  const voiceLang = useMemo(() => toShortLang(conversationLanguage), [conversationLanguage]);
 
   const value = useMemo(
     () => ({ voiceLang, locked, setVoiceLang, setAuto, observeDetected, langs: VOICE_LANGS }),
