@@ -160,13 +160,13 @@ export function CopilotWorkspace({
       <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-ink-faint">
         <span className="flex items-center gap-2 font-semibold tracking-wide uppercase text-brand">
           <span className="h-2 w-2 rounded-full bg-brand animate-pulse" />
-          {listening ? "● VOICE JOURNEY PLANNER • LIVE AUDIO STREAM" : "● CONVERSATIONAL INGRESS / Voice & Plain Text"}
+          {listening ? `● ${t("workspace.liveAudioStream")}` : `● ${t("workspace.ingress")}`}
         </span>
 
         <div className="flex items-center gap-3">
           {listening ? (
             <span className="flex items-center gap-1.5 text-[0.7rem] font-medium text-ink-soft">
-              <Lock className="h-3.5 w-3.5 text-confirm" /> End-to-end client ephemeral session
+              <Lock className="h-3.5 w-3.5 text-confirm" /> {t("workspace.ephemeralSession")}
             </span>
           ) : (
             <VoiceLangSelect />
@@ -177,10 +177,10 @@ export function CopilotWorkspace({
       {/* Main Title Section */}
       <div className="text-center space-y-1">
         <h1 className="text-2xl font-bold tracking-tight text-brand-ink sm:text-3xl">
-          Where do you need to go?
+          {t("workspace.title")}
         </h1>
         <p className="text-sm text-ink-soft">
-          Tell me in plain words or type. I'll figure out the railway complexity.
+          {t("workspace.sub")}
         </p>
       </div>
 
@@ -193,17 +193,17 @@ export function CopilotWorkspace({
               <div className="flex items-center gap-2">
                 <span className="text-base font-bold text-brand-ink">Aarav</span>
                 <span className="rounded-full bg-brand/10 px-2 py-0.5 text-[0.68rem] font-bold uppercase tracking-wider text-brand">
-                  COPILOT GUIDE
+                  {t("agent.guide")}
                 </span>
               </div>
               <p className="mt-0.5 text-xs text-ink-soft">
-                "Namaste! Tell me your journey in plain words — I'll monitor Tatkal quotas and secure your seat tomorrow."
+                "{t("workspace.personaSub")}"
               </p>
             </div>
           </div>
 
           <span className="inline-flex items-center gap-1.5 rounded-full bg-confirm-soft px-3 py-1 text-xs font-semibold text-confirm shrink-0">
-            <span className="h-2 w-2 rounded-full bg-confirm animate-ping" /> Active & Ready
+            <span className="h-2 w-2 rounded-full bg-confirm animate-ping" /> {t("agent.activeReady")}
           </span>
         </div>
       </div>
@@ -219,8 +219,8 @@ export function CopilotWorkspace({
               onChange={(e) => setInputGoal(e.target.value)}
               placeholder={
                 listening
-                  ? "Listening... speak naturally in English, Hindi or Hinglish"
-                  : 'e.g., "Mumbai to Delhi tomorrow before 8 AM" or "Delhi jaana hai kal subah with parents"'
+                  ? t("workspace.listeningPlaceholder")
+                  : t("workspace.placeholder")
               }
               className="w-full bg-transparent pr-12 text-[1.02rem] text-ink placeholder:text-ink-faint focus:outline-none"
             />
@@ -228,14 +228,14 @@ export function CopilotWorkspace({
             <button
               type="button"
               onClick={handleMicPress}
-              aria-label={listening ? "Stop listening" : "Voice input"}
+              aria-label={listening ? t("voice.stop") : t("voice.openLabel")}
               className={cn(
                 "absolute right-0 inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold text-white transition-all shadow-sm",
                 listening ? "bg-danger animate-pulse" : "bg-brand hover:bg-brand-strong"
               )}
             >
               <Mic className="h-4 w-4" />
-              <span>Voice</span>
+              <span>{t("voice.speakShort")}</span>
             </button>
           </div>
 
@@ -243,7 +243,7 @@ export function CopilotWorkspace({
           <div className="flex flex-wrap items-center justify-between gap-3 border-t border-line/60 pt-3">
             <div className="flex items-center gap-2 text-xs text-ink-faint">
               <span className={cn("h-2 w-2 rounded-full", listening ? "bg-danger animate-ping" : "bg-confirm")} />
-              <span>{listening ? "Microphone active • Latency < 140ms" : "Speech & Plain Text Ingress Active"}</span>
+              <span>{listening ? t("workspace.micActive") : t("workspace.ingressActive")}</span>
             </div>
 
             <div className="flex items-center gap-2">
@@ -258,7 +258,7 @@ export function CopilotWorkspace({
                 )}
               >
                 <Mic className="h-3.5 w-3.5" />
-                {listening ? "Stop Listening" : "Speak your journey"}
+                {listening ? t("voice.stop") : t("goal.speakTitle")}
               </button>
 
               <button
@@ -266,7 +266,7 @@ export function CopilotWorkspace({
                 disabled={!inputGoal.trim() && !listening}
                 className="inline-flex items-center gap-1.5 rounded-full bg-brand px-4 py-1.5 text-xs font-semibold text-white shadow-[var(--shadow-brand)] transition-colors hover:bg-brand-strong disabled:opacity-40"
               >
-                Find my best train <ArrowRight className="h-3.5 w-3.5" />
+                {t("planning.findBestTrain")} <ArrowRight className="h-3.5 w-3.5" />
               </button>
             </div>
           </div>
@@ -285,9 +285,9 @@ export function CopilotWorkspace({
             <div className="flex items-center justify-between border-b border-line pb-2">
               <div className="flex items-center gap-2 text-xs font-bold text-brand uppercase tracking-wider">
                 <Mic className="h-4 w-4 animate-pulse text-danger" />
-                CAPTURING INTENT
+                {t("workspace.capturingIntent")}
               </div>
-              <span className="text-[0.68rem] text-ink-faint font-mono">IRCTC NLP Engine v2.4</span>
+              <span className="text-[0.68rem] text-ink-faint font-mono">{t("workspace.nlpEngine")}</span>
             </div>
 
             <div className="text-base font-semibold text-brand-ink leading-relaxed">
@@ -303,10 +303,10 @@ export function CopilotWorkspace({
                 🚅 NDLS (New Delhi)
               </span>
               <span className="inline-flex items-center gap-1 rounded-full bg-surface-muted border border-line px-2.5 py-1 text-[0.72rem] font-medium text-ink-soft">
-                📅 Tomorrow (Tatkal Open 10 AM)
+                📅 {t("workspace.tomorrowTatkal")}
               </span>
               <span className="inline-flex items-center gap-1 rounded-full bg-surface-muted border border-line px-2.5 py-1 text-[0.72rem] font-medium text-ink-soft">
-                👥 {paxCount} Adults
+                👥 {t("workspace.adultsCount", { count: paxCount })}
               </span>
             </div>
 
@@ -317,21 +317,21 @@ export function CopilotWorkspace({
                 onClick={handleFormSubmit}
                 className="inline-flex items-center gap-1 rounded-full bg-brand px-3.5 py-1.5 text-xs font-semibold text-white shadow-sm hover:bg-brand-strong"
               >
-                Done speaking <ArrowRight className="h-3.5 w-3.5" />
+                {t("workspace.doneSpeaking")} <ArrowRight className="h-3.5 w-3.5" />
               </button>
               <button
                 type="button"
                 onClick={handleMicPress}
                 className="inline-flex items-center gap-1 rounded-full bg-danger/10 border border-danger/30 px-3.5 py-1.5 text-xs font-semibold text-danger hover:bg-danger/20"
               >
-                Tap to stop
+                {t("workspace.tapToStop")}
               </button>
               <button
                 type="button"
                 onClick={() => reset()}
                 className="inline-flex items-center gap-1 text-xs text-ink-faint hover:text-ink"
               >
-                <Keyboard className="h-3.5 w-3.5" /> Type instead
+                <Keyboard className="h-3.5 w-3.5" /> {t("workspace.typeInstead")}
               </button>
             </div>
           </div>
@@ -344,7 +344,7 @@ export function CopilotWorkspace({
                 MMCT • Platform 1
               </div>
               <span className="text-[0.68rem] font-semibold text-ink-faint bg-surface-muted px-2 py-0.5 rounded">
-                TRACK 01 IDLE
+                {t("workspace.trackIdle")}
               </span>
             </div>
 
@@ -353,10 +353,10 @@ export function CopilotWorkspace({
                 <span className="flex items-center gap-1.5 text-confirm">
                   <Train className="h-4 w-4" /> WAP-7 • 12951
                 </span>
-                <span className="text-[0.68rem] text-white/70">Steam Ready • Idling</span>
+                <span className="text-[0.68rem] text-white/70">{t("workspace.steamReady")}</span>
               </div>
               <div className="text-[0.72rem] text-white/80">
-                Listening to route preferences... Locomotive ready to plot your itinerary.
+                {t("workspace.locoReady")}
               </div>
             </div>
 
@@ -367,7 +367,7 @@ export function CopilotWorkspace({
                 <span>05:00 PM</span>
               </div>
               <div className="text-[0.7rem] text-ink-faint italic pl-3">
-                Synthesizing intermediate halts...
+                {t("workspace.synthesizingHalts")}
               </div>
               <div className="flex justify-between font-semibold text-ink">
                 <span>● New Delhi (NDLS)</span>
@@ -379,10 +379,10 @@ export function CopilotWorkspace({
             <div className="rounded-lg border border-brand/20 bg-brand-soft/40 p-2.5 flex items-center justify-between text-xs">
               <div className="flex items-center gap-2 font-mono font-bold text-brand-ink">
                 <Clock className="h-4 w-4 text-brand" />
-                <span>IRCTC ATOMIC CLOCK 09:58:42 AM</span>
+                <span>{t("workspace.atomicClock")} 09:58:42 AM</span>
               </div>
               <span className="rounded-full bg-confirm-soft px-2.5 py-0.5 text-[0.68rem] font-semibold text-confirm">
-                AC Opens in 1m 18s
+                {t("workspace.acOpensIn")}
               </span>
             </div>
           </div>
@@ -392,14 +392,14 @@ export function CopilotWorkspace({
       {/* Try Asking Suggestions */}
       <div className="space-y-2">
         <div className="text-[0.68rem] font-bold uppercase tracking-wider text-ink-faint">
-          TRY ASKING:
+          {t("workspace.tryAsking")}
         </div>
         <div className="flex flex-wrap gap-2">
           {[
-            "Mumbai to Delhi tomorrow morning",
-            "Delhi se Varanasi 3A kal shaam",
-            "Bengaluru to Chennai early morning",
-            "Reaching Kolkata before 10 AM with senior citizens",
+            t("workspace.sampleQuery1"),
+            t("workspace.sampleQuery2"),
+            t("workspace.sampleQuery3"),
+            t("workspace.sampleQuery4"),
           ].map((q) => (
             <button
               key={q}
@@ -418,10 +418,10 @@ export function CopilotWorkspace({
         <div className="flex items-center justify-between border-b border-line pb-2 text-xs">
           <div className="flex items-center gap-2 font-bold text-brand-ink">
             <Train className="h-4 w-4 text-brand" />
-            <span>Active Sector Readiness: Western Rail Corridor</span>
+            <span>{t("workspace.sectorReadiness")}</span>
           </div>
           <span className="flex items-center gap-1.5 font-mono text-[0.7rem] text-confirm font-semibold">
-            <span className="h-2 w-2 rounded-full bg-confirm animate-ping" /> 10:00:00 AM IST Atomic clock syncd
+            <span className="h-2 w-2 rounded-full bg-confirm animate-ping" /> {t("workspace.atomicClockSynced")}
           </span>
         </div>
 
@@ -430,30 +430,30 @@ export function CopilotWorkspace({
           <span className="font-bold text-ink">● MMCT (Mumbai Central • Platform 1)</span>
           <div className="flex-1 h-0.5 bg-line relative mx-2">
             <span className="absolute -top-3 left-1/2 -translate-x-1/2 rounded bg-brand-ink px-2 py-0.5 text-[0.65rem] font-bold text-white shadow-xs">
-              🚆 12951 TEJAS RAJDHANI • Cabin armed
+              🚆 12951 TEJAS RAJDHANI • {t("workspace.cabinArmed")}
             </span>
           </div>
           <span className="font-bold text-ink">NDLS ● (New Delhi Junction • Platform 3)</span>
         </div>
 
         <div className="flex items-center justify-between text-[0.72rem] text-ink-soft border-t border-line/60 pt-2">
-          <span>✓ Track clear • Western Corridor active • Tatkal opens tomorrow at 10:00 AM (AC) / 11:00 AM (Non-AC)</span>
-          <span className="font-semibold text-brand-ink">Avg Tatkal Exhaustion: 2m 14s</span>
+          <span>✓ {t("workspace.corridorStatus")}</span>
+          <span className="font-semibold text-brand-ink">{t("workspace.tatkalExhaustion")}</span>
         </div>
       </div>
 
-      {/* 3 Value Props Cards (Matching Image 3 Mockup) */}
+      {/* 3 Value Props Cards */}
       <div className="grid gap-3 sm:grid-cols-3">
         <div className="rounded-[var(--radius-lg)] border border-line bg-surface p-4 space-y-2">
           <div className="grid h-8 w-8 place-items-center rounded-lg bg-brand-soft text-brand">
             <Clock className="h-4 w-4" />
           </div>
-          <h3 className="text-sm font-semibold text-brand-ink">We watch the clock</h3>
+          <h3 className="text-sm font-semibold text-brand-ink">{t("plan.watchTitle")}</h3>
           <p className="text-xs leading-relaxed text-ink-soft">
-            No need to sit repeatedly refreshing CAPTCHA screens. Copilot synchronizes with IRCTC atomic time down to the exact millisecond.
+            {t("plan.watchBody")}
           </p>
           <div className="text-[0.68rem] font-semibold text-confirm flex items-center gap-1 pt-1">
-            <Check className="h-3.5 w-3.5" /> Live server sync
+            <Check className="h-3.5 w-3.5" /> {t("workspace.liveServerSync")}
           </div>
         </div>
 
@@ -461,12 +461,12 @@ export function CopilotWorkspace({
           <div className="grid h-8 w-8 place-items-center rounded-lg bg-brand-soft text-brand">
             <Compass className="h-4 w-4" />
           </div>
-          <h3 className="text-sm font-semibold text-brand-ink">Backup ready</h3>
+          <h3 className="text-sm font-semibold text-brand-ink">{t("plan.backupTitle")}</h3>
           <p className="text-xs leading-relaxed text-ink-soft">
-            If your chosen Rajdhani exhausts its quota in seconds, seamless automatic failover switches to your confirmed backup train instantly.
+            {t("plan.backupBody")}
           </p>
           <div className="text-[0.68rem] font-semibold text-confirm flex items-center gap-1 pt-1">
-            <Check className="h-3.5 w-3.5" /> Zero-panic routing
+            <Check className="h-3.5 w-3.5" /> {t("workspace.zeroPanicRouting")}
           </div>
         </div>
 
@@ -474,12 +474,12 @@ export function CopilotWorkspace({
           <div className="grid h-8 w-8 place-items-center rounded-lg bg-brand-soft text-brand">
             <ShieldCheck className="h-4 w-4" />
           </div>
-          <h3 className="text-sm font-semibold text-brand-ink">You're always in control</h3>
+          <h3 className="text-sm font-semibold text-brand-ink">{t("plan.controlTitle")}</h3>
           <p className="text-xs leading-relaxed text-ink-soft">
-            We never deduct money or autofill bank OTPs without your explicit biometric authorization. Your payment never leaves safe hands.
+            {t("plan.controlBody")}
           </p>
           <div className="text-[0.68rem] font-semibold text-confirm flex items-center gap-1 pt-1">
-            <Check className="h-3.5 w-3.5" /> Biometric consent gated
+            <Check className="h-3.5 w-3.5" /> {t("workspace.biometricGated")}
           </div>
         </div>
       </div>
@@ -489,7 +489,7 @@ export function CopilotWorkspace({
         <div className="rounded-[var(--radius)] border border-line bg-surface-muted/50 p-3">
           <div className="flex items-center justify-between border-b border-line/60 pb-2">
             <span className="text-[0.72rem] font-semibold uppercase tracking-wide text-ink-faint">
-              Conversation Thread ({turns.length})
+              {t("workspace.threadTitle", { count: turns.length })}
             </span>
             {turns.length > 2 && (
               <button
@@ -499,11 +499,11 @@ export function CopilotWorkspace({
               >
                 {showHistory ? (
                   <>
-                    Hide history <ChevronUp className="h-3.5 w-3.5" />
+                    {t("workspace.hideHistory")} <ChevronUp className="h-3.5 w-3.5" />
                   </>
                 ) : (
                   <>
-                    Show earlier ({turns.length - 2}) <ChevronDown className="h-3.5 w-3.5" />
+                    {t("workspace.showEarlier", { count: turns.length - 2 })} <ChevronDown className="h-3.5 w-3.5" />
                   </>
                 )}
               </button>
@@ -522,7 +522,7 @@ export function CopilotWorkspace({
                   )}
                 >
                   <div className="text-[0.68rem] font-semibold opacity-70 mb-0.5">
-                    {turn.role === "user" ? "You" : "Aarav (Copilot)"}
+                    {turn.role === "user" ? t("workspace.you") : t("workspace.copilotSpeaker")}
                   </div>
                   <div>{turn.text}</div>
                 </div>
@@ -542,7 +542,7 @@ export function CopilotWorkspace({
           <CopilotAvatar state={state} voiceState="awaiting_clarification" size="lg" className="mx-auto mb-2" />
           <h2 className="text-lg font-bold text-brand-ink">{result.responseText}</h2>
           <p className="mt-1 text-xs text-ink-soft">
-            Tell me your starting city or station to complete journey resolution.
+            {t("workspace.tellStartingCity")}
           </p>
           <div className="mt-4 flex flex-wrap justify-center gap-2">
             {["Pune", "Mumbai", "Bangalore", "Delhi", "Chennai", "Kolkata"].map((city) => (
@@ -577,23 +577,23 @@ export function CopilotWorkspace({
               onClick={reset}
               className="inline-flex items-center gap-1 text-xs font-medium text-ink-faint hover:text-ink"
             >
-              <RotateCcw className="h-3.5 w-3.5" /> Start new journey
+              <RotateCcw className="h-3.5 w-3.5" /> {t("workspace.startNewJourney")}
             </button>
           </div>
 
           {/* Quick Refinement Chips */}
           <div className="mt-3.5 border-t border-line pt-3">
             <div className="mb-2 text-[0.68rem] font-semibold uppercase tracking-wide text-ink-faint">
-              Refine Journey by Voice or Tap
+              {t("workspace.refineTitle")}
             </div>
             <div className="flex flex-wrap gap-1.5">
               {[
-                { label: "Change date", q: "Change date to day after tomorrow" },
-                { label: "Change class", q: "Change class to 2A" },
-                { label: "Try another station", q: "Try another station near origin" },
-                { label: "Fastest", q: "Fastest option" },
-                { label: "Cheapest", q: "Cheaper option" },
-                { label: `Don't use ${originText} station`, q: `Don't use ${originText} station` },
+                { label: t("refine.changeDate"), q: "Change date to day after tomorrow" },
+                { label: t("refine.changeClass"), q: "Change class to 2A" },
+                { label: t("refine.tryStation"), q: "Try another station near origin" },
+                { label: t("refine.fastest"), q: "Fastest option" },
+                { label: t("refine.cheapest"), q: "Cheaper option" },
+                { label: t("refine.dontUse", { station: originText ?? "" }), q: `Don't use ${originText ?? ""} station` },
               ].map((chip) => (
                 <button
                   key={chip.label}
@@ -624,7 +624,7 @@ export function CopilotWorkspace({
         <div className="space-y-4">
           <div className="flex items-center justify-between">
             <h2 className="text-xs font-semibold uppercase tracking-wide text-ink-faint">
-              ⭐ Recommended Candidate
+              ⭐ {t("results.recommended")}
             </h2>
             {result?.audioBase64 && (
               <button
@@ -632,7 +632,7 @@ export function CopilotWorkspace({
                 onClick={replay}
                 className="inline-flex items-center gap-1 text-xs font-semibold text-brand hover:underline"
               >
-                <Volume2 className="h-3.5 w-3.5" /> Replay explanation
+                <Volume2 className="h-3.5 w-3.5" /> {t("results.replay")}
               </button>
             )}
           </div>
@@ -664,7 +664,7 @@ export function CopilotWorkspace({
 
                 {primaryOption.why && (
                   <div className="mt-3 rounded-lg border border-brand/20 bg-surface/80 p-3 text-xs leading-relaxed text-ink-soft">
-                    <div className="font-semibold text-brand-ink mb-1">Why this option:</div>
+                    <div className="font-semibold text-brand-ink mb-1">{t("results.why")}</div>
                     <div>{primaryOption.why}</div>
                   </div>
                 )}
@@ -676,7 +676,7 @@ export function CopilotWorkspace({
                     {formatFare(primaryOption.fare)}
                   </div>
                   <div className="inline-flex items-center gap-1 rounded-full bg-confirm-soft px-2.5 py-0.5 text-xs font-semibold text-confirm mt-1">
-                    {primaryOption.level} Confirmation
+                    {primaryOption.level} {t("results.confirmation")}
                   </div>
                 </div>
 
@@ -686,7 +686,7 @@ export function CopilotWorkspace({
                   onClick={() => handlePrepareTatkal(result!.plan, primaryOption)}
                   className="mt-4 sm:mt-0 inline-flex items-center justify-center gap-2 rounded-full bg-brand px-5 py-2.5 text-sm font-semibold text-white shadow-[var(--shadow-brand)] transition-colors hover:bg-brand-strong"
                 >
-                  Prepare for Tatkal <ArrowRight className="h-4 w-4" />
+                  {t("results.prepareCTA")} <ArrowRight className="h-4 w-4" />
                 </button>
               </div>
             </div>
@@ -696,7 +696,7 @@ export function CopilotWorkspace({
           {secondaryOptions.length > 0 && (
             <div className="pt-2">
               <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-ink-faint">
-                Other Verified Options ({secondaryOptions.length})
+                {t("results.otherOptions", { count: secondaryOptions.length })}
               </h3>
               <div className="grid gap-3 sm:grid-cols-2">
                 {secondaryOptions.map((opt) => (
@@ -717,7 +717,7 @@ export function CopilotWorkspace({
                         onClick={() => handlePrepareTatkal(result!.plan, opt)}
                         className="mt-1 text-xs font-semibold text-brand hover:underline"
                       >
-                        Select option →
+                        {t("results.selectOption")}
                       </button>
                     </div>
                   </div>
@@ -734,20 +734,20 @@ export function CopilotWorkspace({
           <div className="mx-auto mb-2 grid h-12 w-12 place-items-center rounded-full bg-caution-soft text-caution">
             <HelpCircle className="h-6 w-6" />
           </div>
-          <h2 className="text-lg font-bold text-ink">No verified journey found</h2>
+          <h2 className="text-lg font-bold text-ink">{t("results.noFound")}</h2>
           <p className="mx-auto mt-1.5 max-w-md text-xs leading-relaxed text-ink-soft">
             {`I couldn't find a verified ${travelClass} train journey matching ${originText} → ${destText} for ${travelDate}.`}
           </p>
 
           <div className="mt-4 border-t border-line pt-4">
             <div className="mb-2.5 text-[0.68rem] font-semibold uppercase tracking-wide text-ink-faint">
-              Recovery Actions
+              {t("results.recoveryActions")}
             </div>
             <div className="flex flex-wrap justify-center gap-2">
               {[
-                "Change date",
-                "Change class",
-                "Try another station",
+                t("refine.changeDate"),
+                t("refine.changeClass"),
+                t("refine.tryStation"),
                 "Refine by voice",
               ].map((action) => (
                 <button
@@ -774,27 +774,27 @@ export function CopilotWorkspace({
           <div className="flex items-center justify-between border-b border-confirm/20 pb-3">
             <div className="flex items-center gap-2 text-confirm">
               <ShieldCheck className="h-5 w-5" />
-              <h2 className="text-base font-bold">Tatkal Preparation Workspace</h2>
+              <h2 className="text-base font-bold">{t("prep.workspaceTitle")}</h2>
             </div>
-            <span className="text-xs font-semibold text-confirm">Window opens 10:00 AM</span>
+            <span className="text-xs font-semibold text-confirm">{t("prep.windowOpens")}</span>
           </div>
 
           <div className="grid gap-2 text-xs text-ink-soft sm:grid-cols-2">
             <div className="flex items-center gap-2">
               <Check className="h-4 w-4 text-confirm shrink-0" />
-              <span>Journey selected: <strong>{primaryOption.title}</strong></span>
+              <span>{t("prep.journeySelected")} <strong>{primaryOption.title}</strong></span>
             </div>
             <div className="flex items-center gap-2">
               <Check className="h-4 w-4 text-confirm shrink-0" />
-              <span>Class: <strong>{primaryOption.travelClass}</strong></span>
+              <span>{t("prep.classLabel")} <strong>{primaryOption.travelClass}</strong></span>
             </div>
             <div className="flex items-center gap-2">
               <Check className="h-4 w-4 text-confirm shrink-0" />
-              <span>Identity readiness: <strong>{identity.status === "verified" ? "Verified" : "Ready"}</strong></span>
+              <span>{t("prep.identityReadiness")} <strong>{identity.status === "verified" ? t("prep.verified") : t("home.ready")}</strong></span>
             </div>
             <div className="flex items-center gap-2">
               <Check className="h-4 w-4 text-confirm shrink-0" />
-              <span>Rail Wallet coverage: <strong>{wallet.balance >= primaryOption.fare ? "Covered" : "Ready"}</strong></span>
+              <span>{t("prep.walletCoverage")} <strong>{wallet.balance >= primaryOption.fare ? t("prep.covered") : t("home.ready")}</strong></span>
             </div>
           </div>
 
@@ -813,7 +813,7 @@ export function CopilotWorkspace({
       {/* Footer Disclaimer */}
       <div className="text-center text-[0.72rem] text-ink-faint flex items-center justify-center gap-1.5 pt-2 border-t border-line">
         <Lock className="h-3.5 w-3.5 text-confirm" />
-        <span>Voice audio is processed privately for your journey search only. Never recorded or shared.</span>
+        <span>{t("workspace.footerPrivacy")}</span>
       </div>
     </div>
   );
