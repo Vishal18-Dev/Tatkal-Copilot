@@ -4,13 +4,13 @@ import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
-import { Phone, PhoneOff, PhoneIncoming } from "lucide-react";
+import { Phone, PhoneOff, PhoneIncoming, PhoneCall } from "lucide-react";
 import { useLang } from "@/lib/i18n";
 import { useStore } from "@/lib/store";
 import { cn } from "@/lib/utils";
 import { buildCallScript } from "@/lib/calling/script";
 import { useCallConversation } from "@/lib/calling/conversation";
-import { callingProvider, type CallReason, type PlacedCall } from "@/lib/calling/provider";
+import { callingProvider, RealCallingProvider, type CallReason, type PlacedCall } from "@/lib/calling/provider";
 import type { CopilotContext } from "@/lib/copilot";
 import type { Trip } from "@/types";
 import { VoiceWaveform } from "@/components/voice/VoiceWaveform";
@@ -82,6 +82,27 @@ export function CallScreen({ onClose }: { onClose: () => void }) {
   function handleDecline() {
     decline();
     setTimeout(onClose, 300);
+  }
+
+  // Real telephony: dial the user's actual mobile with the same grounded
+  // briefing. Works when telephony credentials are configured server-side;
+  // otherwise it says so honestly and the in-browser call remains the demo.
+  const [dialing, setDialing] = useState(false);
+  const [dialMsg, setDialMsg] = useState<string | null>(null);
+  async function callMyMobile() {
+    if (dialing || !user?.phone) return;
+    setDialing(true);
+    setDialMsg(null);
+    const real = new RealCallingProvider();
+    const r = await real.placeCall({
+      reason: reasonFor(activeTrip),
+      tripId: activeTrip?.id,
+      toName: user?.name,
+      toNumber: user.phone,
+      briefing: script.steps.start.text,
+    });
+    setDialing(false);
+    setDialMsg(r.ok ? t("call.dialing") : r.error ?? t("call.cannotPlace"));
   }
 
   const ringing = state === "ringing";
@@ -216,6 +237,21 @@ export function CallScreen({ onClose }: { onClose: () => void }) {
           </CallButton>
         )}
       </div>
+
+      {/* Real telephony: ring the user's actual mobile with the same briefing. */}
+      {(ringing || live) && user?.phone && (
+        <div className="flex flex-col items-center gap-1.5 pb-2">
+          <button
+            onClick={callMyMobile}
+            disabled={dialing}
+            className="inline-flex items-center gap-2 rounded-full border border-white/20 px-4 py-2 text-sm font-medium text-white/90 transition-colors hover:bg-white/10 disabled:opacity-50"
+          >
+            <PhoneCall className="h-4 w-4" />
+            {dialing ? t("call.dialingShort") : t("call.callMobile")}
+          </button>
+          {dialMsg && <span className="max-w-xs text-center text-[0.72rem] text-white/60">{dialMsg}</span>}
+        </div>
+      )}
 
       <p className="text-[0.7rem] italic text-white/40">{t("call.simNote")}</p>
     </motion.div>,

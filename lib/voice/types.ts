@@ -96,6 +96,13 @@ export interface VoiceConversationOptions {
   onConfirm: (goal: string, plan: Plan) => void;
   /** Fired with Sarvam's detected BCP-47 code so the UI can follow the speaker. */
   onDetectLang?: (bcp47: string) => void;
+  /**
+   * Hands-free mode: keep the mic open, auto-end each turn on a trailing
+   * silence (voice-activity detection), and re-open the mic after the agent
+   * replies — so the user never has to tap start/stop. Falls back to
+   * push-to-talk if the browser lacks the Web Audio API.
+   */
+  continuous?: boolean;
 }
 
 /** Sarvam BCP-47 language codes we actually use (subset of the full list). */
@@ -118,3 +125,19 @@ export const VOICE_MIN_RECORDING_MS = 400;
 export const VOICE_MAX_AUDIO_BYTES = 8 * 1024 * 1024; // 8MB
 export const VOICE_REQUEST_TIMEOUT_MS = 20_000;
 export const VOICE_ACCEPTED_MIME_PREFIXES = ["audio/webm", "audio/mp4", "audio/ogg", "audio/wav"];
+
+/* ------------------------------------------------------------------
+   Hands-free (continuous) listening — voice-activity detection.
+   The mic stays open; a turn auto-ends after a short silence once
+   the speaker has actually said something, and the agent re-opens
+   the mic after it finishes replying. Tuned to feel conversational
+   without cutting people off mid-sentence.
+------------------------------------------------------------------ */
+/** RMS amplitude (0–1) above which we count the frame as speech. */
+export const VOICE_VAD_RMS_THRESHOLD = 0.02;
+/** Trailing silence that ends a turn, once speech has been heard. */
+export const VOICE_VAD_SILENCE_MS = 1400;
+/** Minimum speech before a turn can auto-end (guards against a stray blip). */
+export const VOICE_VAD_MIN_SPEECH_MS = 500;
+/** Delay before the mic re-opens after the agent finishes a reply. */
+export const VOICE_HANDS_FREE_RESUME_MS = 650;

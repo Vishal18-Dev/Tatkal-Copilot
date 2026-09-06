@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Mic,
+  MicOff,
   Square,
   X,
   TrainFront,
@@ -24,6 +25,7 @@ import { useVoiceLang } from "@/lib/voice/voice-lang";
 import { cn, formatFare } from "@/lib/utils";
 import { VoiceWaveform } from "./VoiceWaveform";
 import { VoiceLangSelect } from "./VoiceLangSelect";
+import { ScreenShareAssist } from "./ScreenShareAssist";
 import type { Plan } from "@/types";
 
 const FALLBACK_ERRORS = new Set(["mic_permission_denied", "mic_unsupported"]);
@@ -56,6 +58,7 @@ export function VoiceConversation({
   const convo = useVoiceConversation({
     voiceLang,
     locked,
+    continuous: true, // hands-free: the mic stays open the whole session
     onDetectLang: observeDetected,
     onConfirm: (goal, plan) => {
       if (onConfirmGoal) onConfirmGoal(goal, plan);
@@ -73,9 +76,12 @@ export function VoiceConversation({
     micSupported,
     elapsedMs,
     maxRecordingMs,
+    continuous,
+    paused,
     start,
     stop,
     cancel,
+    togglePause,
     confirmByTap,
     rejectByTap,
     tapAdjustment,
@@ -99,7 +105,15 @@ export function VoiceConversation({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  const muted = continuous && paused;
+
   function onMicPress() {
+    if (continuous) {
+      // Hands-free: while speaking, tap to interrupt; otherwise mute/resume.
+      if (speaking) stopSpeaking();
+      else togglePause();
+      return;
+    }
     if (recording) stop();
     else if (speaking) stopSpeaking();
     else start();
@@ -113,7 +127,11 @@ export function VoiceConversation({
   const statusText =
     state === "error"
       ? t(errorKind ? `voice.error.${errorMap(errorKind)}` : "voice.error.generic")
-      : t(STATUS_KEY[state] ?? "voice.tapToSpeak");
+      : muted
+        ? t("voice.paused")
+        : continuous && state === "idle"
+          ? t("voice.listening")
+          : t(STATUS_KEY[state] ?? "voice.tapToSpeak");
 
   const detected = useMemo(() => {
     if (!result) return [];
@@ -339,39 +357,60 @@ export function VoiceConversation({
             )}
           </div>
         )}
+
+        {/* Guided screen-share assistance — show me your screen and I'll help. */}
+        <ScreenShareAssist />
       </div>
 
       {/* Mic dock */}
       <div className="border-t border-line px-5 py-5">
         <div className="mx-auto flex max-w-xl flex-col items-center gap-3">
-          <VoiceWaveform active={recording || speaking} />
+          <VoiceWaveform active={(recording || speaking) && !muted} />
           <button
             onClick={onMicPress}
             disabled={micDisabled}
-            aria-label={recording ? t("voice.stop") : speaking ? t("voice.stopPlayback") : t("voice.tapToSpeak")}
-            aria-pressed={recording}
+            aria-label={
+              muted
+                ? t("voice.resume")
+                : recording
+                  ? continuous
+                    ? t("voice.mute")
+                    : t("voice.stop")
+                  : speaking
+                    ? t("voice.stopPlayback")
+                    : t("voice.tapToSpeak")
+            }
+            aria-pressed={continuous ? !paused : recording}
             className={cn(
               "relative grid h-16 w-16 shrink-0 place-items-center rounded-full text-white transition-colors disabled:opacity-40 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand",
-              recording ? "bg-danger" : "bg-brand hover:bg-brand-strong"
+              muted ? "bg-ink-faint hover:bg-ink-soft" : recording ? "bg-danger" : "bg-brand hover:bg-brand-strong"
             )}
           >
-            {recording && (
+            {recording && !muted && (
               <span className="absolute inset-0 -z-10 animate-ping rounded-full bg-danger/40 motion-reduce:animate-none" />
             )}
             {busy ? (
               <Loader2 className="h-6 w-6 animate-spin" />
-            ) : recording ? (
-              <Square className="h-5 w-5" fill="currentColor" />
+            ) : muted ? (
+              <MicOff className="h-6 w-6" />
             ) : speaking ? (
               <Volume2 className="h-6 w-6" />
+            ) : recording ? (
+              continuous ? (
+                <Mic className="h-6 w-6" />
+              ) : (
+                <Square className="h-5 w-5" fill="currentColor" />
+              )
             ) : (
               <Mic className="h-6 w-6" />
             )}
           </button>
-          {recording ? (
-            <span className="tabular text-xs font-medium text-ink-faint">
-              0:{String(Math.floor(elapsedMs / 1000)).padStart(2, "0")}
-              {remainingSec <= 3 && ` · ${t("voice.autoStopSoon")}`}
+          {muted ? (
+            <span className="text-center text-[0.72rem] font-medium text-ink-faint">{t("voice.pausedHint")}</span>
+          ) : recording ? (
+            <span className="text-center text-[0.72rem] font-medium text-ink-faint">
+              {continuous ? t("voice.handsFreeHint") : `0:${String(Math.floor(elapsedMs / 1000)).padStart(2, "0")}`}
+              {!continuous && remainingSec <= 3 && ` · ${t("voice.autoStopSoon")}`}
             </span>
           ) : result ? (
             <span className="text-center text-[0.72rem] text-ink-faint">{t("voice.refineHint")}</span>

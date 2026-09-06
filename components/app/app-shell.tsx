@@ -14,6 +14,9 @@ import {
   User as UserIcon,
   Plus,
   LifeBuoy,
+  Settings,
+  LogOut,
+  ChevronDown,
 } from "lucide-react";
 import { Logo } from "@/components/brand/logo";
 import { LanguageToggle } from "@/components/brand/language-toggle";
@@ -28,12 +31,21 @@ import { cn } from "@/lib/utils";
 // Figma V2 shell — a calm horizontal top nav in place of the sidebar.
 // Items are the app's real destinations (the journey stages Options/Prepare/
 // Book live inside the /app/plan wizard's own progress, not as routes).
+// Only the core journey destinations live in the top bar. Secondary
+// destinations (Travellers, Activity, Help, Settings) moved into the account
+// menu to keep the nav calm and scannable.
 const NAV = [
   { href: "/app", label: "nav.home", icon: Home, exact: true },
   { href: "/app/plan", label: "nav.plan", icon: Sparkles },
   { href: "/app/trips", label: "nav.trips", icon: Ticket },
+];
+
+// Everything reachable from the account menu.
+const MENU = [
+  { href: "/app/settings", label: "nav.settings", icon: Settings },
   { href: "/app/travellers", label: "nav.travellers", icon: Users },
   { href: "/app/activity", label: "nav.activity", icon: ActivityIcon },
+  { href: "/app/help", label: "nav.help", icon: LifeBuoy },
 ];
 
 function isActive(pathname: string, href: string, exact?: boolean) {
@@ -80,20 +92,14 @@ export function AppShell({ children }: { children: ReactNode }) {
 
           {/* Right controls */}
           <div className="flex shrink-0 items-center gap-1.5">
-            <Link
-              href="/app/help"
-              className="hidden items-center gap-1.5 rounded-[var(--radius)] px-3 py-2 text-sm font-medium text-ink-soft transition-colors hover:bg-surface-muted hover:text-ink md:inline-flex"
-            >
-              <LifeBuoy className="h-4 w-4" />
-              {t("nav.help")}
-            </Link>
             <LanguageToggle />
             <ThemeToggle />
             <VoiceButton />
             <NotificationsButton count={unreadCount} notifications={notifications} />
-            <ProfilePill
+            <AccountMenu
               isAuthed={isAuthed}
               name={user?.name}
+              pathname={pathname}
               onSignIn={() => setAuthOpen(true)}
             />
           </div>
@@ -146,16 +152,21 @@ function TopNavLink({
   );
 }
 
-function ProfilePill({
+function AccountMenu({
   isAuthed,
   name,
+  pathname,
   onSignIn,
 }: {
   isAuthed: boolean;
   name?: string;
+  pathname: string;
   onSignIn: () => void;
 }) {
   const { t } = useLang();
+  const { logout } = useStore();
+  const [open, setOpen] = useState(false);
+
   if (!isAuthed) {
     return (
       <button
@@ -169,18 +180,78 @@ function ProfilePill({
       </button>
     );
   }
+
   return (
-    <Link
-      href="/app/settings"
-      className="inline-flex items-center gap-2 rounded-full border border-line-strong bg-surface px-2 py-1.5 text-sm font-medium text-ink transition-colors hover:bg-surface-muted"
-    >
-      <span className="grid h-7 w-7 place-items-center rounded-full bg-brand text-xs font-semibold text-white">
-        {(name ?? "You").slice(0, 1).toUpperCase()}
-      </span>
-      <span className="hidden max-w-[9rem] truncate pr-1 sm:inline">
-        {name ?? t("shell.account")}
-      </span>
-    </Link>
+    <div className="relative">
+      <button
+        onClick={() => setOpen((o) => !o)}
+        aria-haspopup="menu"
+        aria-expanded={open}
+        aria-label={t("shell.account")}
+        className="inline-flex items-center gap-1.5 rounded-full border border-line-strong bg-surface py-1.5 pl-2 pr-2.5 text-sm font-medium text-ink transition-colors hover:bg-surface-muted"
+      >
+        <span className="grid h-7 w-7 place-items-center rounded-full bg-brand text-xs font-semibold text-white">
+          {(name ?? "You").slice(0, 1).toUpperCase()}
+        </span>
+        <span className="hidden max-w-[9rem] truncate sm:inline">{name ?? t("shell.account")}</span>
+        <ChevronDown className={cn("h-3.5 w-3.5 text-ink-faint transition-transform", open && "rotate-180")} />
+      </button>
+
+      <AnimatePresence>
+        {open && (
+          <>
+            {/* Click-away layer */}
+            <button
+              aria-hidden="true"
+              tabIndex={-1}
+              onClick={() => setOpen(false)}
+              className="fixed inset-0 z-40 cursor-default"
+            />
+            <motion.div
+              role="menu"
+              initial={{ opacity: 0, y: 6 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: 6 }}
+              className="absolute right-0 top-full z-50 mt-2 w-56 overflow-hidden rounded-[var(--radius-lg)] border border-line bg-surface py-1.5 shadow-[var(--shadow-lift)]"
+            >
+              {name && (
+                <div className="truncate px-3.5 pb-1.5 pt-1 text-xs text-ink-faint">{name}</div>
+              )}
+              {MENU.map((m) => {
+                const active = isActive(pathname, m.href, m.href === "/app");
+                return (
+                  <Link
+                    key={m.href}
+                    href={m.href}
+                    role="menuitem"
+                    onClick={() => setOpen(false)}
+                    className={cn(
+                      "flex items-center gap-2.5 px-3.5 py-2 text-sm transition-colors",
+                      active ? "bg-brand-soft text-brand-ink" : "text-ink hover:bg-surface-muted"
+                    )}
+                  >
+                    <m.icon className="h-4 w-4 text-ink-soft" />
+                    {t(m.label)}
+                  </Link>
+                );
+              })}
+              <div className="my-1 border-t border-line" />
+              <button
+                role="menuitem"
+                onClick={() => {
+                  setOpen(false);
+                  logout();
+                }}
+                className="flex w-full items-center gap-2.5 px-3.5 py-2 text-sm text-danger transition-colors hover:bg-danger-soft/50"
+              >
+                <LogOut className="h-4 w-4" />
+                {t("shell.signout")}
+              </button>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
+    </div>
   );
 }
 
