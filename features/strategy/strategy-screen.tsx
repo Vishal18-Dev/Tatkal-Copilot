@@ -15,6 +15,7 @@ import { Button } from "@/components/ui/button";
 import { StepShell } from "@/components/step-shell";
 import { OptionCard } from "./option-card";
 import { TrainRow } from "./train-row";
+import { DynamicJourneyDecision } from "@/components/app/DynamicJourneyDecision";
 import { useJourney } from "@/lib/journey";
 import { useLang } from "@/lib/i18n";
 import { explainDeviation } from "@/lib/planner";
@@ -86,6 +87,15 @@ export function StrategyScreen() {
           <Sparkles className="h-4 w-4" />
         </span>
         <p className="text-[0.95rem] leading-relaxed text-ink">{plan.narrative.whyRecommended}</p>
+      </div>
+
+      {/* Item 5F.1 — Dynamic Journey Decision Experience */}
+      <div className="mt-6">
+        <DynamicJourneyDecision
+          initialOrigin={plan.intent.from}
+          initialDestination={plan.intent.to}
+          onProceedToBooking={() => goTo("vault")}
+        />
       </div>
 
       {/* Hero cards — top options */}

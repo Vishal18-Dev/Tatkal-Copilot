@@ -3,22 +3,15 @@
 import { motion } from "framer-motion";
 import { Clock, GitBranch, ShieldCheck } from "lucide-react";
 import { StepShell } from "@/components/step-shell";
-import { JourneyForm } from "@/features/goal/journey-form";
+import { CopilotWorkspace } from "@/components/copilot/CopilotWorkspace";
 import { useLang } from "@/lib/i18n";
 
-export function ComposeScreen() {
+export function ComposeScreen({ initialGoal }: { initialGoal?: string }) {
   const { t } = useLang();
   return (
     <StepShell wide>
-      <div className="mx-auto max-w-xl text-center">
-        <h1 className="text-headline text-brand-ink">{t("goal.title")}</h1>
-        <p className="mx-auto mt-3 max-w-md text-lg text-ink-soft">
-          {t("goal.subtitle")}
-        </p>
-      </div>
-
-      <div className="mx-auto mt-9 max-w-3xl">
-        <JourneyForm />
+      <div className="mx-auto max-w-3xl">
+        <CopilotWorkspace initialGoal={initialGoal} />
       </div>
 
       <div className="mx-auto mt-10 max-w-4xl">
@@ -60,3 +53,4 @@ function Promises() {
     </div>
   );
 }
+

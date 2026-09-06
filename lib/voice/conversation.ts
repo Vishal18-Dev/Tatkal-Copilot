@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { parseVoiceCommand } from "./commands";
 import {
   composeAnswer,
@@ -26,10 +26,29 @@ import type {
   VoiceRespondResult,
   VoiceState,
   VoiceTurn,
+  SemanticCommandIntent,
 } from "./types";
+import type { AudioMetadata, Conversation, ToolActionMetadata } from "@/lib/conversation/types";
+import { addMessage, createConversation } from "@/lib/conversation/service";
+import { RealtimeSTTClient } from "./realtime-stt";
+import type { ConversationalJourneyState } from "@/lib/copilot/journey-state";
+import type { Trip } from "@/types";
 
 let turnSeq = 0;
 const nextId = () => `turn_${Date.now()}_${turnSeq++}`;
+
+const emptySubscribe = () => () => {};
+function getMicSnapshot(): boolean {
+  return (
+    typeof navigator !== "undefined" &&
+    !!navigator.mediaDevices?.getUserMedia &&
+    typeof MediaRecorder !== "undefined" &&
+    (typeof window === "undefined" || window.isSecureContext)
+  );
+}
+function getServerSnapshot(): boolean {
+  return false;
+}
 
 /**
  * Client-side orchestrator for the voice agent: records a clip, sends it to
@@ -51,11 +70,18 @@ export function useVoiceConversation({
   const [state, setState] = useState<VoiceState>("idle");
   const [errorKind, setErrorKind] = useState<VoiceErrorKind | null>(null);
   const [turns, setTurns] = useState<VoiceTurn[]>([]);
+  const [interimTranscript, setInterimTranscript] = useState<string | null>(null);
+  const [conversation, setConversation] = useState<Conversation>(() =>
+    createConversation({ channel: "browser_voice", language: voiceLang })
+  );
   const [result, setResult] = useState<VoiceRespondResult | null>(null);
-  const [micSupported, setMicSupported] = useState(false);
+  const micSupported = useSyncExternalStore(emptySubscribe, getMicSnapshot, getServerSnapshot);
   const [elapsedMs, setElapsedMs] = useState(0);
   // Hands-free: the mic stays open across turns until the user pauses it.
   const [paused, setPaused] = useState(false);
+
+  const journeyStateRef = useRef<ConversationalJourneyState | undefined>(undefined);
+  const tripRef = useRef<Trip | undefined>(undefined);
 
   const goalRef = useRef<string>("");
   const resultRef = useRef<VoiceRespondResult | null>(null);
@@ -70,6 +96,15 @@ export function useVoiceConversation({
   // knows its result is stale and must not overwrite newer UI state.
   const requestGenRef = useRef(0);
   const abortRef = useRef<AbortController | null>(null);
+
+  // Realtime streaming + fallback state
+  const isRestFallbackRef = useRef(false);
+  const realtimeClientRef = useRef<RealtimeSTTClient | null>(null);
+  const finalReceivedRef = useRef(false);
+
+  const stopRef = useRef<() => Promise<void>>(async () => {});
+  const requestPlanRef = useRef<(goal: string, myGen: number) => Promise<void>>(async () => {});
+  const handleFollowUpRef = useRef<(text: string, myGen: number) => Promise<void>>(async () => {});
 
   // The language the agent actually responds in. Held in a ref (not the
   // voiceLang prop) so a language DETECTED mid-turn takes effect on the very
@@ -91,21 +126,7 @@ export function useVoiceConversation({
   const speechStartRef = useRef(0);
   const silenceStartRef = useRef(0);
 
-  useEffect(() => {
-    setMicSupported(
-      typeof navigator !== "undefined" &&
-        !!navigator.mediaDevices?.getUserMedia &&
-        typeof MediaRecorder !== "undefined" &&
-        (typeof window === "undefined" || window.isSecureContext)
-    );
-    return () => {
-      cleanupMedia();
-      abortRef.current?.abort();
-      // eslint-disable-next-line react-hooks/exhaustive-deps
-    };
-  }, []);
-
-  function teardownVad() {
+  const teardownVad = useCallback(() => {
     if (vadRafRef.current != null) cancelAnimationFrame(vadRafRef.current);
     vadRafRef.current = null;
     // Closing the AudioContext is async and best-effort — ignore failures.
@@ -114,20 +135,32 @@ export function useVoiceConversation({
     speechDetectedRef.current = false;
     speechStartRef.current = 0;
     silenceStartRef.current = 0;
-  }
+  }, []);
 
-  function cleanupMedia() {
+  const cleanupMedia = useCallback(() => {
     if (maxDurationTimerRef.current) clearTimeout(maxDurationTimerRef.current);
     if (elapsedTimerRef.current) clearInterval(elapsedTimerRef.current);
     maxDurationTimerRef.current = null;
     elapsedTimerRef.current = null;
     teardownVad();
+    if (realtimeClientRef.current) {
+      realtimeClientRef.current.abort();
+      realtimeClientRef.current = null;
+    }
+    setInterimTranscript(null);
     streamRef.current?.getTracks().forEach((t) => t.stop());
     streamRef.current = null;
     recorderRef.current = null;
     audioElRef.current?.pause();
     audioElRef.current = null;
-  }
+  }, [teardownVad]);
+
+  useEffect(() => {
+    return () => {
+      cleanupMedia();
+      abortRef.current?.abort();
+    };
+  }, [cleanupMedia]);
 
   /**
    * Voice-activity detection: watch the mic level and auto-end the turn after a
@@ -135,7 +168,7 @@ export function useVoiceConversation({
    * the Web Audio API is missing, hands-free silently degrades to the max-
    * duration auto-stop and the manual stop button.
    */
-  function setupVad(stream: MediaStream, onSilence: () => void) {
+  const setupVad = useCallback((stream: MediaStream, onSilence: () => void) => {
     try {
       const AC: typeof AudioContext | undefined =
         window.AudioContext ?? (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
@@ -162,6 +195,12 @@ export function useVoiceConversation({
         const now = Date.now();
 
         if (rms > VOICE_VAD_RMS_THRESHOLD) {
+          // Natural barge-in: if agent is speaking, halt playback and return to listening
+          if (audioElRef.current && !audioElRef.current.paused) {
+            audioElRef.current.pause();
+            audioElRef.current = null;
+            setState(isRestFallbackRef.current ? "rest_listening" : "listening");
+          }
           if (!speechDetectedRef.current) speechStartRef.current = now;
           speechDetectedRef.current = true;
           silenceStartRef.current = 0;
@@ -179,11 +218,43 @@ export function useVoiceConversation({
     } catch {
       /* VAD unavailable — hands-free falls back to manual/max-duration stop */
     }
-  }
+  }, [teardownVad]);
 
-  const pushTurn = useCallback((role: VoiceTurn["role"], text: string, final = true) => {
-    setTurns((t) => [...t, { id: nextId(), role, text, final }]);
-  }, []);
+  const pushTurn = useCallback(
+    (
+      role: VoiceTurn["role"],
+      text: string,
+      final = true,
+      meta?: {
+        normalizedText?: string;
+        language?: VoiceLang;
+        detectedLanguage?: string;
+        intent?: SemanticCommandIntent;
+        audio?: AudioMetadata;
+        toolAction?: ToolActionMetadata;
+      }
+    ) => {
+      const turnId = nextId();
+      setTurns((t) => [...t, { id: turnId, role, text, final }]);
+      setConversation((c) => {
+        const { conversation: updated } = addMessage(c, {
+          id: turnId,
+          role: role === "agent" ? "assistant" : "user",
+          channel: "browser_voice",
+          originalText: text,
+          normalizedText: meta?.normalizedText,
+          language: meta?.language ?? activeLangRef.current,
+          detectedLanguage: meta?.detectedLanguage,
+          intent: meta?.intent,
+          status: final ? "final" : "interim",
+          audio: meta?.audio,
+          toolAction: meta?.toolAction,
+        });
+        return updated;
+      });
+    },
+    []
+  );
 
   const fail = useCallback((kind: VoiceErrorKind) => {
     setErrorKind(kind);
@@ -193,6 +264,8 @@ export function useVoiceConversation({
   /** Start recording a clip from the mic. Auto-stops at VOICE_MAX_RECORDING_MS. */
   const start = useCallback(async () => {
     setErrorKind(null);
+    setInterimTranscript(null);
+    finalReceivedRef.current = false;
     if (!micSupported) {
       fail("mic_unsupported");
       return;
@@ -228,25 +301,83 @@ export function useVoiceConversation({
     recorder.start();
     recordStartRef.current = Date.now();
     setElapsedMs(0);
-    setState("listening");
 
     elapsedTimerRef.current = setInterval(() => {
       setElapsedMs(Date.now() - recordStartRef.current);
     }, 200);
     // Never let an accidentally-open mic keep recording indefinitely.
     maxDurationTimerRef.current = setTimeout(() => {
-      void stop();
-      // eslint-disable-next-line react-hooks/exhaustive-deps
+      void stopRef.current();
     }, VOICE_MAX_RECORDING_MS);
 
     // Hands-free: end the turn on a trailing silence instead of a tap.
     if (continuousRef.current) {
       setupVad(stream, () => {
-        void stop();
+        void stopRef.current();
       });
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [micSupported]);
+
+    // Connect to realtime STT if not permanently downgraded to REST for this session
+    if (isRestFallbackRef.current) {
+      setState("rest_listening");
+    } else {
+      setState("connecting");
+      try {
+        const client = new RealtimeSTTClient({
+          language: activeLangRef.current,
+          onInterim: (text) => {
+            // Natural barge-in
+            if (audioElRef.current && !audioElRef.current.paused) {
+              audioElRef.current.pause();
+              audioElRef.current = null;
+              setState(isRestFallbackRef.current ? "rest_listening" : "listening");
+            }
+            // Interim transcript is UI-only ephemeral state; never runs tools or touches conversation
+            setInterimTranscript(text);
+          },
+          onFinal: (text, languageCode) => {
+            setInterimTranscript(null);
+            const trimmed = text?.trim();
+            if (!trimmed) return;
+            finalReceivedRef.current = true;
+            if (languageCode) {
+              const detected = fromBcp47(languageCode);
+              if (detected && !locked) activeLangRef.current = detected;
+              onDetectLang?.(languageCode);
+            }
+            let recognizedIntent: SemanticCommandIntent | undefined;
+            if (resultRef.current) {
+              const cmd = parseVoiceCommand(trimmed, activeLangRef.current);
+              if (cmd.intent !== "unknown") recognizedIntent = cmd.intent;
+            }
+            pushTurn("user", trimmed, true, {
+              detectedLanguage: languageCode ?? undefined,
+              language: activeLangRef.current,
+              intent: recognizedIntent,
+            });
+            const myGen = requestGenRef.current;
+            if (!resultRef.current) {
+              void requestPlanRef.current(trimmed, myGen);
+            } else {
+              void handleFollowUpRef.current(trimmed, myGen);
+            }
+          },
+          onError: (err) => {
+            console.warn("[realtime-stt] Error, sticky REST fallback engaged:", err.message);
+            isRestFallbackRef.current = true;
+            setState("rest_listening");
+          },
+        });
+        await client.start(stream);
+        realtimeClientRef.current = client;
+        setState("listening");
+      } catch (err) {
+        console.warn("[realtime-stt] Connection failed, sticky REST fallback engaged:", err);
+        isRestFallbackRef.current = true;
+        setState("rest_listening");
+      }
+    }
+  }, [micSupported, cleanupMedia, fail, setupVad, locked, onDetectLang, pushTurn]);
 
   /** Stop recording, transcribe, and route the transcript appropriately. */
   const stop = useCallback(async () => {
@@ -258,7 +389,12 @@ export function useVoiceConversation({
     if (elapsedTimerRef.current) clearInterval(elapsedTimerRef.current);
     const durationMs = Date.now() - recordStartRef.current;
 
-    setState("transcribing");
+    if (realtimeClientRef.current) {
+      await realtimeClientRef.current.stop();
+      realtimeClientRef.current = null;
+    }
+    setInterimTranscript(null);
+
     const stopped = new Promise<void>((resolve) => {
       recorder.onstop = () => resolve();
     });
@@ -268,6 +404,14 @@ export function useVoiceConversation({
     streamRef.current = null;
 
     if (myGen !== requestGenRef.current) return; // cancelled while wrapping up
+
+    // If realtime STT already delivered the final recognized text, skip duplicate REST transcribe!
+    if (finalReceivedRef.current) {
+      finalReceivedRef.current = false;
+      return;
+    }
+
+    setState("transcribing");
 
     if (durationMs < VOICE_MIN_RECORDING_MS) {
       fail("recording_too_short");
@@ -320,12 +464,21 @@ export function useVoiceConversation({
         if (detected && !locked) activeLangRef.current = detected;
         onDetectLang?.(data.languageCode);
       }
-      pushTurn("user", text);
+      let recognizedIntent: SemanticCommandIntent | undefined;
+      if (resultRef.current) {
+        const cmd = parseVoiceCommand(text, activeLangRef.current);
+        if (cmd.intent !== "unknown") recognizedIntent = cmd.intent;
+      }
+      pushTurn("user", text, true, {
+        detectedLanguage: data.languageCode ?? undefined,
+        language: activeLangRef.current,
+        intent: recognizedIntent,
+      });
 
       if (!resultRef.current) {
-        await requestPlan(text, myGen);
+        await requestPlanRef.current(text, myGen);
       } else {
-        await handleFollowUp(text, myGen);
+        await handleFollowUpRef.current(text, myGen);
       }
     } catch (err) {
       if (myGen !== requestGenRef.current) return;
@@ -333,49 +486,7 @@ export function useVoiceConversation({
     } finally {
       clearTimeout(timer);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [voiceLang, locked, pushTurn, onDetectLang]);
-
-  const requestPlan = useCallback(
-    async (goal: string, myGen: number) => {
-      goalRef.current = goal;
-      setState("thinking");
-      const controller = new AbortController();
-      abortRef.current = controller;
-      const timer = setTimeout(() => controller.abort(), VOICE_REQUEST_TIMEOUT_MS);
-      try {
-        const res = await fetch("/api/voice/respond", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ transcript: goal, voiceLang: activeLangRef.current }),
-          signal: controller.signal,
-        });
-        if (myGen !== requestGenRef.current) return;
-        if (!res.ok) {
-          const body = (await res.json().catch(() => ({}))) as { errorKind?: VoiceErrorKind };
-          fail(body.errorKind ?? "planner_error");
-          return;
-        }
-        const data = (await res.json()) as VoiceRespondResult;
-        if (myGen !== requestGenRef.current) return;
-        resultRef.current = data;
-        setResult(data);
-        pushTurn("agent", data.responseText);
-        await speak(data, myGen);
-      } catch (err) {
-        if (myGen !== requestGenRef.current) return;
-        fail(
-          controller.signal.aborted || (err instanceof DOMException && err.name === "AbortError")
-            ? "timeout"
-            : "network_error"
-        );
-      } finally {
-        clearTimeout(timer);
-      }
-    },
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [voiceLang, pushTurn]
-  );
+  }, [voiceLang, locked, pushTurn, onDetectLang, fail]);
 
   /** TTS is best-effort: a playback failure still leaves the text result on screen. */
   const speak = useCallback(async (data: VoiceRespondResult, myGen: number) => {
@@ -396,6 +507,59 @@ export function useVoiceConversation({
       if (myGen === requestGenRef.current) setState("result");
     }
   }, []);
+
+  const requestPlan = useCallback(
+    async (goal: string, myGen: number) => {
+      goalRef.current = goal;
+      setState("thinking");
+      const controller = new AbortController();
+      abortRef.current = controller;
+      const timer = setTimeout(() => controller.abort(), VOICE_REQUEST_TIMEOUT_MS);
+      try {
+        const res = await fetch("/api/voice/respond", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            transcript: goal,
+            voiceLang: activeLangRef.current,
+            journeyState: journeyStateRef.current,
+            trip: tripRef.current,
+          }),
+          signal: controller.signal,
+        });
+        if (myGen !== requestGenRef.current) return;
+        if (!res.ok) {
+          const body = (await res.json().catch(() => ({}))) as { errorKind?: VoiceErrorKind };
+          fail(body.errorKind ?? "planner_error");
+          return;
+        }
+        const data = (await res.json()) as VoiceRespondResult;
+        if (myGen !== requestGenRef.current) return;
+        if (data.journeyState) journeyStateRef.current = data.journeyState;
+        if (data.trip !== undefined) tripRef.current = data.trip;
+        resultRef.current = data;
+        setResult(data);
+        pushTurn("agent", data.responseText, true, {
+          language: data.voiceLang ?? activeLangRef.current,
+          audio: {
+            present: !!data.audioBase64,
+            codec: data.audioCodec,
+          },
+        });
+        await speak(data, myGen);
+      } catch (err) {
+        if (myGen !== requestGenRef.current) return;
+        fail(
+          controller.signal.aborted || (err instanceof DOMException && err.name === "AbortError")
+            ? "timeout"
+            : "network_error"
+        );
+      } finally {
+        clearTimeout(timer);
+      }
+    },
+    [pushTurn, speak, fail]
+  );
 
   const replay = useCallback(() => {
     if (resultRef.current) void speak(resultRef.current, requestGenRef.current);
@@ -442,14 +606,14 @@ export function useVoiceConversation({
         if (myGen === requestGenRef.current) setState("result");
       }
     },
-    [voiceLang, pushTurn]
+    [pushTurn]
   );
 
   /** Answer a spoken question from grounded plan data, staying on the pick. */
   const answerQuestion = useCallback(
     async (question: string, myGen: number) => {
       const r = resultRef.current;
-      if (!r) return;
+      if (!r || !r.recommended) return;
       // Compose in English; respondLine translates for display + TTS.
       const answer = composeAnswer(r.plan, r.recommended, question, "en");
       await respondLine(answer, myGen);
@@ -465,45 +629,42 @@ export function useVoiceConversation({
       const goal = composeGoal(r.plan.intent, adjustment);
       await requestPlan(goal, myGen); // re-plans + speaks the new recommendation
     },
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [voiceLang]
+    [requestPlan]
   );
 
-  const handleFollowUp = useCallback(
-    async (text: string, myGen: number) => {
-      const cmd = parseVoiceCommand(text);
-      if (cmd.kind === "confirm") {
-        confirmByTap();
-        return;
-      }
-      if (cmd.kind === "reject") {
-        reset();
-        return;
-      }
-      if (cmd.kind === "cancel") {
-        cancel();
-        return;
-      }
-      if (cmd.kind === "repeat" && resultRef.current) {
-        pushTurn("agent", resultRef.current.responseText);
-        await speak(resultRef.current, myGen);
-        return;
-      }
+  const confirmByTap = useCallback(() => {
+    if (!resultRef.current || !resultRef.current.recommended) return;
+    setState("confirming");
+    onConfirm(goalRef.current, resultRef.current.plan);
+  }, [onConfirm]);
 
-      // Not a command — is it an adjustment (re-plan) or a question (answer)?
-      const fu = parseFollowUp(text);
-      if (fu.kind === "adjust" && fu.adjustment) {
-        await applyAdjustment(fu.adjustment, myGen);
-      } else if (fu.kind === "question") {
-        await answerQuestion(text, myGen);
-      } else {
-        // Truly unrecognized — stay on the pick, don't guess (spec §11).
-        if (myGen === requestGenRef.current) setState("result");
-      }
-    },
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [applyAdjustment, answerQuestion]
-  );
+  /** User-initiated stop: abandon everything in flight, back to idle. */
+  const cancel = useCallback(() => {
+    requestGenRef.current += 1;
+    abortRef.current?.abort();
+    cleanupMedia();
+    fail("cancelled");
+  }, [cleanupMedia, fail]);
+
+  const reset = useCallback(() => {
+    requestGenRef.current += 1;
+    abortRef.current?.abort();
+    cleanupMedia();
+    goalRef.current = "";
+    resultRef.current = null;
+    setResult(null);
+    journeyStateRef.current = undefined;
+    tripRef.current = undefined;
+    setTurns([]);
+    setConversation(createConversation({ channel: "browser_voice", language: voiceLang }));
+    setErrorKind(null);
+    setElapsedMs(0);
+    setState("idle");
+  }, [voiceLang, cleanupMedia]);
+
+  const rejectByTap = useCallback(() => {
+    reset();
+  }, [reset]);
 
   /** Tap equivalents (accessibility + reliable in every environment). */
   const tapAdjustment = useCallback(
@@ -523,38 +684,43 @@ export function useVoiceConversation({
     [answerQuestion, pushTurn]
   );
 
-  const confirmByTap = useCallback(() => {
-    if (!resultRef.current) return;
-    setState("confirming");
-    onConfirm(goalRef.current, resultRef.current.plan);
-  }, [onConfirm]);
+  const handleFollowUp = useCallback(
+    async (text: string, myGen: number) => {
+      const cmd = parseVoiceCommand(text, activeLangRef.current);
+      if (cmd.kind === "confirm" || cmd.intent === "yes" || cmd.intent === "confirm") {
+        confirmByTap();
+        return;
+      }
+      if (cmd.kind === "reject" || cmd.intent === "no") {
+        reset();
+        return;
+      }
+      if (cmd.kind === "cancel" || cmd.intent === "cancel" || cmd.intent === "stop") {
+        cancel();
+        return;
+      }
+      if ((cmd.kind === "repeat" || cmd.intent === "repeat") && resultRef.current) {
+        pushTurn("agent", resultRef.current.responseText);
+        await speak(resultRef.current, myGen);
+        return;
+      }
+      if (cmd.intent === "change" || cmd.kind === "change") {
+        reset();
+        return;
+      }
 
-  const rejectByTap = useCallback(() => {
-    reset();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+      // Every follow-up (refinements, questions, new origin/destination, adjustments)
+      // routes through Unified Copilot Brain via requestPlan to enforce journey state integrity.
+      await requestPlan(text, myGen);
+    },
+    [confirmByTap, reset, cancel, pushTurn, speak, requestPlan]
+  );
 
-  /** User-initiated stop: abandon everything in flight, back to idle. */
-  const cancel = useCallback(() => {
-    requestGenRef.current += 1;
-    abortRef.current?.abort();
-    cleanupMedia();
-    fail("cancelled");
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  const reset = useCallback(() => {
-    requestGenRef.current += 1;
-    abortRef.current?.abort();
-    cleanupMedia();
-    goalRef.current = "";
-    resultRef.current = null;
-    setResult(null);
-    setTurns([]);
-    setErrorKind(null);
-    setElapsedMs(0);
-    setState("idle");
-  }, []);
+  useEffect(() => {
+    stopRef.current = stop;
+    requestPlanRef.current = requestPlan;
+    handleFollowUpRef.current = handleFollowUp;
+  });
 
   /** Hands-free: temporarily stop listening (mute) without leaving the surface. */
   const pause = useCallback(() => {
@@ -564,8 +730,7 @@ export function useVoiceConversation({
     abortRef.current?.abort();
     cleanupMedia();
     setState("idle");
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [cleanupMedia]);
 
   /** Hands-free: resume listening after a pause. */
   const resume = useCallback(() => {
@@ -598,7 +763,7 @@ export function useVoiceConversation({
   // Adjustment chips reflect the current recommendation (e.g. offer a class
   // switch that isn't the current class).
   const adjustments = useMemo(
-    () => (result ? suggestedAdjustments(result.plan, result.recommended) : []),
+    () => (result && result.recommended ? suggestedAdjustments(result.plan, result.recommended) : []),
     [result]
   );
 
@@ -606,6 +771,8 @@ export function useVoiceConversation({
     state,
     errorKind,
     turns,
+    interimTranscript,
+    conversation,
     result,
     adjustments,
     micSupported,

@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { synthesizeSpeech } from "@/lib/voice/sarvam";
-import { SARVAM_TTS_LANG, VOICE_REQUEST_TIMEOUT_MS } from "@/lib/voice/types";
-import type { Lang } from "@/lib/i18n";
+import { VOICE_REQUEST_TIMEOUT_MS } from "@/lib/voice/types";
+import { bcp47For, fromBcp47, isVoiceLang, type VoiceLang } from "@/lib/voice/languages";
 import type { CallSpeakResult } from "@/lib/calling/types";
 
 export const runtime = "nodejs";
@@ -14,8 +14,19 @@ export const runtime = "nodejs";
  * breaking (same non-fatal-TTS principle as the voice agent).
  */
 export async function POST(req: Request) {
-  const body = (await req.json().catch(() => ({}))) as { text?: string; lang?: Lang };
-  const { text, lang = "en" } = body;
+  const body = (await req.json().catch(() => ({}))) as {
+    text?: string;
+    lang?: string;
+    voiceLang?: string;
+  };
+  const { text } = body;
+  const rawLang = body.voiceLang || body.lang || "en";
+  const normalized = rawLang.trim();
+  const resolvedLang: VoiceLang =
+    isVoiceLang(normalized)
+      ? normalized
+      : (fromBcp47(normalized) ?? "en");
+  const languageCode = bcp47For(resolvedLang);
 
   if (!text || typeof text !== "string" || !text.trim()) {
     return NextResponse.json({ error: "text required" }, { status: 400 });
@@ -28,7 +39,7 @@ export async function POST(req: Request) {
   const timer = setTimeout(() => controller.abort(), VOICE_REQUEST_TIMEOUT_MS);
   try {
     const tts = await synthesizeSpeech(text, {
-      languageCode: SARVAM_TTS_LANG[lang],
+      languageCode,
       outputAudioCodec: "mp3",
       signal: controller.signal,
     });

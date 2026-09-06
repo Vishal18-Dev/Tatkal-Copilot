@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { transcribeAudio } from "@/lib/voice/sarvam";
-import { SARVAM_STT_LANG, VOICE_MAX_AUDIO_BYTES, VOICE_REQUEST_TIMEOUT_MS } from "@/lib/voice/types";
-import type { Lang } from "@/lib/i18n";
+import { VOICE_MAX_AUDIO_BYTES, VOICE_REQUEST_TIMEOUT_MS } from "@/lib/voice/types";
+import { bcp47For, fromBcp47, isVoiceLang, type VoiceLang } from "@/lib/voice/languages";
 import type { VoiceErrorKind } from "@/lib/voice/types";
 
 export const runtime = "nodejs";
@@ -17,6 +17,9 @@ function fail(errorKind: VoiceErrorKind, status: number, detail?: string) {
  * returns its transcript via Sarvam AI speech-to-text. Frozen contract: this
  * route only turns audio into text — it never interprets the goal itself,
  * that happens in /api/voice/respond using the existing planner.
+ *
+ * Accepts canonical `voiceLang` parameter (or legacy `lang`), supporting all
+ * 10 Indian languages. When omitted or "auto", Sarvam auto-detects.
  */
 export async function POST(req: Request) {
   const startedAt = Date.now();
@@ -29,7 +32,15 @@ export async function POST(req: Request) {
   }
 
   const audio = form.get("audio");
-  const lang = (form.get("lang") as string | null) as Lang | null;
+  const rawLang = (form.get("voiceLang") || form.get("lang")) as string | null;
+  const normalized = rawLang?.trim();
+  const resolvedLang: VoiceLang | null =
+    normalized && isVoiceLang(normalized)
+      ? normalized
+      : normalized
+        ? fromBcp47(normalized)
+        : null;
+  const languageCode = resolvedLang ? bcp47For(resolvedLang) : undefined;
 
   if (!(audio instanceof Blob) || audio.size === 0) {
     return fail("recording_error", 400, "no audio field");
@@ -47,7 +58,7 @@ export async function POST(req: Request) {
 
   try {
     const result = await transcribeAudio(audio, "clip.webm", {
-      languageCode: lang ? SARVAM_STT_LANG[lang] : undefined,
+      languageCode,
       signal: controller.signal,
     });
 

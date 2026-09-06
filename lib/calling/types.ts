@@ -1,12 +1,15 @@
 import type { Lang } from "@/lib/i18n";
 
-/** The screens a simulated call walks through. */
+/** The screens a call walks through. */
 export type CallState =
   | "idle" // nothing happening
   | "ringing" // incoming-call screen, waiting for Accept/Decline
   | "connecting"
+  | "listening" // user speech being captured / transcribed
+  | "thinking" // Copilot brain processing turn
   | "speaking" // Copilot's line is playing (TTS)
-  | "awaiting_reply" // waiting for the user to tap a reply option
+  | "interrupted" // user barge-in interrupted Copilot speech
+  | "awaiting_reply" // waiting for the user to tap or speak a reply
   | "ended";
 
 /** One line Copilot says, optionally followed by reply options. */

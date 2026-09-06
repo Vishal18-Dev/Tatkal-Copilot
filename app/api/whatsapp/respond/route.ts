@@ -1,5 +1,9 @@
 import { NextResponse } from "next/server";
 import { parseIntentLocally, buildPlanLocally } from "@/lib/planner";
+import { executeCopilotTurn } from "@/lib/copilot/unified-agent";
+import type { Trip } from "@/types";
+import type { WalletState } from "@/lib/payments/types";
+import type { IdentityReadiness } from "@/lib/identity/types";
 import type { Lang } from "@/lib/i18n";
 import type { QuickReply, WhatsAppRespondResult } from "@/lib/whatsapp/types";
 
@@ -8,20 +12,39 @@ export const runtime = "nodejs";
 /**
  * Powers the simulated WhatsApp thread. Same grounding contract as voice:
  * this route ONLY calls the existing frozen planner (parseIntentLocally +
- * buildPlanLocally) — no second railway-parsing engine, no invented trains,
- * fares or confidence. `stage` just controls which reply is composed from
- * that same grounded data; it never changes what the planner returns.
+ * buildPlanLocally) or the Unified Copilot Brain (executeCopilotTurn) — no
+ * second railway-parsing engine, no invented trains, fares or confidence.
  */
 export async function POST(req: Request) {
   const body = (await req.json().catch(() => ({}))) as {
     message?: string;
-    stage?: "goal" | "preference";
+    stage?: "goal" | "preference" | "copilot" | "turn";
     lang?: Lang;
+    trip?: Trip;
+    wallet?: WalletState;
+    identity?: IdentityReadiness;
   };
   const { message, stage = "goal", lang = "en" } = body;
 
   if (!message || typeof message !== "string" || !message.trim()) {
     return NextResponse.json({ error: "message required" }, { status: 400 });
+  }
+
+  if (stage === "copilot" || stage === "turn") {
+    const turnResult = await executeCopilotTurn({
+      channel: "whatsapp",
+      text: message,
+      trip: body.trip,
+      wallet: body.wallet,
+      identity: body.identity,
+      language: lang,
+    });
+    return NextResponse.json({
+      reply: turnResult.speakText || turnResult.speakEnglish,
+      actionPlan: turnResult.actionPlan,
+      toolUsed: turnResult.toolUsed,
+      validation: turnResult.validation,
+    });
   }
 
   const intent = parseIntentLocally(message);

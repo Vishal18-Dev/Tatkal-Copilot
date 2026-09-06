@@ -10,5 +10,8 @@
   { "code": "KOTA", "name": "Kota Junction", "city": "Kota" },
   { "code": "RTM", "name": "Ratlam Junction", "city": "Ratlam" },
   { "code": "SBC", "name": "KSR Bengaluru", "city": "Bengaluru" },
-  { "code": "MAS", "name": "MGR Chennai Central", "city": "Chennai" }
+  { "code": "MAS", "name": "MGR Chennai Central", "city": "Chennai" },
+  { "code": "PUNE", "name": "Pune Junction", "city": "Pune" },
+  { "code": "HWH", "name": "Howrah Junction", "city": "Kolkata" },
+  { "code": "SDAH", "name": "Sealdah", "city": "Kolkata" }
 ]

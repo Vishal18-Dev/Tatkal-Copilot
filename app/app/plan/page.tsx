@@ -11,7 +11,7 @@ import { VaultScreen } from "@/features/vault/vault-screen";
 import { JourneyReviewScreen } from "@/features/review/journey-review-screen";
 import { AuthorizeScreen } from "@/features/authorize/authorize-screen";
 
-function PlanStage() {
+function PlanStage({ initialGoal }: { initialGoal?: string }) {
   const { step } = useJourney();
   const idx = STEP_ORDER.indexOf(step);
   const pct = (idx / (STEP_ORDER.length - 1)) * 100;
@@ -27,7 +27,7 @@ function PlanStage() {
       </div>
 
       <AnimatePresence mode="wait">
-        {step === "compose" && <ComposeScreen key="compose" />}
+        {step === "compose" && <ComposeScreen key="compose" initialGoal={initialGoal} />}
         {step === "thinking" && <ThinkingScreen key="thinking" />}
         {step === "strategy" && <StrategyScreen key="strategy" />}
         {step === "vault" && <VaultScreen key="vault" />}
@@ -43,7 +43,7 @@ function PlanInner() {
   const goal = params.get("goal") ?? undefined;
   return (
     <JourneyProvider initialGoal={goal}>
-      <PlanStage />
+      <PlanStage initialGoal={goal} />
     </JourneyProvider>
   );
 }

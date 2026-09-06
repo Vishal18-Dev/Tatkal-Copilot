@@ -8,13 +8,30 @@
     "arrival": "06:40",
     "arrivalDayOffset": 1,
     "durationMins": 845,
-    "runsOn": ["Daily"],
+    "runsOn": [
+      "Daily"
+    ],
     "tatkalOpensAt": "10:00",
     "competition": 58,
     "classes": [
-      { "travelClass": "3A", "tatkalQuota": 62, "confirmProbability": 63, "fare": 2360 },
-      { "travelClass": "2A", "tatkalQuota": 34, "confirmProbability": 48, "fare": 3190 },
-      { "travelClass": "1A", "tatkalQuota": 12, "confirmProbability": 71, "fare": 5240 }
+      {
+        "travelClass": "3A",
+        "tatkalQuota": 62,
+        "confirmProbability": 63,
+        "fare": 2360
+      },
+      {
+        "travelClass": "2A",
+        "tatkalQuota": 34,
+        "confirmProbability": 48,
+        "fare": 3190
+      },
+      {
+        "travelClass": "1A",
+        "tatkalQuota": 12,
+        "confirmProbability": 71,
+        "fare": 5240
+      }
     ],
     "alternateBoarding": [
       {
@@ -42,13 +59,30 @@
     "arrival": "08:35",
     "arrivalDayOffset": 1,
     "durationMins": 935,
-    "runsOn": ["Daily"],
+    "runsOn": [
+      "Daily"
+    ],
     "tatkalOpensAt": "10:00",
     "competition": 92,
     "classes": [
-      { "travelClass": "3A", "tatkalQuota": 58, "confirmProbability": 29, "fare": 2410 },
-      { "travelClass": "2A", "tatkalQuota": 30, "confirmProbability": 22, "fare": 3260 },
-      { "travelClass": "1A", "tatkalQuota": 10, "confirmProbability": 38, "fare": 5390 }
+      {
+        "travelClass": "3A",
+        "tatkalQuota": 58,
+        "confirmProbability": 29,
+        "fare": 2410
+      },
+      {
+        "travelClass": "2A",
+        "tatkalQuota": 30,
+        "confirmProbability": 22,
+        "fare": 3260
+      },
+      {
+        "travelClass": "1A",
+        "tatkalQuota": 10,
+        "confirmProbability": 38,
+        "fare": 5390
+      }
     ],
     "alternateBoarding": [
       {
@@ -69,11 +103,18 @@
     "arrival": "10:05",
     "arrivalDayOffset": 1,
     "durationMins": 1095,
-    "runsOn": ["Daily"],
+    "runsOn": [
+      "Daily"
+    ],
     "tatkalOpensAt": "10:00",
     "competition": 57,
     "classes": [
-      { "travelClass": "3A", "tatkalQuota": 72, "confirmProbability": 54, "fare": 1490 }
+      {
+        "travelClass": "3A",
+        "tatkalQuota": 72,
+        "confirmProbability": 54,
+        "fare": 1490
+      }
     ],
     "alternateBoarding": [
       {
@@ -94,30 +135,328 @@
     "arrival": "05:30",
     "arrivalDayOffset": 2,
     "durationMins": 1885,
-    "runsOn": ["Daily"],
+    "runsOn": [
+      "Daily"
+    ],
     "tatkalOpensAt": "11:00",
     "competition": 61,
     "classes": [
-      { "travelClass": "3A", "tatkalQuota": 52, "confirmProbability": 52, "fare": 2280 },
-      { "travelClass": "2A", "tatkalQuota": 26, "confirmProbability": 46, "fare": 3310 },
-      { "travelClass": "SL", "tatkalQuota": 96, "confirmProbability": 61, "fare": 880 }
+      {
+        "travelClass": "3A",
+        "tatkalQuota": 52,
+        "confirmProbability": 52,
+        "fare": 2280
+      },
+      {
+        "travelClass": "2A",
+        "tatkalQuota": 26,
+        "confirmProbability": 46,
+        "fare": 3310
+      },
+      {
+        "travelClass": "SL",
+        "tatkalQuota": 96,
+        "confirmProbability": 61,
+        "fare": 880
+      }
     ]
   },
   {
     "number": "11041",
-    "name": "Mumbai–Chennai Express",
+    "name": "Mumbai\u2013Chennai Express",
     "fromCode": "BCT",
     "toCode": "MAS",
     "departure": "12:05",
     "arrival": "19:10",
     "arrivalDayOffset": 1,
     "durationMins": 1865,
-    "runsOn": ["Daily"],
+    "runsOn": [
+      "Daily"
+    ],
     "tatkalOpensAt": "11:00",
     "competition": 54,
     "classes": [
-      { "travelClass": "SL", "tatkalQuota": 104, "confirmProbability": 64, "fare": 640 },
-      { "travelClass": "3A", "tatkalQuota": 46, "confirmProbability": 51, "fare": 1720 }
+      {
+        "travelClass": "SL",
+        "tatkalQuota": 104,
+        "confirmProbability": 64,
+        "fare": 640
+      },
+      {
+        "travelClass": "3A",
+        "tatkalQuota": 46,
+        "confirmProbability": 51,
+        "fare": 1720
+      }
     ]
+  },
+  {
+    "number": "12263",
+    "name": "Pune\u2013NZM Duronto",
+    "fromCode": "PUNE",
+    "toCode": "NZM",
+    "departure": "11:20",
+    "arrival": "09:55",
+    "arrivalDayOffset": 1,
+    "durationMins": 1355,
+    "runsOn": [
+      "Mon",
+      "Thu",
+      "Sat"
+    ],
+    "tatkalOpensAt": "10:00",
+    "competition": 45,
+    "classes": [
+      {
+        "travelClass": "3A",
+        "tatkalQuota": 52,
+        "confirmProbability": 68,
+        "fare": 1890
+      },
+      {
+        "travelClass": "2A",
+        "tatkalQuota": 28,
+        "confirmProbability": 55,
+        "fare": 2560
+      },
+      {
+        "travelClass": "1A",
+        "tatkalQuota": 10,
+        "confirmProbability": 72,
+        "fare": 4380
+      }
+    ],
+    "alternateBoarding": []
+  },
+  {
+    "number": "12197",
+    "name": "Pune\u2013Delhi Intercity SF",
+    "fromCode": "PUNE",
+    "toCode": "NDLS",
+    "departure": "08:40",
+    "arrival": "07:15",
+    "arrivalDayOffset": 1,
+    "durationMins": 1355,
+    "runsOn": [
+      "Daily"
+    ],
+    "tatkalOpensAt": "10:00",
+    "competition": 40,
+    "classes": [
+      {
+        "travelClass": "3A",
+        "tatkalQuota": 58,
+        "confirmProbability": 72,
+        "fare": 1750
+      },
+      {
+        "travelClass": "2A",
+        "tatkalQuota": 24,
+        "confirmProbability": 60,
+        "fare": 2350
+      },
+      {
+        "travelClass": "SL",
+        "tatkalQuota": 120,
+        "confirmProbability": 80,
+        "fare": 720
+      }
+    ],
+    "alternateBoarding": []
+  },
+  {
+    "number": "12259",
+    "name": "Sealdah Duronto Express",
+    "fromCode": "PUNE",
+    "toCode": "SDAH",
+    "departure": "15:15",
+    "arrival": "20:10",
+    "arrivalDayOffset": 1,
+    "durationMins": 1735,
+    "runsOn": [
+      "Daily"
+    ],
+    "tatkalOpensAt": "10:00",
+    "competition": 48,
+    "classes": [
+      {
+        "travelClass": "3A",
+        "tatkalQuota": 56,
+        "confirmProbability": 66,
+        "fare": 2240
+      },
+      {
+        "travelClass": "2A",
+        "tatkalQuota": 24,
+        "confirmProbability": 58,
+        "fare": 3120
+      },
+      {
+        "travelClass": "1A",
+        "tatkalQuota": 10,
+        "confirmProbability": 74,
+        "fare": 5100
+      }
+    ],
+    "alternateBoarding": [
+      {
+        "stationCode": "CCH",
+        "stationName": "Chinchwad Junction",
+        "reachesAfterMins": 15,
+        "confirmUplift": 12,
+        "reason": "Boarding at Chinchwad Junction avoids Pune Junction congestion."
+      },
+      {
+        "stationCode": "KK",
+        "stationName": "Khadki",
+        "reachesAfterMins": 10,
+        "confirmUplift": 8,
+        "reason": "Khadki is closer to Hinjawadi and PCMC."
+      }
+    ]
+  },
+  {
+    "number": "12129",
+    "name": "Azad Hind Express",
+    "fromCode": "PUNE",
+    "toCode": "HWH",
+    "departure": "18:35",
+    "arrival": "03:55",
+    "arrivalDayOffset": 2,
+    "durationMins": 2000,
+    "runsOn": [
+      "Daily"
+    ],
+    "tatkalOpensAt": "10:00",
+    "competition": 42,
+    "classes": [
+      {
+        "travelClass": "3A",
+        "tatkalQuota": 64,
+        "confirmProbability": 70,
+        "fare": 1850
+      },
+      {
+        "travelClass": "SL",
+        "tatkalQuota": 140,
+        "confirmProbability": 78,
+        "fare": 690
+      }
+    ],
+    "alternateBoarding": [
+      {
+        "stationCode": "CCH",
+        "stationName": "Chinchwad Junction",
+        "reachesAfterMins": 14,
+        "confirmUplift": 15,
+        "reason": "Chinchwad boarding point provides higher Tatkal seat confirmation uplift."
+      },
+      {
+        "stationCode": "KK",
+        "stationName": "Khadki",
+        "reachesAfterMins": 8,
+        "confirmUplift": 10,
+        "reason": "Khadki provides easy access from western Pune."
+      }
+    ]
+  },
+  {
+    "number": "12321",
+    "name": "Mumbai–Howrah Mail",
+    "fromCode": "BCT",
+    "toCode": "HWH",
+    "departure": "21:30",
+    "arrival": "11:45",
+    "arrivalDayOffset": 2,
+    "durationMins": 2295,
+    "runsOn": [
+      "Daily"
+    ],
+    "tatkalOpensAt": "10:00",
+    "competition": 52,
+    "classes": [
+      {
+        "travelClass": "3A",
+        "tatkalQuota": 60,
+        "confirmProbability": 61,
+        "fare": 2180
+      },
+      {
+        "travelClass": "2A",
+        "tatkalQuota": 28,
+        "confirmProbability": 50,
+        "fare": 3050
+      },
+      {
+        "travelClass": "SL",
+        "tatkalQuota": 110,
+        "confirmProbability": 72,
+        "fare": 790
+      }
+    ],
+    "alternateBoarding": []
+  },
+  {
+    "number": "12809",
+    "name": "Mumbai–Howrah SF Express",
+    "fromCode": "BCT",
+    "toCode": "HWH",
+    "departure": "20:35",
+    "arrival": "06:00",
+    "arrivalDayOffset": 2,
+    "durationMins": 2005,
+    "runsOn": [
+      "Daily"
+    ],
+    "tatkalOpensAt": "10:00",
+    "competition": 55,
+    "classes": [
+      {
+        "travelClass": "3A",
+        "tatkalQuota": 54,
+        "confirmProbability": 59,
+        "fare": 2110
+      },
+      {
+        "travelClass": "2A",
+        "tatkalQuota": 22,
+        "confirmProbability": 48,
+        "fare": 2980
+      }
+    ],
+    "alternateBoarding": []
+  },
+  {
+    "number": "12303",
+    "name": "Poorva Express",
+    "fromCode": "NDLS",
+    "toCode": "HWH",
+    "departure": "17:40",
+    "arrival": "17:00",
+    "arrivalDayOffset": 1,
+    "durationMins": 1400,
+    "runsOn": [
+      "Mon",
+      "Tue",
+      "Fri",
+      "Sat"
+    ],
+    "tatkalOpensAt": "10:00",
+    "competition": 46,
+    "classes": [
+      {
+        "travelClass": "3A",
+        "tatkalQuota": 64,
+        "confirmProbability": 68,
+        "fare": 1820
+      },
+      {
+        "travelClass": "2A",
+        "tatkalQuota": 30,
+        "confirmProbability": 56,
+        "fare": 2610
+      }
+    ],
+    "alternateBoarding": []
   }
 ]

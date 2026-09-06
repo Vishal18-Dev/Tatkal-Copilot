@@ -2,6 +2,8 @@ import type { Trip } from "@/types";
 import { calculateReadiness } from "@/lib/readiness";
 import { validateAgentDecision } from "@/lib/action-validator";
 import { formatFare } from "@/lib/utils";
+import { resolveLocation, resolveLocationFromCoordinates } from "@/lib/geo/location-resolver";
+import { resolveAndRankJourney, resolveAndRankJourneyAsync } from "@/lib/geo/journey-ranker";
 import type {
   ActionPlanResult,
   CopilotContext,
@@ -244,6 +246,142 @@ export function useBackupOption(ctx: CopilotContext): ActionPlanResult {
   };
 }
 
+export function explainBookingAuthority(ctx: CopilotContext): ToolResult {
+  const isAssisted = ctx.trip?.mode === "assisted";
+  if (isAssisted) {
+    return {
+      ok: true,
+      speak: "You're in Assisted mode. I can prepare the booking, but I need your confirmation before I start it.",
+      data: { mode: "assisted", canAutonomouslyBook: false },
+    };
+  }
+  return {
+    ok: true,
+    speak: "I'll start your prepared booking strategy.",
+    data: { mode: "auto", canAutonomouslyBook: true },
+  };
+}
+
+import type { ConversationalJourneyState } from "./journey-state";
+
+/**
+ * Resolves natural origin and destination places, discovers candidate stations,
+ * and dynamically ranks candidate journeys with clear explanations.
+ */
+export function resolveJourney(
+  originQuery: string | undefined,
+  destQuery: string | undefined,
+  ctx: CopilotContext,
+  journeyState?: ConversationalJourneyState
+): ToolResult {
+  // 1. Resolve Origin
+  let origin = originQuery ? resolveLocation(originQuery) : null;
+  if (!origin && ctx.geolocation) {
+    origin = resolveLocationFromCoordinates(ctx.geolocation);
+  }
+  if (!origin && ctx.trip?.from) {
+    origin = resolveLocation(ctx.trip.from);
+  }
+
+  if (!origin) {
+    const speak = ctx.lang === "hi"
+      ? "आप कहाँ से यात्रा शुरू करना चाहते हैं?"
+      : "Where are you starting from?";
+    return {
+      ok: true,
+      speak,
+      data: { needsOrigin: true, pendingClarification: "origin" },
+    };
+  }
+
+  // 2. Resolve Destination
+  const destination = destQuery ? resolveLocation(destQuery) : null;
+  if (!destination) {
+    const speak = ctx.lang === "hi"
+      ? "आप कहाँ जाना चाहते हैं?"
+      : "Where would you like to travel to?";
+    return {
+      ok: false,
+      speak,
+      data: { needsDestination: true, pendingClarification: "destination" },
+      error: "missing_destination",
+    };
+  }
+
+  // 3. Rank Candidate Journeys
+  const ranking = resolveAndRankJourney(origin, destination, {
+    boardingStationPreference: journeyState?.boardingStationPreference,
+    excludeStationCode: journeyState?.excludeStationCode,
+    preferredClass: journeyState?.travelClass,
+    priority: journeyState?.priority,
+  });
+  return {
+    ok: Boolean(ranking.primary),
+    speak: ranking.explanation,
+    data: ranking,
+  };
+}
+
+export async function resolveJourneyAsync(
+  originQuery: string | undefined,
+  destQuery: string | undefined,
+  ctx: CopilotContext,
+  journeyState?: ConversationalJourneyState
+): Promise<ToolResult> {
+  let origin = originQuery ? await (async () => {
+    const { resolveLocationAsync } = await import("@/lib/geo/location-resolver");
+    return resolveLocationAsync(originQuery);
+  })() : null;
+
+  if (!origin && ctx.geolocation) {
+    origin = resolveLocationFromCoordinates(ctx.geolocation);
+  }
+  if (!origin && ctx.trip?.from) {
+    origin = resolveLocation(ctx.trip.from);
+  }
+
+  if (!origin) {
+    const speak = ctx.lang === "hi"
+      ? "आप कहाँ से यात्रा शुरू करना चाहते हैं?"
+      : "Where are you starting from?";
+    return {
+      ok: true,
+      speak,
+      data: { needsOrigin: true, pendingClarification: "origin" },
+    };
+  }
+
+  const destination = destQuery ? await (async () => {
+    const { resolveLocationAsync } = await import("@/lib/geo/location-resolver");
+    return resolveLocationAsync(destQuery);
+  })() : null;
+
+  if (!destination) {
+    const speak = ctx.lang === "hi"
+      ? "आप कहाँ जाना चाहते हैं?"
+      : "Where would you like to travel to?";
+    return {
+      ok: false,
+      speak,
+      data: { needsDestination: true, pendingClarification: "destination" },
+      error: "missing_destination",
+    };
+  }
+
+  const ranking = await resolveAndRankJourneyAsync(origin, destination, {
+    boardingStationPreference: journeyState?.boardingStationPreference,
+    excludeStationCode: journeyState?.excludeStationCode,
+    preferredClass: journeyState?.travelClass,
+    priority: journeyState?.priority,
+  });
+
+  return {
+    ok: Boolean(ranking.primary),
+    speak: ranking.explanation,
+    data: ranking,
+  };
+}
+
 /* ---------------- Registry (contract metadata, surfaced to tests/docs) ---------------- */
 
 export const COPILOT_TOOLS: Record<string, CopilotToolMeta> = {
@@ -255,6 +393,8 @@ export const COPILOT_TOOLS: Record<string, CopilotToolMeta> = {
   get_identity_status: { name: "get_identity_status", purpose: "Report identity verification status.", inputs: ["identity"], output: "Verified or not.", permission: "informational", requiresConfirmation: false },
   get_tatkal_status: { name: "get_tatkal_status", purpose: "Report the Tatkal window status.", inputs: ["trip"], output: "Open now or opens-at label.", permission: "informational", requiresConfirmation: false },
   get_booking_status: { name: "get_booking_status", purpose: "Report the booking status.", inputs: ["trip.booking"], output: "None / confirmed / recovered / failed.", permission: "informational", requiresConfirmation: false },
+  explain_booking_authority: { name: "explain_booking_authority", purpose: "Explain mode-based booking authority.", inputs: ["trip.mode"], output: "Assisted vs Permissioned booking behavior.", permission: "informational", requiresConfirmation: false },
+  resolve_journey: { name: "resolve_journey", purpose: "Resolve places, candidate stations, and ranked trains.", inputs: ["originQuery", "destQuery"], output: "Ranked trains, stations, and rationale.", permission: "informational", requiresConfirmation: false },
   prepare_journey: { name: "prepare_journey", purpose: "Start preparing the journey.", inputs: ["trip"], output: "A route into Mission Control.", permission: "preparation", requiresConfirmation: false },
   request_booking_confirmation: { name: "request_booking_confirmation", purpose: "Ask to start booking (validated).", inputs: ["trip"], output: "A confirmation-gated plan.", permission: "booking", requiresConfirmation: true },
   use_backup_option: { name: "use_backup_option", purpose: "Ask to use the backup (validated).", inputs: ["trip"], output: "A confirmation-gated plan.", permission: "booking", requiresConfirmation: true },

@@ -1,30 +1,22 @@
 import { NextResponse } from "next/server";
+import { getOrCreatePhoneSession, maskPhoneNumber } from "@/lib/calling/session-manager";
 
 export const runtime = "nodejs";
 
 /**
- * Places a REAL outbound phone call to the user's mobile via a telephony vendor
- * (Twilio by default), speaking the Copilot's proactive briefing. This is the
- * production seam behind RealCallingProvider — the browser never sees any
- * credential; they stay here, server-side.
- *
- * Enabled only when the vendor env vars are set:
- *   TWILIO_ACCOUNT_SID
- *   TWILIO_AUTH_TOKEN
- *   TWILIO_FROM_NUMBER      (an E.164 number you own on the vendor, e.g. +1...)
- * Without them the route returns { ok:false, reason:"not_configured" } and no
- * call is placed — the app falls back to the in-browser simulated call.
- *
- * NOTE: this first version speaks the briefing (a one-way proactive call). A
- * full two-way phone conversation needs the vendor's media-stream webhooks
- * bridged to realtime STT/TTS driving lib/copilot per turn — the SAME tool
- * layer browser voice uses. That bridge is intentionally left as the next step.
+ * Places a REAL outbound phone call to the user's mobile via Twilio,
+ * connecting the call to a bidirectional Media Stream WebSocket / TwiML bridge.
  */
 export async function POST(req: Request) {
   const body = (await req.json().catch(() => ({}))) as {
     to?: string;
     briefing?: string;
+    reason?: string;
+    tripId?: string;
+    toName?: string;
+    url?: string;
   };
+
   const to = (body.to ?? "").trim();
   const briefing = (body.briefing ?? "").trim().slice(0, 1000);
 
@@ -34,19 +26,75 @@ export async function POST(req: Request) {
 
   const sid = process.env.TWILIO_ACCOUNT_SID;
   const token = process.env.TWILIO_AUTH_TOKEN;
-  const from = process.env.TWILIO_FROM_NUMBER;
+  const from = process.env.TWILIO_PHONE_NUMBER || process.env.TWILIO_FROM_NUMBER;
+
   if (!sid || !token || !from) {
-    // Honest: nothing is dialled unless real telephony is configured.
+    console.warn("[api/calling/dial] missing Twilio production credentials");
     return NextResponse.json({ ok: false, reason: "not_configured" });
   }
 
   const toE164 = to.startsWith("+") ? to.replace(/[\s-]/g, "") : `+91${to.replace(/[\s-]/g, "")}`;
-  const twiml = `<?xml version="1.0" encoding="UTF-8"?><Response><Say voice="Polly.Aditi">${escapeXml(
-    briefing || "This is your Tatkal Copilot with an update on your journey."
-  )}</Say></Response>`;
+  const host = req.headers.get("host") || "localhost:3000";
+  const protocol = host.includes("localhost") ? "http" : "https";
+  const wsProtocol = host.includes("localhost") ? "ws" : "wss";
+
+  const tempCallSid = `call_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
+  const session = getOrCreatePhoneSession(tempCallSid, {
+    toNumber: toE164,
+    language: "hi",
+  });
+
+  const actionUrl = `${protocol}://${host}/api/calling/respond?callSid=${encodeURIComponent(tempCallSid)}`;
+  const statusUrl = `${protocol}://${host}/api/calling/status`;
+  const streamUrl = `${wsProtocol}://${host}/api/calling/stream?callSid=${encodeURIComponent(tempCallSid)}`;
+
+  // Contextual Opening (Spec Requirement §8)
+  let openingGreeting = briefing;
+  if (!openingGreeting) {
+    if (session.trip) {
+      openingGreeting = `Hi, this is Tatkal Copilot. You asked me to help with your ${session.trip.from} to ${session.trip.to} Tatkal journey. I have your journey context ready. Would you like me to walk you through the options?`;
+    } else {
+      openingGreeting = "Hi, this is Tatkal Copilot. I'm ready to help plan your Tatkal journey. Where would you like to travel?";
+    }
+  }
+
+  // TwiML with bidirectional Media Stream (Spec Requirement §2)
+  const twiml = `<?xml version="1.0" encoding="UTF-8"?>
+<Response>
+  <Connect>
+    <Stream url="${escapeXml(streamUrl)}" />
+  </Connect>
+  <Say voice="Polly.Aditi">${escapeXml(openingGreeting)}</Say>
+  <Gather input="speech" action="${escapeXml(actionUrl)}" method="POST" language="hi-IN" speechTimeout="auto" speechModel="experimental_conversations">
+    <Say voice="Polly.Aditi">मैं सुन रहा हूँ। आप क्या करना चाहेंगे?</Say>
+  </Gather>
+  <Redirect method="POST">${escapeXml(actionUrl)}</Redirect>
+</Response>`;
 
   try {
-    const form = new URLSearchParams({ To: toE164, From: from, Twiml: twiml });
+    console.info(`[api/calling/dial] placing outbound call to=${maskPhoneNumber(toE164)}`);
+    const formParams: Record<string, string> = {
+      To: toE164,
+      From: from,
+      StatusCallback: statusUrl,
+      StatusCallbackEvent: "completed",
+    };
+
+    const publicUrl = process.env.TWILIO_WEBHOOK_URL || process.env.PUBLIC_URL || process.env.NEXT_PUBLIC_APP_URL;
+
+    if (body.url) {
+      formParams.Url = body.url;
+    } else if (publicUrl && !publicUrl.includes("localhost")) {
+      formParams.Url = `${publicUrl.replace(/\/$/, "")}/api/calling/inbound`;
+    } else if (host.includes("localhost") || host.includes("127.0.0.1")) {
+      // Local development fallback — Twilio cloud servers cannot reach local host directly
+      formParams.Url = "https://webhooks.twilio.com/v1/Voice/Template/voice_speech_recognition";
+    } else {
+      formParams.Url = `${protocol}://${host}/api/calling/inbound`;
+    }
+
+    const form = new URLSearchParams(formParams);
+
     const res = await fetch(`https://api.twilio.com/2010-04-01/Accounts/${sid}/Calls.json`, {
       method: "POST",
       headers: {
@@ -55,15 +103,23 @@ export async function POST(req: Request) {
       },
       body: form.toString(),
     });
+
     const data = (await res.json().catch(() => ({}))) as { sid?: string; message?: string };
+
     if (!res.ok) {
       console.warn(`[api/calling/dial] vendor error: ${data.message ?? res.status}`);
-      return NextResponse.json({ ok: false, reason: "vendor_error" }, { status: 502 });
+      return NextResponse.json(
+        { ok: false, reason: "vendor_error", error: data.message || `Twilio HTTP error ${res.status}` },
+        { status: 502 }
+      );
     }
-    console.info(`[api/calling/dial] placed call sid=${data.sid}`);
-    return NextResponse.json({ ok: true, sid: data.sid, simulated: false });
+
+    const realSid = data.sid || tempCallSid;
+    console.info(`[api/calling/dial] call started sid=${realSid} to=${maskPhoneNumber(toE164)}`);
+
+    return NextResponse.json({ ok: true, sid: realSid, simulated: false });
   } catch (err) {
-    console.warn(`[api/calling/dial] ${err instanceof Error ? err.message : err}`);
+    console.warn(`[api/calling/dial] call error: ${err instanceof Error ? err.message : err}`);
     return NextResponse.json({ ok: false, reason: "network_error" }, { status: 502 });
   }
 }
@@ -71,3 +127,4 @@ export async function POST(req: Request) {
 function escapeXml(s: string): string {
   return s.replace(/[<>&'"]/g, (c) => ({ "<": "&lt;", ">": "&gt;", "&": "&amp;", "'": "&apos;", '"': "&quot;" }[c] as string));
 }
+

@@ -65,7 +65,12 @@ export function CopilotVoiceDock({
           <Sparkles className="h-4 w-4" />
         </span>
         <span className="text-sm font-semibold text-ink">{t("copilot.dockTitle")}</span>
-        <div className="ml-auto">
+        <div className="ml-auto flex items-center gap-2">
+          <span className="hidden sm:inline-flex rounded-md border border-line bg-surface-muted px-2 py-0.5 text-[0.72rem] font-medium text-ink-soft">
+            {getContext().trip?.mode === "assisted"
+              ? "🤝 Assisted · Ask before acting"
+              : "⚡ Permissioned · Can act automatically"}
+          </span>
           <VoiceLangSelect className="inline-flex items-center gap-1 rounded-full border border-line bg-surface px-2 py-1 text-xs text-ink-soft focus-within:border-brand" />
         </div>
       </div>

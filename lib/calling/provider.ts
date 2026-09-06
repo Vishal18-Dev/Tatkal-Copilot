@@ -89,7 +89,7 @@ export class RealCallingProvider implements CallingProvider {
   readonly isReal = true;
 
   channelLabel(): string {
-    return "Live call";
+    return "Live Phone Call";
   }
 
   async placeCall(ctx: OutboundCallContext): Promise<PlacedCall> {
@@ -100,24 +100,43 @@ export class RealCallingProvider implements CallingProvider {
       const res = await fetch("/api/calling/dial", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ to: ctx.toNumber, briefing: ctx.briefing }),
+        body: JSON.stringify({
+          to: ctx.toNumber,
+          briefing: ctx.briefing,
+          reason: ctx.reason,
+          tripId: ctx.tripId,
+          toName: ctx.toName,
+        }),
       });
-      const data = (await res.json().catch(() => ({}))) as { ok?: boolean; sid?: string; reason?: string };
-      if (data.ok) return { ok: true, simulated: false, sessionId: data.sid };
-      // not_configured is the honest default until telephony credentials exist.
-      return {
-        ok: false,
-        simulated: false,
-        error:
-          data.reason === "not_configured"
-            ? "Real calling isn't set up yet — add telephony credentials to enable it."
-            : "Couldn't place the call right now.",
+      const data = (await res.json().catch(() => ({}))) as {
+        ok?: boolean;
+        sid?: string;
+        reason?: string;
+        error?: string;
       };
+      if (data.ok) return { ok: true, simulated: false, sessionId: data.sid };
+      let errMsg = "Couldn't place the call right now.";
+      if (data.reason === "not_configured") {
+        errMsg = "Real calling isn't set up yet — set TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN and TWILIO_PHONE_NUMBER.";
+      } else if (data.reason === "invalid_number") {
+        errMsg = "Invalid phone number format.";
+      } else if (data.error) {
+        errMsg = data.error;
+      }
+      return { ok: false, simulated: false, error: errMsg };
     } catch {
       return { ok: false, simulated: false, error: "Couldn't reach the calling service." };
     }
   }
 }
 
-/** Active provider. Swap for RealCallingProvider once telephony is wired. */
-export const callingProvider: CallingProvider = new MockCallingProvider();
+/** Active provider instance. Uses RealCallingProvider if credentials exist. */
+export const callingProvider: CallingProvider =
+  typeof process !== "undefined" &&
+  process.env &&
+  process.env.TWILIO_ACCOUNT_SID &&
+  process.env.TWILIO_AUTH_TOKEN
+    ? new RealCallingProvider()
+    : new MockCallingProvider();
+
+

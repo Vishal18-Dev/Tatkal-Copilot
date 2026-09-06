@@ -20,12 +20,14 @@ import type { VoiceLang } from "./languages";
  */
 export type VoiceState =
   | "idle"
+  | "connecting"
   | "listening"
   | "transcribing"
   | "thinking"
   | "result"
   | "confirming"
   | "speaking"
+  | "rest_listening"
   | "error";
 
 /** Every failure mode the voice layer can hit, each with its own graceful copy. */
@@ -50,16 +52,22 @@ export interface VoiceTurn {
   final: boolean;
 }
 
+import type { ConversationalJourneyState } from "@/lib/copilot/journey-state";
+import type { Trip } from "@/types";
+
 /** What /api/voice/respond hands back to the client. */
 export interface VoiceRespondResult {
   plan: Plan;
-  recommended: StrategyOption;
+  recommended?: StrategyOption | null;
   responseText: string;
   /** base64-encoded audio (whatever codec was requested) — absent if TTS failed or was skipped. */
   audioBase64?: string;
   audioCodec?: string;
   /** The language the responseText + audio are rendered in. */
   voiceLang?: VoiceLang;
+  journeyState?: ConversationalJourneyState;
+  trip?: Trip;
+  voiceState?: "awaiting_clarification" | "showing_results" | "no_results" | "showing_info";
 }
 
 /** What /api/voice/transcribe hands back to the client. */
@@ -68,17 +76,36 @@ export interface VoiceTranscribeResult {
   languageCode: string | null;
 }
 
+/** Normalized semantic intent for voice commands across all 10 Indian languages. */
+export type SemanticCommandIntent =
+  | "yes"
+  | "no"
+  | "cancel"
+  | "repeat"
+  | "confirm"
+  | "backup"
+  | "cheaper"
+  | "change"
+  | "stop"
+  | "unknown";
+
 /** A recognized spoken intent once we're past the initial goal capture. */
 export type VoiceCommandKind =
   | "confirm" // "yes", "choose it", "book it", "haan"
   | "reject" // "no", "not that one", "nahi"
   | "repeat" // "say that again", "what?", "dobara"
   | "cancel" // "stop", "cancel", "never mind"
+  | "backup"
+  | "cheaper"
+  | "change"
   | "unknown";
 
 export interface VoiceCommand {
   kind: VoiceCommandKind;
+  intent: SemanticCommandIntent;
   raw: string;
+  language?: VoiceLang;
+  confidence?: number;
 }
 
 export interface VoiceConversationOptions {
@@ -105,15 +132,31 @@ export interface VoiceConversationOptions {
   continuous?: boolean;
 }
 
-/** Sarvam BCP-47 language codes we actually use (subset of the full list). */
-export const SARVAM_STT_LANG: Record<Lang, string> = {
+/** Sarvam BCP-47 language codes for all 10 supported voice languages. */
+export const SARVAM_STT_LANG: Record<VoiceLang, string> = {
   en: "en-IN",
   hi: "hi-IN",
+  mr: "mr-IN",
+  kn: "kn-IN",
+  ta: "ta-IN",
+  te: "te-IN",
+  gu: "gu-IN",
+  pa: "pa-IN",
+  ur: "ur-IN",
+  ml: "ml-IN",
 };
 
-export const SARVAM_TTS_LANG: Record<Lang, string> = {
+export const SARVAM_TTS_LANG: Record<VoiceLang, string> = {
   en: "en-IN",
   hi: "hi-IN",
+  mr: "mr-IN",
+  kn: "kn-IN",
+  ta: "ta-IN",
+  te: "te-IN",
+  gu: "gu-IN",
+  pa: "pa-IN",
+  ur: "ur-IN",
+  ml: "ml-IN",
 };
 
 /* ------------------------------------------------------------------

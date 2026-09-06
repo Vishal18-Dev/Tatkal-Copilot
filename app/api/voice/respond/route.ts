@@ -1,30 +1,16 @@
 import { NextResponse } from "next/server";
-import { parseIntentLocally, buildPlanLocally } from "@/lib/planner";
+import { executeCopilotTurn } from "@/lib/copilot/unified-agent";
 import { voiceProvider } from "@/lib/voice/provider";
 import { bcp47For, isVoiceLang, type VoiceLang } from "@/lib/voice/languages";
 import { VOICE_REQUEST_TIMEOUT_MS } from "@/lib/voice/types";
 import type { Lang } from "@/lib/i18n";
 import type { VoiceErrorKind, VoiceRespondResult } from "@/lib/voice/types";
-import type { Plan, StrategyOption } from "@/types";
+import type { Plan, StrategyOption, Trip } from "@/types";
+import type { ConversationalJourneyState } from "@/lib/copilot/journey-state";
+import type { RankedJourneyOption, JourneyResolutionResult } from "@/lib/geo/types";
 
 export const runtime = "nodejs";
 
-/**
- * Turns a transcribed goal into a plan + a short spoken response, rendered in
- * the caller's active language.
- *
- * Grounding contract (do not weaken): this route reuses parseIntentLocally +
- * buildPlanLocally verbatim — the same frozen planner every other screen
- * uses — so every train, fare, confidence word and boarding station a caller
- * hears is real, existing plan data. It never invents availability, PNRs,
- * coaches or berths.
- *
- * Multilingual contract: the response is COMPOSED in English (grounded), then
- * translated into the active language for both the transcript text and the
- * TTS. There is no planner-per-language — one English pipeline, 10 languages
- * out. Translation and TTS are best-effort: either failing degrades to the
- * English text / caption, never an error to the user (spec §24/§27).
- */
 export async function POST(req: Request) {
   const startedAt = Date.now();
 
@@ -33,8 +19,10 @@ export async function POST(req: Request) {
     lang?: Lang;
     voiceLang?: string;
     speak?: boolean;
+    journeyState?: ConversationalJourneyState;
+    trip?: Trip;
   };
-  const { transcript, speak = true } = body;
+  const { transcript, speak = true, journeyState, trip } = body;
   const voiceLang: VoiceLang = resolveVoiceLang(body.voiceLang, body.lang);
   const bcp47 = bcp47For(voiceLang);
 
@@ -42,37 +30,34 @@ export async function POST(req: Request) {
     return fail("planner_error", 400, "transcript required");
   }
 
-  let plan: Plan;
-  let recommended: StrategyOption | undefined;
+  let turnResult;
   try {
-    const intent = parseIntentLocally(transcript);
-    plan = buildPlanLocally(intent);
-    recommended = plan.options.find((o) => o.id === plan.recommendedId) ?? plan.options[0];
+    turnResult = await executeCopilotTurn({
+      channel: "browser_voice",
+      text: transcript,
+      language: voiceLang,
+      journeyState,
+      trip,
+    });
   } catch (err) {
-    return fail("planner_error", 500, err instanceof Error ? err.message : "planner threw");
+    return fail("planner_error", 500, err instanceof Error ? err.message : "copilot brain threw");
   }
 
-  if (!recommended) {
-    return fail("planner_error", 422, "no options for this route");
-  }
+  const { plan, recommended, voiceState } = buildPlanFromTurnResult(turnResult, transcript);
+  const responseText = turnResult.speakText;
 
-  const englishText = phraseRecommendation(recommended.title, recommended.travelClass);
-  let responseText = englishText;
+  const result: VoiceRespondResult = {
+    plan,
+    recommended,
+    responseText,
+    voiceLang: turnResult.language,
+    journeyState: turnResult.journeyState,
+    trip: turnResult.trip,
+    voiceState,
+  };
 
   const hasKey = !!process.env.SARVAM_API_KEY;
-
-  // Render into the active language (skip for English).
-  if (hasKey && voiceLang !== "en") {
-    try {
-      responseText = await voiceProvider.translate(englishText, bcp47);
-    } catch {
-      responseText = englishText; // best-effort
-    }
-  }
-
-  const result: VoiceRespondResult = { plan, recommended, responseText, voiceLang };
-
-  if (speak && hasKey) {
+  if (speak && hasKey && responseText) {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), VOICE_REQUEST_TIMEOUT_MS);
     try {
@@ -89,10 +74,133 @@ export async function POST(req: Request) {
   }
 
   console.info(
-    `[api/voice/respond] ok lang=${voiceLang} ms=${Date.now() - startedAt} recommended=${recommended.id} audio=${!!result.audioBase64}`
+    `[api/voice/respond] ok lang=${voiceLang} ms=${Date.now() - startedAt} recommended=${recommended?.id ?? "none"} audio=${!!result.audioBase64}`
   );
 
   return NextResponse.json(result);
+}
+
+function buildPlanFromTurnResult(
+  turnResult: Awaited<ReturnType<typeof executeCopilotTurn>>,
+  transcript: string
+): {
+  plan: Plan;
+  recommended: StrategyOption | null;
+  voiceState: "awaiting_clarification" | "showing_results" | "no_results" | "showing_info";
+} {
+  const journeyState = turnResult.journeyState;
+  const trip = turnResult.trip;
+  const rawData = turnResult.toolResult?.data as any;
+
+  let options: StrategyOption[] = [];
+  let voiceState: "awaiting_clarification" | "showing_results" | "no_results" | "showing_info" = "showing_info";
+
+  if (rawData?.needsOrigin || rawData?.needsDestination) {
+    voiceState = "awaiting_clarification";
+  } else if (rawData?.rankedOptions && rawData.rankedOptions.length > 0) {
+    options = rawData.rankedOptions.map(rankedOptionToStrategyOption);
+    voiceState = "showing_results";
+  } else if (trip?.primary) {
+    const primaryOpt = tripToStrategyOption(trip, true);
+    const backupOpt = trip.backup ? tripToStrategyOption(trip, false) : undefined;
+    options = [primaryOpt, ...(backupOpt ? [backupOpt] : [])];
+    voiceState = "showing_results";
+  } else if (journeyState?.originText && journeyState?.destinationText) {
+    voiceState = "no_results";
+  } else {
+    voiceState = "showing_info";
+  }
+
+  const recommended = options.length > 0 ? options[0] : null;
+
+  const plan: Plan = {
+    intent: {
+      from: journeyState?.originText || trip?.from || "Origin",
+      fromCode: trip?.fromCode || "ORIG",
+      to: journeyState?.destinationText || trip?.to || "Destination",
+      toCode: trip?.toCode || "DEST",
+      date: journeyState?.travelDate || "Tomorrow",
+      arrivalDeadline: journeyState?.timeConstraint ? journeyState.timeConstraint.raw : null,
+      passengers: journeyState?.passengerCount || 1,
+      preferredClass: (journeyState?.travelClass as any) || "3A",
+      priority: journeyState?.priority === "fastest" ? "arrival-time" : (journeyState?.priority || "safest"),
+      flexibility: 0.6,
+      restated: transcript,
+    },
+    options,
+    recommendedId: recommended ? recommended.id : "",
+    narrative: {
+      whyRecommended: recommended
+        ? `Top-ranked strategy for ${journeyState?.originText || trip?.from || "your route"} to ${journeyState?.destinationText || trip?.to || "destination"}`
+        : turnResult.speakEnglish,
+    },
+    source: "gpt",
+  };
+
+  return { plan, recommended, voiceState };
+}
+
+function rankedOptionToStrategyOption(ro: RankedJourneyOption, index: number): StrategyOption {
+  const confLevel =
+    ro.tatkalConfirmProbability > 80 ? "Very High" : ro.tatkalConfirmProbability > 60 ? "High" : "Medium";
+  return {
+    id: ro.optionId,
+    kind: "direct",
+    title: ro.train.name,
+    subtitle: `#${ro.train.number} · ${Math.floor(ro.totalDurationMins / 60)}h ${ro.totalDurationMins % 60}m`,
+    travelClass: ro.travelClass,
+    stars: ro.tatkalConfirmProbability > 80 ? 5 : ro.tatkalConfirmProbability > 60 ? 4 : 3,
+    confirmProbability: ro.tatkalConfirmProbability,
+    level: confLevel,
+    departureDisplay: ro.train.departure,
+    arrivalDisplay: ro.train.arrival + " · tomorrow",
+    durationDisplay: `${Math.floor(ro.totalDurationMins / 60)}h ${ro.totalDurationMins % 60}m`,
+    fare: ro.fare,
+    boardingStationCode: ro.boardingStation.code,
+    boardingStationName: ro.boardingStation.name,
+    betterBoarding: ro.boardingStation.code !== ro.train.fromCode,
+    tag: index === 0 ? "recommended" : "popular",
+    tagLabel: index === 0 ? "Recommended" : "Option",
+    meetsDeadline: true,
+    why: ro.reason,
+    risks: [],
+    tradeoffs: [],
+    recommended: index === 0,
+    tatkalOpensAt: ro.train.tatkalOpensAt || "10:00 AM",
+    trainNumber: ro.train.number,
+  };
+}
+
+function tripToStrategyOption(trip: Trip, isPrimary: boolean): StrategyOption {
+  const target = isPrimary ? trip.primary : trip.backup;
+  if (!target) {
+    throw new Error("Missing trip option target");
+  }
+  return {
+    id: target.optionId || (isPrimary ? `primary_${trip.id}` : `backup_${trip.id}`),
+    kind: "direct",
+    title: target.trainName,
+    subtitle: `${trip.fromCode} → ${trip.toCode}`,
+    travelClass: target.travelClass,
+    stars: target.level === "High" ? 4 : 3,
+    confirmProbability: target.level === "High" ? 75 : 50,
+    level: target.level === "High" ? "High" : "Medium",
+    departureDisplay: target.departureDisplay,
+    arrivalDisplay: target.arrivalDisplay,
+    durationDisplay: "12h",
+    fare: target.fare,
+    boardingStationCode: trip.fromCode,
+    boardingStationName: target.boardingStationName,
+    betterBoarding: false,
+    tag: isPrimary ? "recommended" : "popular",
+    tagLabel: isPrimary ? "Recommended" : "Backup",
+    meetsDeadline: true,
+    why: isPrimary ? "Primary Tatkal strategy option" : "Prepared backup option",
+    risks: [],
+    tradeoffs: [],
+    recommended: isPrimary,
+    tatkalOpensAt: trip.tatkalOpensAtLabel || "10:00 AM",
+  };
 }
 
 function resolveVoiceLang(voiceLang: string | undefined, lang: Lang | undefined): VoiceLang {
@@ -106,7 +214,3 @@ function fail(errorKind: VoiceErrorKind, status: number, detail?: string) {
   return NextResponse.json({ errorKind }, { status });
 }
 
-/** Short, conversational English — never reads a full UI card aloud. Translated downstream. */
-function phraseRecommendation(trainName: string, travelClass: string): string {
-  return `I found a strong option for you — ${trainName} in ${travelClass}. Want me to choose it?`;
-}
