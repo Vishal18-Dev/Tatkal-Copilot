@@ -64,10 +64,10 @@ describe("CallingProvider abstraction (telephony boundary)", () => {
     expect(placed.sessionId).toBeTruthy();
   });
 
-  it("the real provider is a documented stub that fails honestly, never fakes a call", async () => {
+  it("the real provider fails honestly without a number, never fakes a call", async () => {
     const real = new RealCallingProvider();
     expect(real.isReal).toBe(true);
-    const placed = await real.placeCall();
+    const placed = await real.placeCall({ reason: "check_in" }); // no toNumber
     expect(placed.ok).toBe(false);
     expect(placed.simulated).toBe(false);
     expect(placed.error).toBeTruthy();

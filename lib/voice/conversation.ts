@@ -10,10 +10,14 @@ import {
   type AdjustmentKind,
 } from "./adjustments";
 import {
+  VOICE_HANDS_FREE_RESUME_MS,
   VOICE_MAX_AUDIO_BYTES,
   VOICE_MAX_RECORDING_MS,
   VOICE_MIN_RECORDING_MS,
   VOICE_REQUEST_TIMEOUT_MS,
+  VOICE_VAD_MIN_SPEECH_MS,
+  VOICE_VAD_RMS_THRESHOLD,
+  VOICE_VAD_SILENCE_MS,
 } from "./types";
 import { fromBcp47, type VoiceLang } from "./languages";
 import type {
@@ -37,13 +41,21 @@ const nextId = () => `turn_${Date.now()}_${turnSeq++}`;
  * this file for "onConfirm" — that is the ONLY way state leaves this module,
  * and it is a plain callback, not a call into the booking agent or store.
  */
-export function useVoiceConversation({ voiceLang, locked = false, onConfirm, onDetectLang }: VoiceConversationOptions) {
+export function useVoiceConversation({
+  voiceLang,
+  locked = false,
+  continuous = false,
+  onConfirm,
+  onDetectLang,
+}: VoiceConversationOptions) {
   const [state, setState] = useState<VoiceState>("idle");
   const [errorKind, setErrorKind] = useState<VoiceErrorKind | null>(null);
   const [turns, setTurns] = useState<VoiceTurn[]>([]);
   const [result, setResult] = useState<VoiceRespondResult | null>(null);
   const [micSupported, setMicSupported] = useState(false);
   const [elapsedMs, setElapsedMs] = useState(0);
+  // Hands-free: the mic stays open across turns until the user pauses it.
+  const [paused, setPaused] = useState(false);
 
   const goalRef = useRef<string>("");
   const resultRef = useRef<VoiceRespondResult | null>(null);
@@ -67,6 +79,18 @@ export function useVoiceConversation({ voiceLang, locked = false, onConfirm, onD
     activeLangRef.current = voiceLang;
   }, [voiceLang]);
 
+  // Hands-free / voice-activity-detection state.
+  const continuousRef = useRef(continuous);
+  useEffect(() => {
+    continuousRef.current = continuous;
+  }, [continuous]);
+  const pausedRef = useRef(false);
+  const audioCtxRef = useRef<AudioContext | null>(null);
+  const vadRafRef = useRef<number | null>(null);
+  const speechDetectedRef = useRef(false);
+  const speechStartRef = useRef(0);
+  const silenceStartRef = useRef(0);
+
   useEffect(() => {
     setMicSupported(
       typeof navigator !== "undefined" &&
@@ -81,16 +105,80 @@ export function useVoiceConversation({ voiceLang, locked = false, onConfirm, onD
     };
   }, []);
 
+  function teardownVad() {
+    if (vadRafRef.current != null) cancelAnimationFrame(vadRafRef.current);
+    vadRafRef.current = null;
+    // Closing the AudioContext is async and best-effort — ignore failures.
+    audioCtxRef.current?.close().catch(() => {});
+    audioCtxRef.current = null;
+    speechDetectedRef.current = false;
+    speechStartRef.current = 0;
+    silenceStartRef.current = 0;
+  }
+
   function cleanupMedia() {
     if (maxDurationTimerRef.current) clearTimeout(maxDurationTimerRef.current);
     if (elapsedTimerRef.current) clearInterval(elapsedTimerRef.current);
     maxDurationTimerRef.current = null;
     elapsedTimerRef.current = null;
+    teardownVad();
     streamRef.current?.getTracks().forEach((t) => t.stop());
     streamRef.current = null;
     recorderRef.current = null;
     audioElRef.current?.pause();
     audioElRef.current = null;
+  }
+
+  /**
+   * Voice-activity detection: watch the mic level and auto-end the turn after a
+   * short trailing silence once the user has actually spoken. Best-effort — if
+   * the Web Audio API is missing, hands-free silently degrades to the max-
+   * duration auto-stop and the manual stop button.
+   */
+  function setupVad(stream: MediaStream, onSilence: () => void) {
+    try {
+      const AC: typeof AudioContext | undefined =
+        window.AudioContext ?? (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+      if (!AC) return;
+      const ctx = new AC();
+      audioCtxRef.current = ctx;
+      const source = ctx.createMediaStreamSource(stream);
+      const analyser = ctx.createAnalyser();
+      analyser.fftSize = 512;
+      source.connect(analyser);
+      const buf = new Uint8Array(analyser.fftSize);
+      speechDetectedRef.current = false;
+      speechStartRef.current = Date.now();
+      silenceStartRef.current = 0;
+
+      const tick = () => {
+        analyser.getByteTimeDomainData(buf);
+        let sumSq = 0;
+        for (let i = 0; i < buf.length; i++) {
+          const v = (buf[i] - 128) / 128;
+          sumSq += v * v;
+        }
+        const rms = Math.sqrt(sumSq / buf.length);
+        const now = Date.now();
+
+        if (rms > VOICE_VAD_RMS_THRESHOLD) {
+          if (!speechDetectedRef.current) speechStartRef.current = now;
+          speechDetectedRef.current = true;
+          silenceStartRef.current = 0;
+        } else if (speechDetectedRef.current && now - speechStartRef.current > VOICE_VAD_MIN_SPEECH_MS) {
+          if (silenceStartRef.current === 0) silenceStartRef.current = now;
+          else if (now - silenceStartRef.current > VOICE_VAD_SILENCE_MS) {
+            teardownVad();
+            onSilence();
+            return;
+          }
+        }
+        vadRafRef.current = requestAnimationFrame(tick);
+      };
+      vadRafRef.current = requestAnimationFrame(tick);
+    } catch {
+      /* VAD unavailable — hands-free falls back to manual/max-duration stop */
+    }
   }
 
   const pushTurn = useCallback((role: VoiceTurn["role"], text: string, final = true) => {
@@ -150,6 +238,13 @@ export function useVoiceConversation({ voiceLang, locked = false, onConfirm, onD
       void stop();
       // eslint-disable-next-line react-hooks/exhaustive-deps
     }, VOICE_MAX_RECORDING_MS);
+
+    // Hands-free: end the turn on a trailing silence instead of a tap.
+    if (continuousRef.current) {
+      setupVad(stream, () => {
+        void stop();
+      });
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [micSupported]);
 
@@ -461,6 +556,45 @@ export function useVoiceConversation({ voiceLang, locked = false, onConfirm, onD
     setState("idle");
   }, []);
 
+  /** Hands-free: temporarily stop listening (mute) without leaving the surface. */
+  const pause = useCallback(() => {
+    pausedRef.current = true;
+    setPaused(true);
+    requestGenRef.current += 1; // drop anything in flight
+    abortRef.current?.abort();
+    cleanupMedia();
+    setState("idle");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  /** Hands-free: resume listening after a pause. */
+  const resume = useCallback(() => {
+    pausedRef.current = false;
+    setPaused(false);
+    void start();
+  }, [start]);
+
+  const togglePause = useCallback(() => {
+    if (pausedRef.current) resume();
+    else pause();
+  }, [pause, resume]);
+
+  // Hands-free loop: open the mic when the surface first settles (idle) and
+  // re-open it after each reply (result) — unless the user has paused it. The
+  // effect's cleanup cancels the pending timer, so React StrictMode's dev
+  // double-invoke can't double-open the mic.
+  useEffect(() => {
+    if (!continuous || pausedRef.current) return;
+    if (state !== "result" && state !== "idle") return;
+    const timer = setTimeout(
+      () => {
+        if (continuousRef.current && !pausedRef.current) void start();
+      },
+      state === "idle" ? 250 : VOICE_HANDS_FREE_RESUME_MS
+    );
+    return () => clearTimeout(timer);
+  }, [state, continuous, start]);
+
   // Adjustment chips reflect the current recommendation (e.g. offer a class
   // switch that isn't the current class).
   const adjustments = useMemo(
@@ -477,9 +611,14 @@ export function useVoiceConversation({ voiceLang, locked = false, onConfirm, onD
     micSupported,
     elapsedMs,
     maxRecordingMs: VOICE_MAX_RECORDING_MS,
+    continuous,
+    paused,
     start,
     stop,
     cancel,
+    pause,
+    resume,
+    togglePause,
     confirmByTap,
     rejectByTap,
     tapAdjustment,

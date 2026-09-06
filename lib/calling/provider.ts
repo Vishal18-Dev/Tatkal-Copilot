@@ -34,6 +34,10 @@ export interface OutboundCallContext {
   toName?: string;
   reason: CallReason;
   tripId?: string;
+  /** E.164 (or Indian 10-digit) mobile number to dial — real provider only. */
+  toNumber?: string;
+  /** The spoken briefing (grounded via lib/copilot) — real provider only. */
+  briefing?: string;
 }
 
 export interface PlacedCall {
@@ -88,12 +92,30 @@ export class RealCallingProvider implements CallingProvider {
     return "Live call";
   }
 
-  async placeCall(): Promise<PlacedCall> {
-    return {
-      ok: false,
-      simulated: false,
-      error: "Real telephony isn't configured in this build.",
-    };
+  async placeCall(ctx: OutboundCallContext): Promise<PlacedCall> {
+    if (!ctx.toNumber) {
+      return { ok: false, simulated: false, error: "No mobile number to call." };
+    }
+    try {
+      const res = await fetch("/api/calling/dial", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ to: ctx.toNumber, briefing: ctx.briefing }),
+      });
+      const data = (await res.json().catch(() => ({}))) as { ok?: boolean; sid?: string; reason?: string };
+      if (data.ok) return { ok: true, simulated: false, sessionId: data.sid };
+      // not_configured is the honest default until telephony credentials exist.
+      return {
+        ok: false,
+        simulated: false,
+        error:
+          data.reason === "not_configured"
+            ? "Real calling isn't set up yet — add telephony credentials to enable it."
+            : "Couldn't place the call right now.",
+      };
+    } catch {
+      return { ok: false, simulated: false, error: "Couldn't reach the calling service." };
+    }
   }
 }
 
