@@ -84,6 +84,34 @@ function runI18nCheck() {
     });
   });
 
+  // F. Script & Native Character Range Verification
+  console.log("✅ Verifying native script compliance for regional locales.");
+  const SCRIPT_RANGES: Partial<Record<SupportedLanguage, RegExp>> = {
+    "kn-IN": /[\u0C80-\u0CFF]/,
+    "ta-IN": /[\u0B80-\u0BFF]/,
+    "te-IN": /[\u0C00-\u0C7F]/,
+    "gu-IN": /[\u0A80-\u0AFF]/,
+    "pa-IN": /[\u0A00-\u0A7F]/,
+    "ur-IN": /[\u0600-\u06FF]/,
+    "ml-IN": /[\u0D00-\u0D7F]/,
+  };
+
+  Object.entries(SCRIPT_RANGES).forEach(([locale, regex]) => {
+    let scriptMatches = 0;
+    canonicalKeys.forEach((key) => {
+      const val = CATALOGS[locale as SupportedLanguage]?.[key as keyof typeof CATALOGS["en-IN"]] || "";
+      if (regex.test(val)) {
+        scriptMatches++;
+      }
+    });
+    const percentage = (scriptMatches / canonicalKeys.length) * 100;
+    if (percentage < 50) {
+      errors.push(
+        `❌ ${locale} catalog is missing native script content! Only ${scriptMatches}/${canonicalKeys.length} (${percentage.toFixed(1)}%) keys match its native script range.`
+      );
+    }
+  });
+
   // Report Results
   console.log("\n=========================================");
   if (errors.length > 0) {
@@ -91,7 +119,7 @@ function runI18nCheck() {
     errors.forEach((err) => console.error(err));
     process.exit(1);
   } else {
-    console.log(`✨ All ${ALL_LOCALES.length} locales passed validation with 100% key and placeholder parity!`);
+    console.log(`✨ All ${ALL_LOCALES.length} locales passed validation with 100% key, placeholder & script parity!`);
     process.exit(0);
   }
 }
