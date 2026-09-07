@@ -102,7 +102,7 @@ function TripCard({ trip }: { trip: Trip }) {
               </span>
             </div>
             <div className="mt-0.5 text-sm text-ink-faint">
-              {trip.dateLabel} · {trip.trainName} · {trip.travellerIds.length} {travWord}
+              {trip.dateLabel === "Tomorrow" ? t("common.tomorrow") : trip.dateLabel} · {trip.trainName} · {trip.travellerIds.length} {travWord}
             </div>
           </div>
           <span className="hidden items-center gap-1 text-sm font-medium text-brand sm:inline-flex">

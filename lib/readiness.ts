@@ -59,7 +59,10 @@ function lifecycleIndex(s: AgentState): number {
  * Evaluates actual application state into structured readiness checks.
  * NEVER asks an LLM to calculate readiness scores.
  */
-export function calculateReadiness(trip: Trip): DetailedReadiness {
+export function calculateReadiness(
+  trip: Trip,
+  t?: (key: string, params?: Record<string, string | number>) => string
+): DetailedReadiness {
   const past = (s: AgentState) => lifecycleIndex(trip.agentState) >= lifecycleIndex(s);
 
   // 1. Passengers ready (Critical)
@@ -84,72 +87,74 @@ export function calculateReadiness(trip: Trip): DetailedReadiness {
   const checks: ReadinessCheck[] = [
     {
       id: "passengers",
-      label: "Passengers ready",
+      label: t ? t("readiness.passengersLabel") : "Passengers ready",
       category: "critical",
       status: passengersReady ? "ready" : "not_ready",
       done: passengersReady,
       reason: passengersReady
-        ? `${passengerCount} passenger${passengerCount > 1 ? "s" : ""} prepared with required details`
-        : "No passengers selected for this journey",
-      explanation: "Required traveller details (name, age, berth preference) are stored and ready for instant form submission when the booking window opens.",
-      hint: passengersReady ? `${passengerCount} passenger${passengerCount > 1 ? "s" : ""} ready` : "Add at least 1 traveller",
+        ? (t ? t("readiness.passengersReasonReady", { count: passengerCount, p: passengerCount > 1 ? "s" : "" }) : `${passengerCount} passenger${passengerCount > 1 ? "s" : ""} prepared with required details`)
+        : (t ? t("readiness.passengersReasonNotReady") : "No passengers selected for this journey"),
+      explanation: t ? t("readiness.passengersExplanation") : "Required traveller details (name, age, berth preference) are stored and ready for instant form submission when the booking window opens.",
+      hint: passengersReady
+        ? (t ? t("readiness.passengersHintReady", { count: passengerCount, p: passengerCount > 1 ? "s" : "" }) : `${passengerCount} passenger${passengerCount > 1 ? "s" : ""} ready`)
+        : (t ? t("readiness.passengersHintNotReady") : "Add at least 1 traveller"),
     },
     {
       id: "train",
-      label: "Train selected",
+      label: t ? t("readiness.trainLabel") : "Train selected",
       category: "critical",
       status: trainReady ? "ready" : "not_ready",
       done: trainReady,
       reason: trainReady
-        ? `Primary strategy selected: ${trip.primary.trainName}`
-        : "No primary train or strategy selected",
-      explanation: "A primary train option and travel class must be selected so Copilot knows where to direct the booking attempt.",
+        ? (t ? t("readiness.trainReasonReady", { train: trip.primary.trainName }) : `Primary strategy selected: ${trip.primary.trainName}`)
+        : (t ? t("readiness.trainReasonNotReady") : "No primary train or strategy selected"),
+      explanation: t ? t("readiness.trainExplanation") : "A primary train option and travel class must be selected so Copilot knows where to direct the booking attempt.",
       hint: trainReady ? `${trip.primary.trainName} · ${trip.primary.travelClass}` : "Select primary train",
     },
     {
       id: "backup",
-      label: "Backup strategy ready",
+      label: t ? t("readiness.backupLabel") : "Backup strategy ready",
       category: "operational",
       status: backupReady ? "ready" : "not_ready",
       done: backupReady,
       reason: backupReady
-        ? `Backup strategy configured: ${trip.backup?.trainName}`
-        : "No backup strategy configured",
-      explanation: "No alternate strategy is configured. A backup strategy provides instant recovery if Tatkal quota runs out on your primary train.",
+        ? (t ? t("readiness.backupReasonReady", { train: trip.backup?.trainName ?? "" }) : `Backup strategy configured: ${trip.backup?.trainName}`)
+        : (t ? t("readiness.backupReasonNotReady") : "No backup strategy configured"),
+      explanation: t ? t("readiness.backupExplanation") : "No alternate strategy is configured. A backup strategy provides instant recovery if Tatkal quota runs out on your primary train.",
       hint: backupReady ? (trip.backup?.trainName ?? "Backup ready") : "No backup selected",
     },
     {
       id: "boarding",
-      label: "Boarding station confirmed",
+      label: t ? t("readiness.boardingLabel") : "Boarding station confirmed",
       category: "critical",
       status: boardingReady ? "ready" : "not_ready",
       done: boardingReady,
       reason: boardingReady
-        ? `Boarding station confirmed: ${trip.primary.boardingStationName}`
-        : "Boarding station missing",
-      explanation: "The boarding station determines Tatkal quota rules and train departure timing.",
+        ? (t ? t("readiness.boardingReasonReady", { station: trip.primary.boardingStationName }) : `Boarding station confirmed: ${trip.primary.boardingStationName}`)
+        : (t ? t("readiness.boardingReasonNotReady") : "Boarding station missing"),
+      explanation: t ? t("readiness.boardingExplanation") : "The boarding station determines Tatkal quota rules and train departure timing.",
       hint: boardingReady ? `Board at ${trip.primary.boardingStationName}` : "Confirm boarding point",
     },
     {
       id: "booking_session",
-      label: "Railway booking session ready",
+      label: t ? t("readiness.sessionLabel") : "Railway booking session ready",
       category: "critical",
       status: sessionReady ? "ready" : "not_ready",
       done: sessionReady,
       reason: sessionReady
-        ? "Authorized railway booking channel permissioned & ready"
-        : "Authorized railway booking channel is not ready",
-      explanation: "Copilot needs an authorized booking channel before it can enter the booking flow. This demo environment uses a permissioned railway provider.",
+        ? (t ? t("readiness.sessionReasonReady") : "Authorized railway booking channel permissioned & ready")
+        : (t ? t("readiness.sessionReasonNotReady") : "Authorized railway booking channel is not ready"),
+      explanation: t ? t("readiness.sessionExplanation") : "Copilot needs an authorized booking channel before it can enter the booking flow. This demo environment uses a permissioned railway provider.",
       hint: sessionReady ? "Channel permissioned & ready" : "Authorize booking channel",
     },
     {
       id: "connectivity",
-      label: "Phone & internet ready",
+      label: t ? t("readiness.connectivityLabel") : "Phone & internet ready",
       category: "operational",
       status: connectivityReady ? "ready" : "not_ready",
       done: connectivityReady,
-      reason: "System & network connectivity requirement satisfied (simulated)",
-      explanation: "Active network connection required to send and receive real-time booking alerts and state updates.",
+      reason: t ? t("readiness.connectivityReasonReady") : "System & network connectivity requirement satisfied (simulated)",
+      explanation: t ? t("readiness.connectivityExplanation") : "Active network connection required to send and receive real-time booking alerts and state updates.",
       hint: "Simulated device & internet check",
     },
   ];
@@ -162,13 +167,17 @@ export function calculateReadiness(trip: Trip): DetailedReadiness {
   const missingIds = checks.filter((c) => c.status === "not_ready").map((c) => c.id);
   const criticalReady = blockingIds.length === 0;
 
-  let summary = "Ready to act";
+  let summary = t ? t("mc.readyToAct") : "Ready to act";
   if (readyCount < totalCount) {
     const unreadyCount = totalCount - readyCount;
     if (blockingIds.length > 0) {
-      summary = `${blockingIds.length} critical item${blockingIds.length > 1 ? "s" : ""} ${blockingIds.length > 1 ? "need" : "needs"} attention`;
+      summary = t
+        ? t("mc.criticalAttention", { count: blockingIds.length })
+        : `${blockingIds.length} critical item${blockingIds.length > 1 ? "s" : ""} ${blockingIds.length > 1 ? "need" : "needs"} attention`;
     } else {
-      summary = `${unreadyCount} operational item${unreadyCount > 1 ? "s" : ""} ${unreadyCount > 1 ? "need" : "needs"} attention`;
+      summary = t
+        ? t("mc.operationalAttention", { count: unreadyCount })
+        : `${unreadyCount} operational item${unreadyCount > 1 ? "s" : ""} ${unreadyCount > 1 ? "need" : "needs"} attention`;
     }
   }
 

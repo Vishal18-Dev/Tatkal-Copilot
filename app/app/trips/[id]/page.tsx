@@ -110,7 +110,7 @@ function PlanMission({ plan }: { plan: Trip }) {
   const isAssisted = plan.mode === "assisted";
   const meta = statusMeta(state);
   const beat = beatFor(state);
-  const detailedReadiness = calculateReadiness(plan);
+  const detailedReadiness = calculateReadiness(plan, t);
   const [expandedCheckId, setExpandedCheckId] = useState<string | null>(null);
   const bookedTravellers = travellers.filter((t) => plan.travellerIds.includes(t.id));
 
@@ -698,7 +698,7 @@ function PlanMission({ plan }: { plan: Trip }) {
         <DemoBadge />
       </div>
       <p className="mb-3 text-ink-soft">
-        {plan.dateLabel}
+        {plan.dateLabel === "Tomorrow" ? t("common.tomorrow") : plan.dateLabel}
         {plan.arrivalTargetLabel ? ` · ${t("mc.arrive")} ${plan.arrivalTargetLabel}` : ""} ·{" "}
         {plan.travellerIds.length} {plan.travellerIds.length > 1 ? t("common.travellers") : t("common.traveller")} ·{" "}
         {plan.mode === "auto" ? t("mc.agentPermissioned") : t("mc.agentAssisted")}
@@ -710,7 +710,7 @@ function PlanMission({ plan }: { plan: Trip }) {
         <span className="text-ink-faint">→</span>
         <span className="font-semibold text-brand-ink">{plan.toCode}</span>
         <span className="text-line-strong">·</span>
-        <span className="text-ink-soft">{plan.dateLabel}</span>
+        <span className="text-ink-soft">{plan.dateLabel === "Tomorrow" ? t("common.tomorrow") : plan.dateLabel}</span>
         <span className="text-line-strong">·</span>
         <span className="text-ink-soft">
           {plan.travellerIds.length} {plan.travellerIds.length > 1 ? t("common.travellers") : t("common.traveller")}
@@ -726,21 +726,21 @@ function PlanMission({ plan }: { plan: Trip }) {
           {isAssisted ? (
             <>
               <span className="inline-flex items-center gap-1.5 rounded-full bg-brand-soft px-2.5 py-0.5 font-semibold text-xs text-brand">
-                🤝 Assisted
+                🤝 {t("mc.modeAssisted")}
               </span>
-              <span className="text-ink-soft text-xs sm:text-sm">Copilot will ask before taking action</span>
+              <span className="text-ink-soft text-xs sm:text-sm">{t("mc.assistedDesc")}</span>
             </>
           ) : (
             <>
               <span className="inline-flex items-center gap-1.5 rounded-full bg-brand-soft px-2.5 py-0.5 font-semibold text-xs text-brand">
-                ⚡ Permissioned
+                ⚡ {t("mc.modePermissioned")}
               </span>
-              <span className="text-ink-soft text-xs sm:text-sm">Copilot can act automatically</span>
+              <span className="text-ink-soft text-xs sm:text-sm">{t("mc.permissionedDesc")}</span>
             </>
           )}
         </div>
         <span className="text-[0.75rem] font-medium text-ink-faint">
-          {isAssisted ? "Keep me in control" : "Let Copilot act"}
+          {isAssisted ? t("mc.keepControl") : t("mc.letAct")}
         </span>
       </div>
 
@@ -795,7 +795,7 @@ function PlanMission({ plan }: { plan: Trip }) {
 
             {/* AI Coach — interactive chat */}
             <CoachCard
-              defaultText={coachFor(state, plan)}
+              defaultText={coachFor(state, plan, t)}
               messages={coachMessages}
               input={coachInput}
               loading={coachLoading}
@@ -997,7 +997,7 @@ function PlanMission({ plan }: { plan: Trip }) {
                   className="border-caution/50 bg-caution-soft/50 text-caution hover:bg-caution-soft"
                 >
                   <RotateCcw className="h-4 w-4 text-caution" />
-                  Reset Inactivity
+                  {t("mc.resetInactivity")}
                 </Button>
               ) : (
                 <Button
@@ -1007,7 +1007,7 @@ function PlanMission({ plan }: { plan: Trip }) {
                   title="Simulate passenger closing app / leaving screen"
                 >
                   <UserX className="h-4 w-4 text-brand" />
-                  Simulate Inactivity
+                  {t("mc.simulateInactivity")}
                 </Button>
               )}
 
@@ -1049,7 +1049,7 @@ function PlanMission({ plan }: { plan: Trip }) {
               <div className="mb-2 flex items-center justify-between">
                 <h3 className="text-sm font-semibold uppercase tracking-wide text-ink-faint">{t("mc.readiness")}</h3>
                 <span className={cn("tabular text-xs font-semibold px-2 py-0.5 rounded-full", detailedReadiness.isReady ? "bg-confirm-soft text-confirm" : "bg-brand-soft text-brand")}>
-                  {detailedReadiness.readyCount}/{detailedReadiness.totalCount} Ready
+                  {t("mc.readyCount", { count: detailedReadiness.readyCount, total: detailedReadiness.totalCount })}
                 </span>
               </div>
               <p className="mb-3.5 text-xs font-medium text-ink-soft">
@@ -1072,7 +1072,7 @@ function PlanMission({ plan }: { plan: Trip }) {
                             <div className="flex items-center gap-1.5 flex-wrap">
                               <span className={cn("text-[0.92rem] font-medium", c.done ? "text-ink" : "text-ink-soft")}>{c.label}</span>
                               <span className={cn("text-[0.65rem] uppercase px-1.5 py-0.2 rounded font-semibold", c.category === "critical" ? "bg-line text-ink-faint" : "bg-surface-muted text-ink-faint")}>
-                                {c.category}
+                                {c.category === "critical" ? t("mc.critical") : t("mc.optional")}
                               </span>
                             </div>
                             <div className="text-xs text-ink-faint mt-0.5">{c.reason}</div>
@@ -1082,7 +1082,7 @@ function PlanMission({ plan }: { plan: Trip }) {
                           type="button"
                           className="ml-2 text-xs font-semibold text-brand hover:underline shrink-0"
                         >
-                          {isExpanded ? "Hide" : "Why?"}
+                          {isExpanded ? t("common.hide") : t("mc.why")}
                         </button>
                       </div>
                       {isExpanded && (
@@ -1265,7 +1265,7 @@ function CoachCard({
           {loading && (
             <div className="flex items-center gap-2 text-sm text-ink-faint">
               <Loader2 className="h-3.5 w-3.5 animate-spin" />
-              Thinking...
+              {t("agent.thinking")}
             </div>
           )}
         </div>
@@ -1276,7 +1276,7 @@ function CoachCard({
           value={input}
           onChange={(e) => onInputChange(e.target.value)}
           onKeyDown={(e) => e.key === "Enter" && onSend()}
-          placeholder="Ask about your journey..."
+          placeholder={t("mc.askCoachPlaceholder")}
           className="w-full bg-transparent text-sm text-ink placeholder:text-ink-faint focus:outline-none"
         />
         <button

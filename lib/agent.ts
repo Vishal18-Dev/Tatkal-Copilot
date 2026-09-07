@@ -159,43 +159,49 @@ export function statusMeta(state: AgentState): {
   }
 }
 
-export function coachFor(state: AgentState, plan: Trip): string {
+export function coachFor(
+  state: AgentState,
+  plan: Trip,
+  t?: (key: string, params?: Record<string, string | number>) => string
+): string {
   const primary = plan.primary.trainName;
   const backup = plan.backup?.trainName;
-  const via = plan.backup?.via;
   switch (state) {
     case "scheduled":
     case "ready":
     case "draft":
-      return `Your plan is ready. I'll watch the clock and prepare everything — you don't need to keep the app open.`;
+      return t ? t("coach.stateReady") : `Your plan is ready. I'll watch the clock and prepare everything — you don't need to keep the app open.`;
     case "t_minus_30":
-      return `Tatkal opens in 30 minutes. Your passengers and backup strategy are already prepared. Nothing to do yet.`;
+      return t ? t("coach.stateT30") : `Tatkal opens in 30 minutes. Your passengers and backup strategy are already prepared. Nothing to do yet.`;
     case "t_minus_10":
-      return `Ten minutes to go. Keep your payment app and the authorized booking channel ready — I'll tell you the moment it opens.`;
+      return t ? t("coach.stateT10") : `Ten minutes to go. Keep your payment app and the authorized booking channel ready — I'll tell you the moment it opens.`;
     case "window_open":
       if (plan.mode === "assisted") {
-        return "The window is open. Your plan is ready. Tap Start booking when you're ready.";
+        return t ? t("coach.stateOpenAssisted") : "The window is open. Your plan is ready. Tap Start booking when you're ready.";
       }
-      return "The window is open. I'm starting your prepared booking strategy now.";
+      return t ? t("coach.stateOpenPermissioned") : "The window is open. I'm starting your prepared booking strategy now.";
     case "user_action_required":
-      return `The window is open and you haven't started yet. Don't rush the search — your plan is prepared. Tap Start booking.`;
+      return t ? t("coach.stateActionRequired") : `The window is open and you haven't started yet. Don't rush the search — your plan is prepared. Tap Start booking.`;
     case "booking_in_progress":
-      return `Attempting ${primary} now. Stay put — I'll switch to your backup instantly if the quota runs out.`;
+      return t ? t("coach.stateBooking", { primary }) : `Attempting ${primary} now. Stay put — I'll switch to your backup instantly if the quota runs out.`;
     case "primary_failed":
     case "backup_recommended":
       if (!plan.backup) {
-        return `${primary} is no longer available and no backup strategy is configured for this journey.`;
+        return t ? t("coach.stateBackupNoConfig", { primary }) : `${primary} is no longer available and no backup strategy is configured for this journey.`;
       }
       if (plan.mode === "assisted") {
-        return "Your primary option is unavailable. Your backup is ready.";
+        return t ? t("coach.stateBackupAssisted") : "Your primary option is unavailable. Your backup is ready.";
       }
-      return "Your primary option is unavailable. Copilot is switching to your prepared backup.";
+      return t ? t("coach.stateBackupPermissioned") : "Your primary option is unavailable. Copilot is switching to your prepared backup.";
     case "backup_attempt":
-      return `Booking ${backup ?? "your backup"} now.`;
+      return t ? t("coach.stateBackupAttempt", { backup: backup ?? "your backup" }) : `Booking ${backup ?? "your backup"} now.`;
     case "confirmed":
-      return `Done. ${plan.booking?.recovered ? "Your backup secured the seat — that's exactly why it mattered." : "Confirmed on your first choice."}`;
+      if (plan.booking?.recovered) {
+        return t ? t("coach.stateConfirmedBackup") : "Done. Your backup secured the seat — that's exactly why it mattered.";
+      }
+      return t ? t("coach.stateConfirmedPrimary") : "Done. Confirmed on your first choice.";
     default:
-      return `I'm keeping watch over this journey.`;
+      return t ? t("coach.stateDefault") : `I'm keeping watch over this journey.`;
   }
 }
 

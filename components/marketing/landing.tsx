@@ -32,9 +32,7 @@ import { useLang } from "@/lib/i18n";
 
 /* ============================================================
    Marketing landing — Figma "Railway Booking Made Peaceful".
-   Visual design follows the Figma; copy is rewritten to stay
-   honest and DEMO-safe (no implied live IRCTC/CRIS/Aadhaar,
-   no fabricated PNRs/stats/reviews, no false compliance).
+   Fully localized via useLang().
    ============================================================ */
 
 export function Landing() {
@@ -44,6 +42,83 @@ export function Landing() {
   const [authOpen, setAuthOpen] = useState(false);
 
   const go = () => router.push("/app/plan");
+
+  const timelineSteps = [
+    {
+      icon: Sparkles,
+      time: t("landing.timeline.step1.time"),
+      title: t("landing.timeline.step1.title"),
+      body: t("landing.timeline.step1.body"),
+      note: t("landing.timeline.step1.note"),
+    },
+    {
+      icon: Bell,
+      time: t("landing.timeline.step2.time"),
+      title: t("landing.timeline.step2.title"),
+      body: t("landing.timeline.step2.body"),
+      note: t("landing.timeline.step2.note"),
+    },
+    {
+      icon: TrainFront,
+      time: t("landing.timeline.step3.time"),
+      title: t("landing.timeline.step3.title"),
+      body: t("landing.timeline.step3.body"),
+      note: t("landing.timeline.step3.note"),
+    },
+    {
+      icon: Smartphone,
+      time: t("landing.timeline.step4.time"),
+      title: t("landing.timeline.step4.title"),
+      body: t("landing.timeline.step4.body"),
+      note: t("landing.timeline.step4.note"),
+    },
+  ];
+
+  const oldWayItems = [
+    t("landing.compare.old1"),
+    t("landing.compare.old2"),
+    t("landing.compare.old3"),
+    t("landing.compare.old4"),
+  ];
+
+  const newWayItems = [
+    t("landing.compare.new1"),
+    t("landing.compare.new2"),
+    t("landing.compare.new3"),
+    t("landing.compare.new4"),
+  ];
+
+  const trustCards = [
+    {
+      icon: Lock,
+      title: t("landing.trust.c1.title"),
+      body: t("landing.trust.c1.body"),
+      tag: t("landing.trust.c1.tag"),
+    },
+    {
+      icon: GitBranch,
+      title: t("landing.trust.c2.title"),
+      body: t("landing.trust.c2.body"),
+      tag: t("landing.trust.c2.tag"),
+    },
+    {
+      icon: Wallet,
+      title: t("landing.trust.c3.title"),
+      body: t("landing.trust.c3.body"),
+      tag: t("landing.trust.c3.tag"),
+    },
+  ];
+
+  const voiceQuotes = [
+    {
+      quote: t("landing.voices.v1.quote"),
+      who: t("landing.voices.v1.who"),
+    },
+    {
+      quote: t("landing.voices.v2.quote"),
+      who: t("landing.voices.v2.who"),
+    },
+  ];
 
   return (
     <div className="min-h-full">
@@ -63,13 +138,13 @@ export function Landing() {
           </Link>
           <nav className="hidden items-center gap-1 md:flex">
             <a href="#timeline" className="rounded-[var(--radius)] px-3.5 py-2 text-sm font-medium text-ink-soft transition-colors hover:bg-surface-muted hover:text-ink">
-              How it works
+              {t("landing.nav.howItWorks")}
             </a>
             <a href="#compare" className="rounded-[var(--radius)] px-3.5 py-2 text-sm font-medium text-ink-soft transition-colors hover:bg-surface-muted hover:text-ink">
-              Why it works
+              {t("landing.nav.whyItWorks")}
             </a>
             <a href="#trust" className="rounded-[var(--radius)] px-3.5 py-2 text-sm font-medium text-ink-soft transition-colors hover:bg-surface-muted hover:text-ink">
-              Your control
+              {t("landing.nav.yourControl")}
             </a>
           </nav>
           <div className="flex items-center gap-2">
@@ -80,7 +155,7 @@ export function Landing() {
               variant={isAuthed ? "secondary" : "primary"}
               onClick={() => (isAuthed ? router.push("/app") : go())}
             >
-              {isAuthed ? "Command Center" : "Plan a journey"}
+              {isAuthed ? t("landing.nav.commandCenter") : t("landing.nav.planTrip")}
             </Button>
           </div>
         </div>
@@ -98,20 +173,18 @@ export function Landing() {
               className="mb-5 inline-flex items-center gap-2 rounded-full border border-line-strong bg-surface/80 px-3.5 py-1.5 text-[0.72rem] font-semibold uppercase tracking-[0.12em] text-ink-soft backdrop-blur"
             >
               <Sparkles className="h-3.5 w-3.5 text-brand" />
-              Dignified railway booking for India
+              {t("landing.hero.badge")}
             </motion.div>
             <h1 className="text-display text-brand-ink">
-              Tatkal booking without the{" "}
-              <span className="text-brand">morning panic.</span>
+              {t("landing.hero.title")}{" "}
+              <span className="text-brand">{t("landing.hero.titleSpan")}</span>
             </h1>
             <p className="mt-5 max-w-xl text-lg leading-relaxed text-ink-soft">
-              We prepare your travellers and strategy the evening before, watch the
-              clock, and walk you into booking the moment Tatkal opens. No frantic
-              refreshing, no captcha scramble — and you always make the final call.
+              {t("landing.hero.desc")}
             </p>
             <div className="mt-7 flex flex-wrap items-center gap-3">
               <Button size="lg" onClick={go} className="group">
-                Plan your journey
+                {t("landing.hero.cta")}
                 <ArrowRight className="h-5 w-5 transition-transform group-hover:translate-x-1" />
               </Button>
               <a
@@ -121,12 +194,12 @@ export function Landing() {
                 <span className="grid h-8 w-8 place-items-center rounded-full border border-line-strong bg-surface">
                   <Play className="h-3.5 w-3.5 text-brand" />
                 </span>
-                See how it works
+                {t("landing.hero.seeHow")}
               </a>
             </div>
             <p className="mt-6 inline-flex items-center gap-1.5 text-sm text-ink-faint">
               <ShieldCheck className="h-4 w-4 text-confirm" />
-              {t("hero.trust")}
+              {t("landing.hero.trust")}
             </p>
           </div>
 
@@ -139,7 +212,7 @@ export function Landing() {
             <Card lift className="overflow-hidden p-0">
               <div className="flex items-center justify-between gap-2 border-b border-line bg-surface-muted/60 px-5 py-3">
                 <span className="flex items-center gap-2 text-sm font-semibold text-brand-ink">
-                  <TrainFront className="h-4 w-4 text-brand" /> Your Tatkal plan
+                  <TrainFront className="h-4 w-4 text-brand" /> {t("landing.plan.title")}
                 </span>
                 <DemoBadge />
               </div>
@@ -159,19 +232,19 @@ export function Landing() {
                         </span>
                       </div>
                     </div>
-                    <span className="text-[0.7rem] text-confirm">Direct corridor</span>
+                    <span className="text-[0.7rem] text-confirm">{t("landing.plan.directCorridor")}</span>
                   </div>
                   <Endpoint code="NDLS" city="New Delhi" tone="caution" align="right" />
                 </div>
                 <div className="grid grid-cols-2 gap-2.5">
-                  <MiniField icon={<Clock className="h-4 w-4" />} label="Journey date" value="Tomorrow" sub="Tatkal opens 10:00 AM" />
-                  <MiniField icon={<TrainFront className="h-4 w-4" />} label="Class" value="AC 3 Tier (3A)" sub="Backup · Split via Kota" />
+                  <MiniField icon={<Clock className="h-4 w-4" />} label={t("landing.plan.journeyDate")} value={t("landing.plan.tomorrow")} sub={t("landing.plan.opensAt")} />
+                  <MiniField icon={<TrainFront className="h-4 w-4" />} label={t("landing.plan.class")} value={t("landing.plan.classVal")} sub={t("landing.plan.classSub")} />
                 </div>
                 <div className="flex items-center gap-2 rounded-[var(--radius)] bg-confirm-soft px-3 py-2 text-sm text-confirm">
-                  <Users className="h-4 w-4" /> 2 travellers ready
+                  <Users className="h-4 w-4" /> {t("landing.plan.travellersReady")}
                 </div>
                 <Button size="md" onClick={go} className="group w-full">
-                  Plan your journey
+                  {t("landing.hero.cta")}
                   <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
                 </Button>
               </div>
@@ -183,16 +256,15 @@ export function Landing() {
       {/* ---------- Timeline / how it works ---------- */}
       <section id="timeline" className="border-y border-line bg-surface/50 py-16">
         <div className="mx-auto max-w-6xl px-5">
-          <SectionEyebrow>The plan, step by step</SectionEyebrow>
+          <SectionEyebrow>{t("landing.timeline.eyebrow")}</SectionEyebrow>
           <h2 className="text-headline text-brand-ink">
-            The Tatkal timeline, prepared in advance.
+            {t("landing.timeline.title")}
           </h2>
           <p className="mt-3 max-w-2xl text-lg text-ink-soft">
-            While the rush fights sluggish servers, your plan is already in place —
-            step by step, all clearly simulated in this prototype.
+            {t("landing.timeline.desc")}
           </p>
           <div className="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            {TIMELINE.map((s, i) => (
+            {timelineSteps.map((s, i) => (
               <motion.div
                 key={s.title}
                 initial={{ opacity: 0, y: 12 }}
@@ -228,12 +300,12 @@ export function Landing() {
       {/* ---------- Old way vs Copilot way ---------- */}
       <section id="compare" className="py-16">
         <div className="mx-auto max-w-6xl px-5">
-          <SectionEyebrow>The reality check</SectionEyebrow>
+          <SectionEyebrow>{t("landing.compare.eyebrow")}</SectionEyebrow>
           <h2 className="text-headline text-brand-ink">
-            The old way vs. the Copilot way.
+            {t("landing.compare.title")}
           </h2>
           <p className="mt-3 max-w-2xl text-lg text-ink-soft">
-            Two very different mornings, at the same 10:00 AM.
+            {t("landing.compare.desc")}
           </p>
           <div className="mt-10 grid gap-4 lg:grid-cols-2">
             <Card className="border-danger/25 p-6">
@@ -241,11 +313,11 @@ export function Landing() {
                 <span className="grid h-9 w-9 place-items-center rounded-full bg-danger-soft">
                   <X className="h-5 w-5" strokeWidth={2.4} />
                 </span>
-                <h3 className="text-lg font-semibold">The 09:59 AM scramble</h3>
+                <h3 className="text-lg font-semibold">{t("landing.compare.oldTitle")}</h3>
               </div>
               <ul className="mt-5 space-y-3">
-                {OLD_WAY.map((x) => (
-                  <li key={x} className="flex items-start gap-2.5 text-[0.95rem] text-ink-soft">
+                {oldWayItems.map((x, idx) => (
+                  <li key={idx} className="flex items-start gap-2.5 text-[0.95rem] text-ink-soft">
                     <X className="mt-0.5 h-4 w-4 shrink-0 text-danger" />
                     {x}
                   </li>
@@ -258,12 +330,12 @@ export function Landing() {
                   <Check className="h-5 w-5" strokeWidth={2.4} />
                 </span>
                 <h3 className="text-lg font-semibold text-brand-ink">
-                  The peaceful morning
+                  {t("landing.compare.newTitle")}
                 </h3>
               </div>
               <ul className="mt-5 space-y-3">
-                {NEW_WAY.map((x) => (
-                  <li key={x} className="flex items-start gap-2.5 text-[0.95rem] text-ink">
+                {newWayItems.map((x, idx) => (
+                  <li key={idx} className="flex items-start gap-2.5 text-[0.95rem] text-ink">
                     <Check className="mt-0.5 h-4 w-4 shrink-0 text-confirm" strokeWidth={2.6} />
                     {x}
                   </li>
@@ -277,13 +349,13 @@ export function Landing() {
       {/* ---------- Trust ---------- */}
       <section id="trust" className="border-y border-line bg-surface/50 py-16">
         <div className="mx-auto max-w-6xl px-5">
-          <SectionEyebrow>You stay in control</SectionEyebrow>
-          <h2 className="text-headline text-brand-ink">Built around your trust.</h2>
+          <SectionEyebrow>{t("landing.trust.eyebrow")}</SectionEyebrow>
+          <h2 className="text-headline text-brand-ink">{t("landing.trust.title")}</h2>
           <p className="mt-3 max-w-2xl text-lg text-ink-soft">
-            One principle: your money and identity stay entirely in your hands.
+            {t("landing.trust.desc")}
           </p>
           <div className="mt-10 grid gap-4 md:grid-cols-3">
-            {TRUST.map((c) => (
+            {trustCards.map((c) => (
               <Card key={c.title} className="p-6">
                 <span className="grid h-11 w-11 place-items-center rounded-[var(--radius)] bg-brand-soft text-brand">
                   <c.icon className="h-5 w-5" />
@@ -306,15 +378,15 @@ export function Landing() {
         <div className="mx-auto max-w-6xl px-5">
           <div className="mb-8 flex flex-wrap items-center gap-3">
             <h2 className="text-headline text-brand-ink">
-              Calm mornings, the way it should feel.
+              {t("landing.voices.title")}
             </h2>
             <span className="rounded-full border border-caution/40 bg-caution-soft px-2.5 py-0.5 text-[0.66rem] font-bold uppercase tracking-wide text-caution">
-              Illustrative
+              {t("landing.voices.badge")}
             </span>
           </div>
           <div className="grid gap-4 md:grid-cols-2">
-            {VOICES.map((v) => (
-              <Card key={v.who} className="p-6">
+            {voiceQuotes.map((v, idx) => (
+              <Card key={idx} className="p-6">
                 <p className="text-[1.02rem] leading-relaxed text-ink">
                   &ldquo;{v.quote}&rdquo;
                 </p>
@@ -323,8 +395,7 @@ export function Landing() {
             ))}
           </div>
           <p className="mt-4 text-xs text-ink-faint">
-            Illustrative of the intended experience — not real customer reviews. This
-            is a prototype.
+            {t("landing.voices.disclaimer")}
           </p>
         </div>
       </section>
@@ -335,25 +406,24 @@ export function Landing() {
           <div className="pointer-events-none absolute inset-0 bg-grid opacity-10" />
           <div className="relative">
             <span className="text-[0.72rem] font-semibold uppercase tracking-[0.14em] text-white/60">
-              No sign-up needed to start
+              {t("landing.cta.badge")}
             </span>
             <h2 className="mt-3 text-headline text-white">
-              Ready for your next train journey?
+              {t("landing.cta.title")}
             </h2>
             <p className="mx-auto mt-3 max-w-lg text-lg text-white/75">
-              Set up tomorrow&apos;s Tatkal in under a minute. Sit back with your
-              morning tea — your plan is lined up.
+              {t("landing.cta.desc")}
             </p>
             <div className="mt-8 flex flex-col items-center gap-3">
               <button
                 onClick={go}
                 className="group inline-flex h-14 items-center gap-2 rounded-[var(--radius)] bg-white px-8 text-base font-semibold text-brand-ink transition-transform hover:-translate-y-0.5"
               >
-                Plan your journey
+                {t("landing.cta.button")}
                 <ArrowRight className="h-5 w-5 transition-transform group-hover:translate-x-1" />
               </button>
               <span className="inline-flex items-center gap-1.5 text-sm text-white/60">
-                <DemoBadge className="border-white/30 bg-white/10 text-white" /> Simulated booking — nothing real is charged
+                <DemoBadge className="border-white/30 bg-white/10 text-white" /> {t("landing.cta.simulated")}
               </span>
             </div>
           </div>
@@ -365,8 +435,7 @@ export function Landing() {
         <div className="mx-auto flex max-w-6xl flex-col items-center justify-between gap-3 px-5 text-sm text-ink-faint sm:flex-row">
           <Logo />
           <span>
-            Prototype · simulated booking · not affiliated with IRCTC or Indian
-            Railways.
+            {t("landing.footer.disclaimer")}
           </span>
         </div>
       </footer>
@@ -380,89 +449,6 @@ export function Landing() {
     </div>
   );
 }
-
-/* ---------------- data (honest, demo-safe) ---------------- */
-
-const TIMELINE = [
-  {
-    icon: Sparkles,
-    time: "Evening prior",
-    title: "Plan in peace",
-    body: "Tell us where you need to go in plain words the evening before. Choose your primary train and an automatic fallback.",
-    note: "Backup ready · Split via Kota",
-  },
-  {
-    icon: Bell,
-    time: "09:50 AM",
-    title: "Get ready early",
-    body: "We pre-stage your passenger list and prepare everything. A quiet reminder tells you it's all set.",
-    note: "Reminder · you're primed",
-  },
-  {
-    icon: TrainFront,
-    time: "10:00 AM",
-    title: "The window opens",
-    body: "The moment Tatkal opens, your prepared plan is ready to book. If the primary quota vanishes, your backup steps in.",
-    note: "Primary → backup, instantly",
-  },
-  {
-    icon: Smartphone,
-    time: "One tap",
-    title: "You confirm",
-    body: "Approve the payment on your own UPI app. Nothing is ever charged without you — and here it's all simulated.",
-    note: "Confirmation to your app",
-  },
-];
-
-const OLD_WAY = [
-  "A dozen browser tabs, all throttled at once.",
-  "Unreadable captchas that vanish in seconds.",
-  "Payment portals that freeze before it's booked.",
-  "The waitlist demotion — and a scramble for plan B.",
-];
-
-const NEW_WAY = [
-  "Passenger details prepared and locked in hours ahead.",
-  "No captcha scramble in the crucial seconds.",
-  "Automatic fallback to your backup train if the first fills.",
-  "One approval on your phone — you always decide.",
-];
-
-const TRUST = [
-  {
-    icon: Lock,
-    title: "You always hold the key",
-    body: "We never store your card, ask for bank OTPs, or take auto-debit permission. Every payment needs your approval on your own phone.",
-    tag: "You approve every payment",
-  },
-  {
-    icon: GitBranch,
-    title: "Automatic backup strategy",
-    body: "If your preferred train sells out in seconds, Copilot has already lined up your chosen alternative on the same corridor.",
-    tag: "Backup prepared in advance",
-  },
-  {
-    icon: Wallet,
-    title: "No hidden anything",
-    body: "No wallet holds, no confusing vouchers, no surprise fees. In this prototype nothing is charged at all.",
-    tag: "Transparent by design",
-  },
-];
-
-const VOICES = [
-  {
-    quote:
-      "I'd plan the trip the night before and let it watch the clock. No sitting glued to the screen at 10 AM.",
-    who: "A weekly commuter",
-  },
-  {
-    quote:
-      "As a senior traveller, the 10 AM rush was terrifying. Having the details ready and a backup lined up changed the morning entirely.",
-    who: "A senior traveller",
-  },
-];
-
-/* ---------------- small pieces ---------------- */
 
 function SectionEyebrow({ children }: { children: React.ReactNode }) {
   return (
