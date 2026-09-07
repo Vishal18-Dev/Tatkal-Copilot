@@ -580,4 +580,4 @@ export const mrIN = {
   "workspace.zeroPanicRouting": "चिंतामुक्त मर्ग",
 } as const;
 
-export type CatalogKey = keyof typeof enIN;
+export type CatalogKey = keyof typeof mrIN;

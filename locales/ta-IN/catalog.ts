@@ -580,4 +580,4 @@ export const taIN = {
   "workspace.zeroPanicRouting": "பதற்றமில்லாத பாதை",
 } as const;
 
-export type CatalogKey = keyof typeof enIN;
+export type CatalogKey = keyof typeof taIN;

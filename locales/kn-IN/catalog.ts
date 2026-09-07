@@ -580,4 +580,4 @@ export const knIN = {
   "workspace.zeroPanicRouting": "ಆತಂಕವಿಲ್ಲದ ಮಾರ್ಗ",
 } as const;
 
-export type CatalogKey = keyof typeof enIN;
+export type CatalogKey = keyof typeof knIN;

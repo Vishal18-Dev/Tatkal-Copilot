@@ -580,4 +580,4 @@ export const paIN = {
   "workspace.zeroPanicRouting": "ਚਿੰਤਾ ਮੁਕਤ ਰੂਟ",
 } as const;
 
-export type CatalogKey = keyof typeof enIN;
+export type CatalogKey = keyof typeof paIN;
