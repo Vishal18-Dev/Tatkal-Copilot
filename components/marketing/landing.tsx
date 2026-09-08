@@ -38,11 +38,16 @@ import { useLang } from "@/lib/i18n";
 
 export function Landing() {
   const { t } = useLang();
-  const { isAuthed } = useStore();
+  const { isAuthed, loginDemo } = useStore();
   const router = useRouter();
   const [authOpen, setAuthOpen] = useState(false);
 
-  const go = () => router.push("/app/plan");
+  const go = () => {
+    if (!isAuthed) {
+      loginDemo();
+    }
+    router.push("/app");
+  };
 
   const timelineSteps = [
     {
@@ -154,7 +159,7 @@ export function Landing() {
             <Button
               size="sm"
               variant={isAuthed ? "secondary" : "primary"}
-              onClick={() => (isAuthed ? router.push("/app") : go())}
+              onClick={go}
             >
               {isAuthed ? t("landing.nav.commandCenter") : t("landing.nav.planTrip")}
             </Button>

@@ -180,6 +180,7 @@ interface StoreCtx {
   requestOtp: (phone: string) => OtpRequestResult;
   verifyOtp: (code: string) => { ok: boolean; error?: string; isNew?: boolean };
   logout: () => void;
+  loginDemo: () => User;
 
   // data
   preferences: UserPreferences;
@@ -394,6 +395,46 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     setUser(null);
     setSession(null);
     setData(loadData("guest"));
+  }, []);
+
+  const loginDemo = useCallback((): User => {
+    const demoUser: User = {
+      id: "u_demo_vishal",
+      phone: "9876543210",
+      name: "Vishal Rao",
+      email: "vishal@tatkal.ai",
+      createdAt: new Date().toISOString(),
+    };
+    const s: Session = {
+      token: genId("s"),
+      userId: demoUser.id,
+      createdAt: new Date().toISOString(),
+      expiresAt: new Date(Date.now() + SESSION_TTL_MS).toISOString(),
+    };
+    try {
+      localStorage.setItem(AUTH_KEY, JSON.stringify({ user: demoUser, session: s }));
+    } catch {
+      /* ignore */
+    }
+    const guest = loadData("guest");
+    const target = loadData(demoUser.id);
+    const merged: UserData = {
+      preferences: target.preferences.onboarded
+        ? target.preferences
+        : guest.preferences,
+      travellers: mergeById(target.travellers, guest.travellers),
+      savedJourneys: mergeById(target.savedJourneys, guest.savedJourneys),
+      trips: mergeById(target.trips, guest.trips),
+      activity: [...guest.activity, ...target.activity],
+      notifications: mergeById(target.notifications, guest.notifications),
+      identity: target.identity.status === "verified" ? target.identity : guest.identity,
+      wallet: target.wallet.balance > 0 ? target.wallet : guest.wallet,
+    };
+    saveData(demoUser.id, merged);
+    setUser(demoUser);
+    setSession(s);
+    setData(merged);
+    return demoUser;
   }, []);
 
   const resetGuestSession = useCallback(() => {
@@ -703,6 +744,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       requestOtp,
       verifyOtp,
       logout,
+      loginDemo,
       preferences: data.preferences,
       travellers: data.travellers,
       savedJourneys: data.savedJourneys,
@@ -741,6 +783,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       requestOtp,
       verifyOtp,
       logout,
+      loginDemo,
       data,
       unreadCount,
       updateProfile,
