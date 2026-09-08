@@ -625,10 +625,10 @@ export function useVoiceConversation({
       setState("speaking");
       if (data.audioBase64) {
         const codec = data.audioCodec === "mp3" || !data.audioCodec ? "mpeg" : data.audioCodec;
-        const played = await lifecycle.playAudioBase64(data.audioBase64, codec, myGen);
-        if (played) return;
+        await lifecycle.playAudioBase64(data.audioBase64, codec, myGen);
+        return;
       }
-      // Fall back to browser voice only if audioBase64 missing/failed
+      // Fall back to browser voice ONLY if audioBase64 was not provided by server
       if (data.responseText && lifecycle.isGenerationActive(myGen)) {
         await lifecycle.playBrowserSpeech(data.responseText, activeLangRef.current, myGen);
       }
@@ -737,12 +737,12 @@ export function useVoiceConversation({
         const spokenText = data.text ?? english;
         pushTurn("agent", spokenText);
         if (data.audioBase64 && lifecycle.isGenerationActive(myGen)) {
-          const played = await lifecycle.playAudioBase64(
+          await lifecycle.playAudioBase64(
             data.audioBase64,
             data.audioCodec || "mp3",
             myGen
           );
-          if (played) return;
+          return;
         }
         if (spokenText && lifecycle.isGenerationActive(myGen)) {
           await lifecycle.playBrowserSpeech(spokenText, activeLangRef.current, myGen);

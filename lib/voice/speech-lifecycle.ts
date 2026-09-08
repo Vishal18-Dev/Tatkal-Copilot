@@ -210,9 +210,9 @@ export function createSpeechLifecycle(
         if (settled) return;
         settled = true;
         audio.removeEventListener("ended", onEnd);
-        audio.removeEventListener("pause", onStop);
-        audio.removeEventListener("error", onStop);
-        audio.removeEventListener("abort", onStop);
+        audio.removeEventListener("pause", onPause);
+        audio.removeEventListener("error", onError);
+        audio.removeEventListener("abort", onAbort);
 
         if (activeAudioElement === audio) {
           activeAudioElement = null;
@@ -230,12 +230,25 @@ export function createSpeechLifecycle(
       };
 
       const onEnd = () => finish(true);
-      const onStop = () => finish(false);
+      const onError = () => finish(false);
+      const onAbort = () => finish(false);
+      const onPause = () => {
+        // In HTML5 media specification, reaching end of audio dispatches 'pause' before 'ended'.
+        // If the audio has ended or reached near duration, this is a natural successful completion.
+        if (audio.ended || (audio.duration && audio.currentTime >= audio.duration - 0.2)) {
+          finish(true);
+          return;
+        }
+        // If paused by cancellation or teardown
+        if (!isGenerationActive(reqGen)) {
+          finish(false);
+        }
+      };
 
       audio.addEventListener("ended", onEnd);
-      audio.addEventListener("pause", onStop);
-      audio.addEventListener("error", onStop);
-      audio.addEventListener("abort", onStop);
+      audio.addEventListener("pause", onPause);
+      audio.addEventListener("error", onError);
+      audio.addEventListener("abort", onAbort);
 
       if (!isGenerationActive(reqGen)) {
         finish(false);

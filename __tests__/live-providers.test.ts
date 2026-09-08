@@ -98,7 +98,7 @@ describe("Item 5E.1 — Live Provider Integration Tests", () => {
       const pnr = await railRadarTrainProvider.getPNR("1234567890");
       expect(pnr.success).toBe(false);
       expect(pnr.error?.code).toBeDefined();
-    });
+    }, 15000);
   });
 
   describe("4. Structured OpenAI Intent Extractor", () => {
