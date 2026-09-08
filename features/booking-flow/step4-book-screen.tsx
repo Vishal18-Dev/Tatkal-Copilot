@@ -868,32 +868,31 @@ export function Step4BookScreen({
       <div className="flex flex-wrap items-center justify-between gap-3 text-xs font-semibold">
         <div className="inline-flex items-center gap-2 rounded-full bg-emerald-500/10 px-3.5 py-1 text-emerald-600 dark:text-emerald-400">
           <span className="h-2 w-2 rounded-full bg-emerald-500 animate-ping" />
-          <span>MISSION CONTROL · TATKAL TIMER ACTIVE · STANDBY WATCH</span>
+          <span>{t("mc.missionControlBadge")}</span>
         </div>
 
         {/* Demo Mode & Live Data Disclosure (§13) */}
         <div className="flex items-center gap-3 font-mono text-[0.75rem] text-ink-soft">
           <span className="text-emerald-600 dark:text-emerald-400 font-semibold flex items-center gap-1.5">
             <CheckCircle2 className="h-3.5 w-3.5" />
-            Live Railway Search Active
+            {t("mc.liveSearchActive")}
           </span>
           <span>·</span>
           <span className="rounded bg-surface-muted px-2 py-0.5 border border-line text-[0.7rem]">
-            Simulated Transaction Layer for Demo
+            {t("mc.simulatedLayer")}
           </span>
           <span>·</span>
-          <span>Slot: AC Tatkal 10:00 AM</span>
+          <span>{t("mc.slotAcTatkal")}</span>
         </div>
       </div>
 
       {/* Main Headline */}
       <div className="space-y-2">
         <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-ink font-[family-name:var(--font-outfit)]">
-          “Badhai ho! Aapka Tatkal booking assistant activate ho gaya hai.”
+          “{t("mc.bookingAssistantActivated")}”
         </h1>
         <p className="text-sm text-ink-soft max-w-3xl leading-relaxed">
-          Sit back and relax. Aarav from Tatkal Copilot will call you 5 minutes before 10:00 AM
-          with a concise briefing, verify your readiness, and execute your authorized booking strategy.
+          {t("mc.bookingAssistantSub")}
         </p>
       </div>
 
@@ -910,7 +909,7 @@ export function Step4BookScreen({
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2 text-xs font-bold tracking-wider text-emerald-400 uppercase">
                   <Clock className="h-4 w-4 animate-pulse" />
-                  <span>Next Tatkal AC Window Opens In</span>
+                  <span>{t("mc.nextWindowOpensIn")}</span>
                 </div>
                 <span className="font-mono text-[0.7rem] bg-white/10 px-2.5 py-0.5 rounded-full text-slate-300">
                   {clockStatus === "running" ? `Demo Clock Active (Beat ${beatIndex + 1}/6)` : "NTP Atomic Drift ±1.4ms"}
@@ -924,7 +923,7 @@ export function Step4BookScreen({
                     {displayHours}
                   </div>
                   <div className="text-[0.65rem] sm:text-[0.75rem] font-bold text-slate-400 tracking-wider uppercase mt-1">
-                    Hours
+                    {t("mc.hours")}
                   </div>
                 </div>
 
@@ -933,7 +932,7 @@ export function Step4BookScreen({
                     {displayMinutes}
                   </div>
                   <div className="text-[0.65rem] sm:text-[0.75rem] font-bold text-slate-400 tracking-wider uppercase mt-1">
-                    Minutes
+                    {t("mc.minutes")}
                   </div>
                 </div>
 
@@ -942,7 +941,7 @@ export function Step4BookScreen({
                     {displaySeconds}
                   </div>
                   <div className="text-[0.65rem] sm:text-[0.75rem] font-bold text-slate-400 tracking-wider uppercase mt-1">
-                    Seconds
+                    {t("mc.seconds")}
                   </div>
                 </div>
               </div>
@@ -968,7 +967,7 @@ export function Step4BookScreen({
                 </div>
                 <div>
                   <span className="text-[0.68rem] uppercase font-bold text-ink-soft tracking-wider">
-                    Copilot Status
+                    {t("mc.copilotStatus")}
                   </span>
                   <div className="flex items-center gap-2 mt-0.5">
                     <span
@@ -978,8 +977,8 @@ export function Step4BookScreen({
                     />
                     <h3 className="text-sm font-bold text-ink">
                       {currentMode === "auto"
-                        ? "Permissioned · Authorized by you"
-                        : "Assisted · Waiting for your approval"}
+                        ? t("mc.permissionedAuthorized")
+                        : t("mc.assistedWaiting")}
                     </h3>
                   </div>
                 </div>
@@ -991,7 +990,7 @@ export function Step4BookScreen({
                   onClick={() => setPermissionModalOpen(true)}
                   className="text-xs font-bold text-brand hover:underline flex items-center gap-1 cursor-pointer"
                 >
-                  <span>Grant Permission</span>
+                  <span>{t("mc.grantPermission")}</span>
                   <ArrowUpRight className="h-3.5 w-3.5" />
                 </button>
               )}
@@ -1000,14 +999,14 @@ export function Step4BookScreen({
             {/* Next Action Box */}
             <div className="p-3.5 rounded-xl bg-surface-muted/50 border border-line/70 space-y-2">
               <span className="text-[0.7rem] uppercase tracking-wider font-bold text-ink-soft block">
-                Next Action Workflow
+                {t("mc.nextActionWorkflow")}
               </span>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs text-ink">
                 <div className="flex items-center gap-2">
                   <span className="font-mono text-[0.7rem] font-bold text-brand bg-brand-soft px-1.5 py-0.5 rounded">
                     T-5 Min
                   </span>
-                  <span>Proactive call from Aarav with booking briefing</span>
+                  <span>{t("mc.callBriefing")}</span>
                 </div>
                 <div className="flex items-center gap-2">
                   <span className="font-mono text-[0.7rem] font-bold text-confirm bg-confirm-soft px-1.5 py-0.5 rounded">
@@ -1015,8 +1014,8 @@ export function Step4BookScreen({
                   </span>
                   <span>
                     {currentMode === "auto"
-                      ? "Attempt primary → auto-switch to backup / PT"
-                      : "Waiting for your 1-tap manual approval"}
+                      ? t("mc.attemptPrimaryAuto")
+                      : t("mc.waiting1Tap")}
                   </span>
                 </div>
               </div>
@@ -1029,12 +1028,12 @@ export function Step4BookScreen({
               <div>
                 <h3 className="text-sm font-bold text-ink flex items-center gap-2">
                   <Layers className="h-4 w-4 text-brand" />
-                  BOOKING STRATEGY
+                  {t("bookingStrategy.title")}
                 </h3>
-                <p className="text-xs text-ink-soft">Deterministic failover tree</p>
+                <p className="text-xs text-ink-soft">{t("mc.deterministicFailover")}</p>
               </div>
               <span className="font-mono text-[0.7rem] text-ink-soft">
-                Live State Tracking
+                {t("mc.liveStateTracking")}
               </span>
             </div>
 
@@ -1043,7 +1042,7 @@ export function Step4BookScreen({
               <div className="p-3 rounded-xl border border-line/70 bg-surface-muted/30 space-y-1.5">
                 <div className="flex items-center justify-between">
                   <span className="text-[0.7rem] uppercase tracking-wider font-bold text-ink-soft">
-                    01 Primary
+                    {t("mc.stepPrimary")}
                   </span>
                   <span
                     className={cn(
@@ -1071,7 +1070,7 @@ export function Step4BookScreen({
               <div className="p-3 rounded-xl border border-line/70 bg-surface-muted/30 space-y-1.5">
                 <div className="flex items-center justify-between">
                   <span className="text-[0.7rem] uppercase tracking-wider font-bold text-ink-soft">
-                    02 Backup
+                    {t("mc.stepBackup")}
                   </span>
                   <span
                     className={cn(
@@ -1104,7 +1103,7 @@ export function Step4BookScreen({
               <div className="p-3 rounded-xl border border-line/70 bg-surface-muted/30 space-y-1.5">
                 <div className="flex items-center justify-between">
                   <span className="text-[0.7rem] uppercase tracking-wider font-bold text-ink-soft">
-                    03 Premium Tatkal
+                    {t("mc.stepPremiumTatkal")}
                   </span>
                   <span
                     className={cn(

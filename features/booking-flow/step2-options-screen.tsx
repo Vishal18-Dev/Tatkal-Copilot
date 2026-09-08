@@ -16,11 +16,13 @@ import {
   Lock,
 } from "lucide-react";
 import { useJourney } from "@/lib/journey";
+import { useLang } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 import { OptionsEmptyState } from "./empty-states/options-empty-state";
 
 export function Step2OptionsScreen() {
   const { plan, chosenOption, recoveryOption, autoFallbackEnabled, setAutoFallbackEnabled, goTo } = useJourney();
+  const { t } = useLang();
 
   if (!plan || !plan.options || plan.options.length === 0) {
     return <OptionsEmptyState />;
@@ -69,13 +71,13 @@ export function Step2OptionsScreen() {
       {/* Main Headline & Eyebrow */}
       <div>
         <div className="text-[0.72rem] font-bold uppercase tracking-wider text-brand">
-          OPTIONS · TRAIN & FAILOVER STRATEGY
+          {t("step2.badge")}
         </div>
         <h1 className="mt-1 text-2xl font-extrabold tracking-tight text-brand-ink sm:text-3xl lg:text-[2.1rem] leading-tight">
-          Maine aapke liye primary train aur failover backup choose kar liya hai.
+          {t("step2.headline")}
         </h1>
         <p className="mt-1.5 text-sm sm:text-base text-ink-soft">
-          Based on your arrival constraint (<strong>before 9:00 AM</strong>) and historical Tatkal exhaustion speeds on the Western Corridor.
+          {t("step2.subheadline")}
         </p>
       </div>
 
@@ -88,7 +90,7 @@ export function Step2OptionsScreen() {
             <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
               <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-500/15 px-3 py-1 text-xs font-bold text-emerald-700 dark:text-emerald-300">
                 <Check className="h-3.5 w-3.5" />
-                <span>Recommended Primary · High Tatkal suitability</span>
+                <span>{t("step2.primarySuitability")}</span>
               </span>
               <span className="font-mono text-xs font-bold text-ink-soft">
                 Class: {primaryClass}
@@ -270,7 +272,7 @@ export function Step2OptionsScreen() {
               className="inline-flex items-center gap-1.5 rounded-full border border-line bg-surface px-4 py-2 text-xs font-semibold text-ink transition-colors hover:bg-surface-muted cursor-pointer"
             >
               <Mic className="h-3.5 w-3.5 text-brand" />
-              <span>Change trains or ask why</span>
+              <span>{t("step2.back")}</span>
             </button>
 
             <button
@@ -278,7 +280,7 @@ export function Step2OptionsScreen() {
               onClick={() => goTo("prepare")}
               className="inline-flex items-center gap-2 rounded-full bg-brand px-5 py-2.5 text-xs font-bold text-white shadow-xs transition-all hover:bg-brand-strong cursor-pointer"
             >
-              <span>Continue to Passenger Selection</span>
+              <span>{t("step2.cta")}</span>
               <ArrowRight className="h-3.5 w-3.5" />
             </button>
           </div>

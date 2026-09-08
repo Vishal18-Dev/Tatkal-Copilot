@@ -220,18 +220,18 @@ export function Step3PrepareScreen() {
       <div className="flex flex-wrap items-center justify-between gap-3 text-xs font-semibold">
         <div className="inline-flex items-center gap-2 rounded-full bg-brand-soft px-3.5 py-1 text-brand font-bold">
           <span className="h-2 w-2 rounded-full bg-brand animate-pulse" />
-          <span>STEP 03 OF 04 · PASSENGER SELECTION & BOOKING STRATEGY</span>
+          <span>{t("prep.stepBadge")}</span>
         </div>
 
         <div className="flex items-center gap-3 font-mono text-[0.75rem] text-ink-soft">
           <span className="flex items-center gap-1.5">
             <Clock className="h-3.5 w-3.5 text-caution" />
-            <span>Execution Window: 10:00:00 IST</span>
+            <span>{t("prep.executionWindow")}</span>
           </span>
           <span>·</span>
           <span className="inline-flex items-center gap-1 text-confirm font-semibold">
             <Sparkles className="h-3 w-3" />
-            VOICE SELECTION APPLIED
+            {t("prep.voiceApplied")}
           </span>
         </div>
       </div>
@@ -239,11 +239,10 @@ export function Step3PrepareScreen() {
       {/* Main Headline */}
       <div className="space-y-1.5">
         <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-brand-ink font-[family-name:var(--font-outfit)]">
-          “Yatri chuniye aur booking mode finalize kijiye.”
+          “{t("prep.headline")}”
         </h1>
         <p className="text-sm text-ink-soft max-w-3xl leading-relaxed">
-          The agent pre-selected {activeSelectedIds.length} passenger{activeSelectedIds.length !== 1 ? "s" : ""} based
-          on your voice note. Select travellers from your saved Master List and choose how Copilot should act tomorrow at 10:00 AM.
+          {t("prep.subheadline")}
         </p>
       </div>
 
@@ -272,16 +271,16 @@ export function Step3PrepareScreen() {
                   </div>
                   <div className="flex items-center gap-2 text-xs text-ink-soft mt-0.5">
                     <span className="text-confirm font-semibold">
-                      High Tatkal Allocation
+                      {t("prep.highTatkalAllocation")}
                     </span>
                     <span>·</span>
                     <span>
                       {autoFallbackEnabled ? (
                         <span className="text-brand font-medium">
-                          ⚡ Auto-Fallback to Backup Active (400ms)
+                          {t("prep.autoFallbackActive")}
                         </span>
                       ) : (
-                        <span className="text-ink-faint">Auto-Fallback Off</span>
+                        <span className="text-ink-faint">{t("prep.autoFallbackOff")}</span>
                       )}
                     </span>
                   </div>
@@ -292,7 +291,7 @@ export function Step3PrepareScreen() {
                 onClick={() => goTo("options")}
                 className="text-xs font-semibold text-brand hover:underline cursor-pointer"
               >
-                Change Train
+                {t("prep.changeTrain")}
               </button>
             </div>
           </div>
@@ -303,10 +302,10 @@ export function Step3PrepareScreen() {
               <div>
                 <h3 className="text-base font-bold text-ink flex items-center gap-2">
                   <UserCheck className="h-4 w-4 text-brand" />
-                  Master Passenger List
+                  {t("prep.masterPassengerList")}
                 </h3>
                 <p className="text-xs text-ink-soft">
-                  Stored securely in your local Aadhaar-linked vault
+                  {t("prep.vaultStorageSub")}
                 </p>
               </div>
               <span className={cn(
@@ -332,7 +331,7 @@ export function Step3PrepareScreen() {
                 <div className="flex-1 space-y-1">
                   <div>
                     <span className="text-[0.68rem] font-bold uppercase tracking-wider text-ink-soft">
-                      What User Said (Canonical Audio Input):
+                      {t("prep.whatUserSaid")}
                     </span>
                     <p className="font-medium text-ink italic mt-0.5">
                       “{plan?.intent.restated || "Book ticket"}”
@@ -340,7 +339,7 @@ export function Step3PrepareScreen() {
                   </div>
                   <div className="border-t border-brand/10 pt-1.5 flex flex-wrap items-center gap-x-2.5 gap-y-1 text-[0.72rem]">
                     <span className="font-bold text-brand uppercase tracking-wider">
-                      What Copilot Understood:
+                      {t("prep.whatCopilotUnderstood")}
                     </span>
                     <span className="text-ink font-semibold">
                       {targetPaxCount ? `${targetPaxCount} Passenger${targetPaxCount > 1 ? "s" : ""}` : "Passenger count pending"}
@@ -363,13 +362,13 @@ export function Step3PrepareScreen() {
                     key={passenger.id}
                     onClick={() => handleTogglePassenger(passenger.id)}
                     className={cn(
-                      "group flex items-center justify-between gap-3 rounded-xl border p-3.5 transition cursor-pointer select-none",
+                      "flex items-center justify-between p-3.5 rounded-xl border transition cursor-pointer select-none",
                       isSelected
                         ? "border-brand bg-brand-soft/20 shadow-xs"
-                        : "border-line bg-surface hover:border-line-strong hover:bg-surface-muted/30"
+                        : "border-line bg-surface hover:bg-surface-muted/40"
                     )}
                   >
-                    <div className="flex items-center gap-3.5">
+                    <div className="flex items-center gap-3">
                       <div
                         className={cn(
                           "h-5 w-5 rounded-md border flex items-center justify-center transition",
@@ -380,23 +379,22 @@ export function Step3PrepareScreen() {
                       >
                         {isSelected && <Check className="h-3.5 w-3.5" strokeWidth={3} />}
                       </div>
-
                       <div>
                         <div className="flex items-center gap-2">
                           <span className="text-sm font-bold text-ink">
                             {passenger.name}
                           </span>
                           {passenger.verified && (
-                            <span className="inline-flex items-center gap-1 rounded bg-confirm-soft px-1.5 py-0.2 text-[0.65rem] font-bold text-confirm">
-                              <ShieldCheck className="h-3 w-3" />
-                              Aadhaar Verified
+                            <span className="inline-flex items-center gap-0.5 rounded-md bg-confirm-soft px-1.5 py-0.2 text-[0.65rem] font-bold text-confirm">
+                              <CheckCircle2 className="h-2.5 w-2.5" />
+                              {t("prep.aadhaarVerified")}
                             </span>
                           )}
                         </div>
-                        <div className="flex items-center gap-2 text-xs text-ink-soft mt-0.5">
-                          <span>
-                            {passenger.age} yrs · {passenger.gender}
-                          </span>
+                        <div className="flex items-center gap-2 text-xs text-ink-soft">
+                          <span>{passenger.age} yrs</span>
+                          <span>·</span>
+                          <span>{passenger.gender}</span>
                           <span>·</span>
                           <span>{passenger.berth}</span>
                           <span>·</span>
@@ -415,7 +413,7 @@ export function Step3PrepareScreen() {
                           : "bg-surface-muted text-ink-faint"
                       )}
                     >
-                      {isSelected ? "Selected" : "Available"}
+                      {isSelected ? "Selected" : t("prep.available")}
                     </span>
                   </div>
                 );
@@ -598,14 +596,14 @@ export function Step3PrepareScreen() {
               <div className="flex items-center justify-between">
                 <h3 className="text-base font-bold text-ink flex items-center gap-2">
                   <ShieldCheck className="h-4 w-4 text-brand" />
-                  Booking Execution Strategy
+                  {t("prep.bookingExecutionStrategy")}
                 </h3>
                 <span className="text-xs font-bold text-brand uppercase tracking-wide">
-                  Choose Mode
+                  {t("prep.chooseMode")}
                 </span>
               </div>
               <p className="text-xs text-ink-soft mt-0.5">
-                Choose how tomorrow at 10:00 AM Tatkal window should play out.
+                {t("prep.strategySub")}
               </p>
             </div>
 
@@ -634,23 +632,23 @@ export function Step3PrepareScreen() {
                     </span>
                     <div>
                       <div className="flex items-center gap-1.5">
-                        <span className="font-bold text-sm text-ink">Assisted</span>
+                        <span className="font-bold text-sm text-ink">{t("mc.modeAssisted")}</span>
                         {mode === "assisted" && (
                           <Check className="h-3.5 w-3.5 text-brand" strokeWidth={3} />
                         )}
                       </div>
                       <p className="text-[0.7rem] font-semibold text-brand">
-                        Keep me in control
+                        {t("mc.keepControl")}
                       </p>
                     </div>
                   </div>
                   <span className="rounded-full bg-surface-muted px-2 py-0.5 text-[0.65rem] font-bold text-ink-soft">
-                    Manual Confirm
+                    {t("prep.manualConfirm")}
                   </span>
                 </div>
 
                 <p className="text-xs text-ink-soft leading-relaxed">
-                  Copilot prepares your booking payload, monitors quota exhaustion speeds, and asks for your 1-tap confirmation before executing.
+                  {t("prep.assistedModeDesc")}
                 </p>
 
                 <div className="space-y-1.5 rounded-lg border border-line/60 bg-surface/80 p-2.5 text-[0.72rem]">
@@ -704,23 +702,23 @@ export function Step3PrepareScreen() {
                     </span>
                     <div>
                       <div className="flex items-center gap-1.5">
-                        <span className="font-bold text-sm text-ink">Permissioned</span>
+                        <span className="font-bold text-sm text-ink">{t("mc.modePermissioned")}</span>
                         {mode === "auto" && (
                           <Check className="h-3.5 w-3.5 text-brand" strokeWidth={3} />
                         )}
                       </div>
                       <p className="text-[0.7rem] font-semibold text-brand">
-                        Let Copilot act autonomously
+                        {t("prep.letCopilotActAutonomously")}
                       </p>
                     </div>
                   </div>
                   <span className="rounded-full bg-confirm-soft px-2 py-0.5 text-[0.65rem] font-bold text-confirm">
-                    PRO / AUTONOMOUS
+                    {t("prep.proAutonomous")}
                   </span>
                 </div>
 
                 <p className="text-xs text-ink-soft leading-relaxed">
-                  Copilot prepares the booking payload for 10:00:00 AM, automatically triggering failover if primary berths fill up.
+                  {t("prep.permissionedModeDesc")}
                 </p>
 
                 <div className="space-y-1.5 rounded-lg border border-line/60 bg-surface/80 p-2.5 text-[0.72rem]">
@@ -823,7 +821,7 @@ export function Step3PrepareScreen() {
               className="w-full sm:w-auto inline-flex items-center justify-center gap-2 rounded-xl border border-line bg-surface px-5 py-3 text-sm font-bold text-ink hover:bg-surface-muted transition cursor-pointer shadow-xs"
             >
               <ArrowLeft className="h-4 w-4" />
-              Back to Train Options
+              {t("prep.backToOptions")}
             </button>
 
             <button
@@ -885,7 +883,7 @@ export function Step3PrepareScreen() {
               }
               className="w-full sm:w-auto inline-flex items-center justify-center gap-2 rounded-xl bg-confirm hover:bg-confirm/90 text-white px-7 py-3 text-sm font-bold shadow-md shadow-confirm/20 transition cursor-pointer disabled:opacity-50"
             >
-              <span>Confirm Journey & Arm Tatkal Assistant</span>
+              <span>{t("prep.confirmCta")}</span>
               <ArrowRight className="h-4 w-4" />
             </button>
           </div>
@@ -937,9 +935,7 @@ export function Step3PrepareScreen() {
             {/* Speech Bubble */}
             <div className="relative rounded-xl bg-surface-muted/60 p-4 text-xs text-ink leading-relaxed border border-line/70">
               <p>
-                “{speechBubbleNames} ka Aadhaar verification match ho gaya hai.
-                IRCTC session tokens warm hain. Mode: <strong>{mode === "auto" ? "Permissioned (Autonomous)" : "Assisted"}</strong>.
-                10 baje main second ke dasve hisse (100ms) mein payload execute karunga.”
+                “{t("prep.aaravSpeech")}”
               </p>
               <div className="mt-3 flex items-center justify-between text-[0.7rem] text-ink-soft border-t border-line/60 pt-2 font-mono">
                 <span>Lock Token: IRCTC-SYNC-9842</span>

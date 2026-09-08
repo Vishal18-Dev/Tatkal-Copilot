@@ -238,69 +238,69 @@ export function CopilotWorkspace({
     if (state === "error" || errorKind) {
       return {
         status: "error" as const,
-        label: "Couldn't hear that. Try again.",
+        label: t("errors.somethingWentWrong"),
         dotColor: "bg-danger",
       };
     }
     if (listening) {
       return {
         status: "listening" as const,
-        label: "Listening…",
+        label: t("agent.listening"),
         dotColor: "bg-danger animate-ping",
       };
     }
     if (state === "transcribing") {
       return {
         status: "transcribing" as const,
-        label: "Transcribing…",
+        label: t("agent.thinking"),
         dotColor: "bg-brand animate-pulse",
       };
     }
     if (busy) {
       return {
         status: "thinking" as const,
-        label: "Aarav is thinking…",
+        label: t("agent.thinking"),
         dotColor: "bg-brand animate-pulse",
       };
     }
     if (speaking) {
       return {
         status: "speaking" as const,
-        label: "Aarav is speaking…",
+        label: t("agent.speaking"),
         dotColor: "bg-confirm animate-pulse",
       };
     }
     return {
       status: "idle" as const,
-      label: "Type or speak to Aarav",
+      label: t("agent.talkToCopilot"),
       dotColor: "bg-confirm",
     };
-  }, [state, errorKind, listening, busy, speaking]);
+  }, [state, errorKind, listening, busy, speaking, t]);
 
   const placeholderText = useMemo(() => {
-    if (listening) return "Listening…";
-    if (turns.length === 0) return "Tell me where you're going…";
-    return "Ask Aarav anything about your journey…";
-  }, [listening, turns.length]);
+    if (listening) return t("workspace.listeningPlaceholder");
+    if (turns.length === 0) return t("workspace.placeholder");
+    return t("copilot.askPlaceholder");
+  }, [listening, turns.length, t]);
 
   const lastAgentTurn = turns.filter((t) => t.role === "agent").slice(-1)[0];
   const agentSpeech =
     result?.responseText ||
     lastAgentTurn?.text ||
     (listening
-      ? "Sun raha hoon... Aap aaram se boliye!"
+      ? t("workspace.listeningPlaceholder")
       : busy
-      ? "IRCTC live quota aur trains check kar raha hoon..."
-      : "Namaste! Main aapka Tatkal Copilot hoon.");
+      ? t("agent.thinking")
+      : t("workspace.personaSub"));
 
   const agentSubtext =
     listening
-      ? "Taking note of stations, date, and quota preferences..."
+      ? t("workspace.locoReady")
       : busy
-      ? "Synchronizing schedule with railway booking window..."
+      ? t("workspace.atomicClockSynced")
       : result
-      ? "Verified direct trains and Tatkal readiness ready for review."
-      : "Batayein kahan jaana hai — Tatkal quota, countdown aur failover booking main sambhal lunga.";
+      ? t("workspace.sectorReadiness")
+      : t("workspace.sub");
 
   return (
     <div className={cn("mx-auto max-w-5xl space-y-8", className)}>
@@ -309,9 +309,9 @@ export function CopilotWorkspace({
         <div className="flex items-center gap-2 font-semibold tracking-wide text-brand">
           <span className="inline-flex items-center gap-1.5 rounded-full bg-brand-soft px-3 py-1 text-[0.72rem] font-bold text-brand">
             <span>🇮🇳</span>
-            <span>TATKAL BOOKING, AB ASAAN</span>
+            <span>{t("brand")}</span>
             <span className="text-ink-faint">·</span>
-            <span className="text-brand font-medium">Bolkar ya Likhkar</span>
+            <span className="text-brand font-medium">{t("workspace.ingressActive")}</span>
           </span>
         </div>
 
@@ -327,17 +327,13 @@ export function CopilotWorkspace({
           <div className="space-y-2">
             <div className="inline-flex items-center gap-1.5 rounded-full bg-[#FF6A00]/10 px-2.5 py-0.5 text-[0.72rem] font-bold text-[#FF6A00]">
               <Sparkles className="h-3 w-3" />
-              <span>Tatkal Copilot</span>
+              <span>{t("agent.copilot")}</span>
             </div>
             <h1 className="text-2xl font-extrabold tracking-tight text-brand-ink sm:text-3xl lg:text-[2.1rem] leading-[1.2]">
-              Train journey plan kijiye, ab apni{" "}
-              <span className="bg-gradient-to-r from-[#FF6A00] via-[#FF8A00] to-[#FFA040] bg-clip-text text-transparent">
-                bhasha mein
-              </span>
-              .
+              {t("workspace.title")}
             </h1>
             <p className="text-xs sm:text-sm text-ink-soft leading-relaxed">
-              Tatkal Copilot is your proactive railway assistant. Just speak or write like family — I'll check live quotas, monitor the Tatkal window, and secure your tickets with zero morning rush panic.
+              {t("workspace.sub")}
             </p>
           </div>
 
@@ -403,7 +399,7 @@ export function CopilotWorkspace({
                       handleFormSubmit();
                     }
                   }}
-                  aria-label="Ask Aarav anything about your journey"
+                  aria-label={t("copilot.askPlaceholder")}
                   placeholder={placeholderText}
                   className="w-full resize-none bg-transparent px-2.5 py-1.5 text-sm sm:text-base text-ink placeholder:text-ink-faint focus:outline-none leading-relaxed"
                 />
@@ -412,7 +408,7 @@ export function CopilotWorkspace({
                 <button
                   type="button"
                   onClick={handleMicPress}
-                  aria-label={listening ? "Stop listening" : "Start speaking"}
+                  aria-label={listening ? t("workspace.tapToStop") : t("copilot.speak")}
                   className={cn(
                     "relative h-10 w-10 shrink-0 rounded-full flex items-center justify-center text-white shadow-xs transition-all active:scale-95",
                     listening
@@ -435,7 +431,7 @@ export function CopilotWorkspace({
                 <button
                   type="submit"
                   disabled={!composerText.trim() || busy}
-                  aria-label="Send message"
+                  aria-label={t("copilot.send")}
                   className="h-10 w-10 shrink-0 rounded-full flex items-center justify-center bg-brand text-white shadow-xs transition-all hover:bg-brand-strong disabled:opacity-30 disabled:cursor-not-allowed active:scale-95"
                 >
                   <ArrowUp className="h-4 w-4" />
@@ -463,7 +459,7 @@ export function CopilotWorkspace({
                     )}
                   >
                     <Sparkles className="h-3.5 w-3.5 text-brand" />
-                    <span>{listening ? "Sun raha hoon..." : "Bolkar bataiye"}</span>
+                    <span>{listening ? t("workspace.listeningPlaceholder") : t("copilot.speak")}</span>
                   </button>
                 </div>
               </div>
@@ -473,14 +469,14 @@ export function CopilotWorkspace({
           {/* Try Asking Suggestions */}
           <div className="space-y-1.5 pt-1">
             <div className="text-[0.68rem] font-bold uppercase tracking-wider text-ink-faint">
-              TRY ASKING:
+              {t("workspace.tryAsking")}
             </div>
             <div className="flex flex-wrap gap-2">
               {[
-                "Mumbai to Delhi kal subah",
-                "Delhi to Varanasi 3A kal shaam",
-                "Bengaluru to Chennai early morning",
-                "Seniors ke saath travel",
+                t("workspace.sampleQuery1"),
+                t("workspace.sampleQuery2"),
+                t("workspace.sampleQuery3"),
+                t("workspace.sampleQuery4"),
               ].map((q) => (
                 <button
                   key={q}
@@ -497,7 +493,7 @@ export function CopilotWorkspace({
             </div>
             <div className="pt-1 text-[0.72rem] text-ink-faint flex items-center gap-1.5">
               <span className="h-1.5 w-1.5 rounded-full bg-confirm" />
-              <span>Nishulk · Zero typing needed · Har Indian language mein bol sakte hain</span>
+              <span>{t("workspace.ephemeralSession")}</span>
             </div>
           </div>
         </div>
@@ -538,7 +534,13 @@ export function CopilotWorkspace({
                   )}
                 />
                 <span>
-                  {listening ? "Aarav is listening..." : speaking ? "Aarav is speaking..." : busy ? "Aarav is analyzing..." : "LIVE COPILOT"}
+                  {listening
+                    ? t("agent.listening")
+                    : speaking
+                    ? t("agent.speaking")
+                    : busy
+                    ? t("agent.thinking")
+                    : t("agent.activeReady")}
                 </span>
               </span>
             </div>
@@ -548,21 +550,21 @@ export function CopilotWorkspace({
               <div className="flex items-center justify-center gap-2">
                 <span className="text-base font-extrabold text-brand-ink">Aarav</span>
                 <span className="rounded-full bg-[#FF6A00]/10 px-2 py-0.5 text-[0.65rem] font-extrabold uppercase tracking-wider text-[#FF6A00]">
-                  TATKAL COPILOT
+                  {t("agent.copilot").toUpperCase()}
                 </span>
               </div>
               <p className="text-[0.72rem] text-ink-soft">
-                Live Railway Search Active · Hinglish, Hindi, English
+                {t("workspace.corridorStatus")}
               </p>
             </div>
 
             {/* Capability Pills */}
             <div className="flex flex-wrap items-center justify-center gap-2 pt-1">
               <span className="inline-flex items-center gap-1 rounded-full bg-surface-muted border border-line px-3 py-1 text-[0.7rem] font-medium text-ink">
-                ⚡ Fast Track Tatkal
+                ⚡ {t("workspace.zeroPanicRouting")}
               </span>
               <span className="inline-flex items-center gap-1 rounded-full bg-surface-muted border border-line px-3 py-1 text-[0.7rem] font-medium text-ink">
-                🛡️ Biometric Gated
+                🛡️ {t("workspace.biometricGated")}
               </span>
             </div>
           </div>
@@ -576,7 +578,7 @@ export function CopilotWorkspace({
           onClick={() => setShowManual((s) => !s)}
           className="inline-flex items-center gap-1.5 text-xs font-semibold text-ink-soft hover:text-brand transition-colors"
         >
-          <span>🔀 Or use manual station codes, quotas & dates</span>
+          <span>🔀 {t("goal.or")}</span>
         </button>
       </div>
 
@@ -589,7 +591,7 @@ export function CopilotWorkspace({
         >
           <div className="grid gap-3 sm:grid-cols-4">
             <div>
-              <label className="text-[0.72rem] font-semibold text-ink-soft">From Station</label>
+              <label className="text-[0.72rem] font-semibold text-ink-soft">{t("plan.form.origin")}</label>
               <input
                 type="text"
                 placeholder="e.g. MMCT / Mumbai"
@@ -599,7 +601,7 @@ export function CopilotWorkspace({
               />
             </div>
             <div>
-              <label className="text-[0.72rem] font-semibold text-ink-soft">To Station</label>
+              <label className="text-[0.72rem] font-semibold text-ink-soft">{t("plan.form.destination")}</label>
               <input
                 type="text"
                 placeholder="e.g. NDLS / Delhi"
@@ -609,7 +611,7 @@ export function CopilotWorkspace({
               />
             </div>
             <div>
-              <label className="text-[0.72rem] font-semibold text-ink-soft">Class</label>
+              <label className="text-[0.72rem] font-semibold text-ink-soft">{t("plan.form.class")}</label>
               <select
                 defaultValue={travelClass || "3A"}
                 className="mt-1 w-full rounded-lg border border-line bg-surface-muted px-3 py-1.5 text-xs text-ink focus:outline-none focus:border-brand"
@@ -626,7 +628,7 @@ export function CopilotWorkspace({
                 onClick={handleFormSubmit}
                 className="w-full rounded-lg bg-brand px-3 py-1.5 text-xs font-semibold text-white hover:bg-brand-strong"
               >
-                Search Trains
+                {t("plan.form.cta")}
               </button>
             </div>
           </div>

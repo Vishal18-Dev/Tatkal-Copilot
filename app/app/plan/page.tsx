@@ -14,18 +14,8 @@ import { Step2OptionsScreen } from "@/features/booking-flow/step2-options-screen
 import { Step3PrepareScreen } from "@/features/booking-flow/step3-prepare-screen";
 import { Check } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useLang } from "@/lib/i18n";
 import type { Plan } from "@/types";
-
-const STAGES: {
-  step: "plan" | "options" | "prepare";
-  num: string;
-  label: string;
-  sub: string;
-}[] = [
-  { step: "plan", num: "01", label: "1. Plan", sub: "Intent & Constraints" },
-  { step: "options", num: "02", label: "2. Options", sub: "Primary & Failover" },
-  { step: "prepare", num: "03", label: "3. Prepare", sub: "Passengers & Strategy" },
-];
 
 function PlanStage({
   initialGoal,
@@ -35,7 +25,19 @@ function PlanStage({
   fromVoice?: boolean;
 }) {
   const router = useRouter();
+  const { t } = useLang();
   const { step, submitGoal, plan, goTo, setPlan, chooseOption } = useJourney();
+
+  const STAGES: {
+    step: "plan" | "options" | "prepare";
+    num: string;
+    label: string;
+    sub: string;
+  }[] = [
+    { step: "plan", num: "01", label: t("stage.plan"), sub: t("stage.planSub") },
+    { step: "options", num: "02", label: t("stage.options"), sub: t("stage.optionsSub") },
+    { step: "prepare", num: "03", label: t("stage.prepare"), sub: t("stage.prepareSub") },
+  ];
   const restoredRef = useRef(false);
 
   useEffect(() => {

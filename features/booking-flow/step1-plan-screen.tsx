@@ -69,7 +69,7 @@ export function Step1PlanScreen() {
       <div className="flex flex-wrap items-center justify-between gap-3 text-xs font-semibold">
         <div className="inline-flex items-center gap-2 rounded-full bg-emerald-500/10 px-3.5 py-1 text-emerald-600 dark:text-emerald-400">
           <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
-          <span>STEP 01 OF 05 · INTENT & CONTEXT CAPTURED · VOICE DECODED</span>
+          <span>{t("step1.badge")}</span>
         </div>
 
         <div className="flex items-center gap-3 font-mono text-[0.75rem] text-ink-soft">
@@ -79,7 +79,7 @@ export function Step1PlanScreen() {
           </span>
           <span>·</span>
           <span className="text-emerald-600 dark:text-emerald-400 font-semibold">
-            IRCTC CORRIDOR READY
+            {t("workspace.locoReady")}
           </span>
         </div>
       </div>
@@ -87,14 +87,10 @@ export function Step1PlanScreen() {
       {/* Main Headline */}
       <div>
         <h1 className="text-2xl font-extrabold tracking-tight text-brand-ink sm:text-3xl lg:text-[2.2rem] leading-tight">
-          “Bilkul, Samajh gaya!{" "}
-          <span className="text-brand">
-            {fromName} se {toName} kal subah.
-          </span>
-          ”
+          “{t("step1.headline", { origin: fromName, destination: toName })}”
         </h1>
         <p className="mt-1.5 text-sm sm:text-base text-ink-soft">
-          Context successfully extracted from voice audio. Review your mission brief below before proceeding to coach selection.
+          {t("step1.subheadline")}
         </p>
       </div>
 
@@ -110,14 +106,14 @@ export function Step1PlanScreen() {
                   <Radio className="h-3.5 w-3.5" />
                 </span>
                 <span className="text-[0.72rem] uppercase tracking-wider font-bold text-ink-faint">
-                  SPOKEN INPUT STREAM
+                  {t("step1.spokenStream")}
                 </span>
                 <span>·</span>
-                <span className="text-ink">Hindi · English Hinglish Voice Model v4.2</span>
+                <span className="text-ink">Sarvam AI · Indic Voice Model</span>
               </div>
               <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/10 px-2.5 py-0.5 text-[0.7rem] font-bold text-emerald-600 dark:text-emerald-400">
                 <CheckCircle2 className="h-3 w-3" />
-                Voice input verified
+                {t("step1.voiceVerified")}
               </span>
             </div>
 
@@ -129,7 +125,7 @@ export function Step1PlanScreen() {
           {/* Extracted Journey Parameters Grid */}
           <div className="space-y-2.5">
             <div className="text-[0.72rem] font-bold uppercase tracking-wider text-ink-faint">
-              EXTRACTED JOURNEY PARAMETERS
+              {t("step1.extractedParams")}
             </div>
 
             <div className="grid gap-3 sm:grid-cols-2">
@@ -137,7 +133,7 @@ export function Step1PlanScreen() {
               <div className="rounded-xl border border-line bg-surface p-3.5 shadow-sm space-y-1">
                 <div className="flex items-center gap-1.5 text-[0.7rem] font-bold uppercase tracking-wider text-ink-faint">
                   <span className="h-2 w-2 rounded-full border border-brand bg-white" />
-                  <span>ORIGIN STATION</span>
+                  <span>{t("step1.originStation")}</span>
                 </div>
                 <div className="text-base font-bold text-brand-ink">{fromName}</div>
                 <div className="font-mono text-xs text-ink-soft">
@@ -149,7 +145,7 @@ export function Step1PlanScreen() {
               <div className="rounded-xl border border-line bg-surface p-3.5 shadow-sm space-y-1">
                 <div className="flex items-center gap-1.5 text-[0.7rem] font-bold uppercase tracking-wider text-ink-faint">
                   <span className="h-2 w-2 rounded-full bg-danger" />
-                  <span>DESTINATION STATION</span>
+                  <span>{t("step1.destStation")}</span>
                 </div>
                 <div className="text-base font-bold text-brand-ink">{toName}</div>
                 <div className="font-mono text-xs text-ink-soft">
@@ -161,11 +157,11 @@ export function Step1PlanScreen() {
               <div className="rounded-xl border border-line bg-surface p-3.5 shadow-sm space-y-1">
                 <div className="flex items-center gap-1.5 text-[0.7rem] font-bold uppercase tracking-wider text-ink-faint">
                   <Clock className="h-3 w-3 text-ink-faint" />
-                  <span>DEPARTURE DATE</span>
+                  <span>{t("step1.dateOfTravel")}</span>
                 </div>
                 <div className="text-base font-bold text-brand-ink">{dateVal}</div>
                 <div className="text-xs text-emerald-600 dark:text-emerald-400 font-medium">
-                  AC Tatkal Opens Today 10:00 AM
+                  {t("mc.slotAcTatkal")}
                 </div>
               </div>
 
@@ -173,7 +169,7 @@ export function Step1PlanScreen() {
               <div className="rounded-xl border border-line bg-surface p-3.5 shadow-sm space-y-1">
                 <div className="flex items-center gap-1.5 text-[0.7rem] font-bold uppercase tracking-wider text-ink-faint">
                   <Train className="h-3 w-3 text-ink-faint" />
-                  <span>PASSENGERS</span>
+                  <span>{t("nav.travellers")}</span>
                 </div>
                 <div className="text-base font-bold text-brand-ink">
                   {passengers !== undefined ? `${passengers} Adult${passengers > 1 ? "s" : ""}` : "Required"}
@@ -197,7 +193,7 @@ export function Step1PlanScreen() {
               <div className="rounded-xl border border-line bg-surface p-3.5 shadow-sm space-y-1">
                 <div className="flex items-center gap-1.5 text-[0.7rem] font-bold uppercase tracking-wider text-ink-faint">
                   <ShieldCheck className="h-3 w-3 text-ink-faint" />
-                  <span>PREFERRED CLASSES</span>
+                  <span>{t("step1.travelClass")}</span>
                 </div>
                 <div className="flex items-center gap-2 pt-0.5">
                   <button
@@ -259,7 +255,7 @@ export function Step1PlanScreen() {
                 className="inline-flex items-center gap-1.5 rounded-full border border-line bg-surface px-4 py-2 text-xs font-semibold text-ink transition-colors hover:bg-surface-muted"
               >
                 <Mic className="h-3.5 w-3.5 text-brand" />
-                <span>Bolkar Sudhaarein</span>
+                <span>{t("copilot.speak")}</span>
               </button>
 
               <button
@@ -267,7 +263,7 @@ export function Step1PlanScreen() {
                 onClick={() => goTo("options")}
                 className="inline-flex items-center gap-2 rounded-full bg-brand px-5 py-2 text-xs font-bold text-white shadow-xs transition-all hover:bg-brand-strong cursor-pointer"
               >
-                <span>Proceed to Train Strategy</span>
+                <span>{t("step1.cta")}</span>
                 <ArrowRight className="h-3.5 w-3.5" />
               </button>
             </div>
