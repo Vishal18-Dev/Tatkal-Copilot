@@ -224,12 +224,12 @@ function AccountMenu({
       <AnimatePresence>
         {open && (
           <>
-            {/* Click-away layer */}
+            {/* Click-away layer — transparent, no full-screen dimming or blur */}
             <button
               aria-hidden="true"
               tabIndex={-1}
               onClick={() => setOpen(false)}
-              className="fixed inset-0 z-40 cursor-default bg-black/10 backdrop-blur-[2px]"
+              className="fixed inset-0 z-40 cursor-default bg-transparent"
             />
             <motion.div
               role="menu"
@@ -237,7 +237,7 @@ function AccountMenu({
               animate={{ opacity: 1, y: 0, scale: 1 }}
               exit={{ opacity: 0, y: 6, scale: 0.98 }}
               transition={{ duration: 0.18, ease: [0.16, 1, 0.3, 1] }}
-              className="absolute right-0 top-full z-50 mt-2 w-56 overflow-hidden rounded-[var(--radius-lg)] border border-line/70 glass-panel py-1.5 shadow-[var(--shadow-lift)]"
+              className="absolute right-0 top-full z-50 mt-2 w-56 overflow-hidden rounded-[var(--radius-lg)] border border-line-strong bg-surface py-1.5 shadow-[var(--shadow-lift)]"
             >
               {name && (
                 <div className="truncate px-3.5 pb-1.5 pt-1 text-xs text-ink-faint">{name}</div>
@@ -310,18 +310,19 @@ function NotificationsButton({
       <AnimatePresence>
         {open && (
           <>
+            {/* Click-away layer — transparent, no full-screen dimming or blur */}
             <button
               aria-hidden="true"
               tabIndex={-1}
               onClick={() => setOpen(false)}
-              className="fixed inset-0 z-40 cursor-default bg-black/10 backdrop-blur-[2px]"
+              className="fixed inset-0 z-40 cursor-default bg-transparent"
             />
             <motion.div
               initial={{ opacity: 0, y: 6, scale: 0.98 }}
               animate={{ opacity: 1, y: 0, scale: 1 }}
               exit={{ opacity: 0, y: 6, scale: 0.98 }}
               transition={{ duration: 0.18, ease: [0.16, 1, 0.3, 1] }}
-              className="absolute right-0 top-full z-50 mt-2 w-80 overflow-hidden rounded-[var(--radius-lg)] border border-line/70 glass-panel shadow-[var(--shadow-lift)]"
+              className="absolute right-0 top-full z-50 mt-2 w-80 overflow-hidden rounded-[var(--radius-lg)] border border-line-strong bg-surface shadow-[var(--shadow-lift)]"
             >
               <div className="border-b border-line/60 px-4 py-2.5 text-sm font-semibold text-ink">
                 {t("shell.notifications")}
