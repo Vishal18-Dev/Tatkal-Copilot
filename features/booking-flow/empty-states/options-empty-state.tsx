@@ -18,6 +18,7 @@ import {
   Layers,
 } from "lucide-react";
 import { useJourney } from "@/lib/journey";
+import { useLang } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 
 interface OptionsEmptyStateProps {
@@ -26,6 +27,7 @@ interface OptionsEmptyStateProps {
 
 export function OptionsEmptyState({ onSpeak }: OptionsEmptyStateProps) {
   const { goTo, submitGoal } = useJourney();
+  const { t } = useLang();
   const [origin, setOrigin] = useState("NDLS — New Delhi");
   const [destination, setDestination] = useState("BBS — Bhubaneswar");
   const [schedule, setSchedule] = useState("Tomorrow 10:00 AM (AC Tatkal)");
@@ -80,16 +82,16 @@ export function OptionsEmptyState({ onSpeak }: OptionsEmptyStateProps) {
       <div className="flex flex-wrap items-center justify-between gap-3 text-xs font-semibold">
         <div className="flex items-center gap-2 rounded-full border border-line dark:border-slate-800 bg-surface dark:bg-slate-900/90 px-3.5 py-1 text-ink-soft dark:text-slate-300">
           <span className="h-2 w-2 rounded-full bg-amber-500 animate-pulse" />
-          <span>Strategy Configuration Phase</span>
+          <span>{t("optionsEmpty.configPhase")}</span>
           <span>·</span>
           <span className="text-ink dark:text-white font-bold">
-            Active Quota: Tatkal (Next Window 10:00 AM)
+            {t("optionsEmpty.activeQuota")}
           </span>
         </div>
 
         <div className="inline-flex items-center gap-1.5 text-emerald-600 dark:text-emerald-400 font-semibold text-xs">
           <Zap className="h-3.5 w-3.5" />
-          <span>Dual-Route Failover Engine Ready</span>
+          <span>{t("optionsEmpty.dualEngineReady")}</span>
         </div>
       </div>
 
@@ -113,14 +115,13 @@ export function OptionsEmptyState({ onSpeak }: OptionsEmptyStateProps) {
 
             <div className="space-y-2">
               <span className="inline-flex items-center gap-1 rounded bg-brand-soft dark:bg-slate-800 px-2 py-0.5 text-[0.68rem] font-bold text-brand dark:text-emerald-400 uppercase tracking-wider">
-                COPILOT ASSISTANT
+                {t("optionsEmpty.copilotAssistant")}
               </span>
               <p className="text-xs text-ink-soft dark:text-slate-300 italic leading-relaxed">
-                “Abhi tak koi journey select nahi hui hai. Pehle Plan tab se
-                train search kijiye ya neeche diye gaye popular routes dekhiye!”
+                {t("optionsEmpty.aaravAdvice")}
               </p>
               <div className="text-[0.7rem] text-ink-faint dark:text-slate-500 font-medium">
-                Available in Hindi, Hinglish & English
+                {t("optionsEmpty.multilingualNote")}
               </div>
             </div>
           </div>
@@ -130,15 +131,13 @@ export function OptionsEmptyState({ onSpeak }: OptionsEmptyStateProps) {
             <div className="space-y-2">
               <div className="flex items-center gap-2 text-xs font-bold text-amber-600 dark:text-amber-400 tracking-wider uppercase">
                 <Hourglass className="h-3.5 w-3.5 animate-pulse" />
-                <span>WAITING FOR JOURNEY QUERY</span>
+                <span>{t("optionsEmpty.waitingQuery")}</span>
               </div>
               <h2 className="text-2xl sm:text-3xl font-black text-ink dark:text-white font-[family-name:var(--font-outfit)]">
-                No trains selected yet.
+                {t("optionsEmpty.noTrains")}
               </h2>
               <p className="text-xs sm:text-sm text-ink-soft dark:text-slate-400 leading-relaxed max-w-xl">
-                Search a route or speak to your Copilot to view recommended
-                trains, historical Tatkal seat exhaustion buffers, and automated
-                failover pairings.
+                {t("optionsEmpty.noTrainsSub")}
               </p>
             </div>
 
@@ -152,7 +151,7 @@ export function OptionsEmptyState({ onSpeak }: OptionsEmptyStateProps) {
                 className="inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white px-5 py-3 text-xs font-bold shadow-md shadow-amber-500/20 transition cursor-pointer"
               >
                 <Mic className="h-4 w-4" />
-                <span>Speak Your Journey to Copilot</span>
+                <span>{t("optionsEmpty.speakJourney")}</span>
               </button>
 
               <button
@@ -161,7 +160,7 @@ export function OptionsEmptyState({ onSpeak }: OptionsEmptyStateProps) {
                 className="inline-flex items-center justify-center gap-2 rounded-xl border border-line dark:border-slate-700 bg-surface-muted/50 dark:bg-slate-800 px-5 py-3 text-xs font-bold text-ink dark:text-slate-200 hover:bg-surface-muted dark:hover:bg-slate-700 transition cursor-pointer"
               >
                 <Globe className="h-4 w-4 text-brand dark:text-emerald-400" />
-                <span>Plan Custom Journey</span>
+                <span>{t("optionsEmpty.planCustom")}</span>
                 <ArrowRight className="h-3.5 w-3.5" />
               </button>
             </div>
@@ -175,7 +174,7 @@ export function OptionsEmptyState({ onSpeak }: OptionsEmptyStateProps) {
           {/* Origin */}
           <div className="sm:col-span-4 space-y-1">
             <span className="text-[0.68rem] font-bold text-ink-faint dark:text-slate-400 uppercase tracking-wider pl-1">
-              Origin Station / City
+              {t("optionsEmpty.originLabel")}
             </span>
             <input
               type="text"
@@ -200,7 +199,7 @@ export function OptionsEmptyState({ onSpeak }: OptionsEmptyStateProps) {
           {/* Destination */}
           <div className="sm:col-span-4 space-y-1">
             <span className="text-[0.68rem] font-bold text-ink-faint dark:text-slate-400 uppercase tracking-wider pl-1">
-              Destination Station / City
+              {t("optionsEmpty.destLabel")}
             </span>
             <input
               type="text"
@@ -213,7 +212,7 @@ export function OptionsEmptyState({ onSpeak }: OptionsEmptyStateProps) {
           {/* Schedule & Find */}
           <div className="sm:col-span-3 space-y-1">
             <span className="text-[0.68rem] font-bold text-ink-faint dark:text-slate-400 uppercase tracking-wider pl-1">
-              Tatkal Schedule
+              {t("optionsEmpty.scheduleLabel")}
             </span>
             <div className="flex items-center gap-2">
               <button
@@ -222,7 +221,7 @@ export function OptionsEmptyState({ onSpeak }: OptionsEmptyStateProps) {
                 className="w-full inline-flex items-center justify-center gap-1.5 rounded-xl bg-brand dark:bg-blue-600 hover:bg-brand-strong dark:hover:bg-blue-500 text-white px-4 py-2 text-xs font-bold transition shadow-xs cursor-pointer"
               >
                 <Search className="h-3.5 w-3.5" />
-                <span>Find Best Trains</span>
+                <span>{t("optionsEmpty.findTrains")}</span>
               </button>
             </div>
           </div>
@@ -234,15 +233,14 @@ export function OptionsEmptyState({ onSpeak }: OptionsEmptyStateProps) {
         <div className="flex flex-wrap items-end justify-between gap-3">
           <div>
             <span className="text-[0.68rem] font-bold text-brand dark:text-emerald-400 uppercase tracking-wider">
-              ZERO LATENCY BOOKING ARCHITECTURE
+              {t("optionsEmpty.archBadge")}
             </span>
             <h3 className="text-lg sm:text-xl font-bold text-ink dark:text-white">
-              How Options & Failover Pairing Works
+              {t("optionsEmpty.howItWorks")}
             </h3>
           </div>
           <p className="text-xs text-ink-soft dark:text-slate-400 max-w-md text-left sm:text-right leading-relaxed">
-            Tatkal quota vanishes in seconds. Copilot pre-bakes a two-tier
-            execution pipeline into memory before the 10:00:00 AM bell rings.
+            {t("optionsEmpty.howItWorksSub")}
           </p>
         </div>
 
@@ -255,21 +253,19 @@ export function OptionsEmptyState({ onSpeak }: OptionsEmptyStateProps) {
                   1
                 </span>
                 <span className="rounded bg-blue-500/10 dark:bg-blue-950 px-2 py-0.5 text-[0.65rem] font-bold text-blue-600 dark:text-blue-400">
-                  Primary Anchor
+                  {t("optionsEmpty.card1Badge")}
                 </span>
               </div>
               <h4 className="text-sm font-bold text-ink dark:text-white">
-                Primary Recommendation
+                {t("optionsEmpty.card1Title")}
               </h4>
               <p className="text-xs text-ink-soft dark:text-slate-400 leading-relaxed">
-                Algorithms index historical server load and berth velocity to
-                pick the single train with maximum confirmation likelihood
-                under 15 seconds.
+                {t("optionsEmpty.card1Desc")}
               </p>
             </div>
             <div className="pt-3 border-t border-line/60 dark:border-slate-800 flex items-center justify-between text-xs">
               <span className="text-ink-soft dark:text-slate-400 text-[0.7rem]">
-                Historical Success Probability
+                {t("optionsEmpty.card1Metric")}
               </span>
               <span className="font-mono font-bold text-emerald-600 dark:text-emerald-400">
                 94.8%
@@ -285,21 +281,19 @@ export function OptionsEmptyState({ onSpeak }: OptionsEmptyStateProps) {
                   2
                 </span>
                 <span className="rounded bg-amber-500/10 dark:bg-amber-950 px-2 py-0.5 text-[0.65rem] font-bold text-amber-600 dark:text-amber-400">
-                  Sub-Second Switch
+                  {t("optionsEmpty.card2Badge")}
                 </span>
               </div>
               <h4 className="text-sm font-bold text-ink dark:text-white">
-                400ms Dynamic Failover
+                {t("optionsEmpty.card2Title")}
               </h4>
               <p className="text-xs text-ink-soft dark:text-slate-400 leading-relaxed">
-                If your primary train hits &apos;REGRET&apos; or sudden gateway
-                timeout, Copilot reroutes your cached captcha and passenger
-                payload to secondary choice in 400ms.
+                {t("optionsEmpty.card2Desc")}
               </p>
             </div>
             <div className="pt-3 border-t border-line/60 dark:border-slate-800 flex items-center justify-between text-xs">
               <span className="text-ink-soft dark:text-slate-400 text-[0.7rem]">
-                Failover Reroute Latency
+                {t("optionsEmpty.card2Metric")}
               </span>
               <span className="font-mono font-bold text-amber-600 dark:text-amber-400">
                 ~380ms
@@ -315,21 +309,19 @@ export function OptionsEmptyState({ onSpeak }: OptionsEmptyStateProps) {
                   3
                 </span>
                 <span className="rounded bg-emerald-500/10 dark:bg-emerald-950 px-2 py-0.5 text-[0.65rem] font-bold text-emerald-600 dark:text-emerald-400">
-                  Telemetry Buffer
+                  {t("optionsEmpty.card3Badge")}
                 </span>
               </div>
               <h4 className="text-sm font-bold text-ink dark:text-white">
-                Quota Exhaustion Buffer
+                {t("optionsEmpty.card3Title")}
               </h4>
               <p className="text-xs text-ink-soft dark:text-slate-400 leading-relaxed">
-                Visual countdown telemetry predicting exactly how many seconds
-                you have before the Tatkal quota goes to Waiting List for each
-                specific class.
+                {t("optionsEmpty.card3Desc")}
               </p>
             </div>
             <div className="pt-3 border-t border-line/60 dark:border-slate-800 flex items-center justify-between text-xs">
               <span className="text-ink-soft dark:text-slate-400 text-[0.7rem]">
-                Average Window Tolerance
+                {t("optionsEmpty.card3Metric")}
               </span>
               <span className="font-mono font-bold text-ink dark:text-slate-200">
                 3m 45s
@@ -346,16 +338,15 @@ export function OptionsEmptyState({ onSpeak }: OptionsEmptyStateProps) {
             <div className="flex items-center gap-2">
               <TrendingUp className="h-4 w-4 text-emerald-500" />
               <h3 className="text-lg sm:text-xl font-bold text-ink dark:text-white">
-                Popular Tatkal Corridors Ready to Pair
+                {t("optionsEmpty.popularTitle")}
               </h3>
             </div>
             <p className="text-xs sm:text-sm text-ink-soft dark:text-slate-400">
-              Select pre-calibrated options instantly to seed your failover
-              roster without manual route typing.
+              {t("optionsEmpty.popularSub")}
             </p>
           </div>
           <span className="text-[0.7rem] text-ink-faint dark:text-slate-500 font-medium">
-            Telemetry updated 4 mins ago
+            {t("optionsEmpty.telemetryUpdated")}
           </span>
         </div>
 
@@ -394,7 +385,7 @@ export function OptionsEmptyState({ onSpeak }: OptionsEmptyStateProps) {
                 <div className="space-y-1.5 rounded-xl bg-surface-muted/50 dark:bg-slate-800/60 p-3 text-[0.72rem]">
                   <div className="flex items-center justify-between">
                     <span className="text-ink-soft dark:text-slate-400">
-                      Tatkal Quota Berths
+                      {t("optionsEmpty.quotaBerths")}
                     </span>
                     <span className="font-bold text-ink dark:text-slate-200">
                       {c.berths}
@@ -402,7 +393,7 @@ export function OptionsEmptyState({ onSpeak }: OptionsEmptyStateProps) {
                   </div>
                   <div className="flex items-center justify-between">
                     <span className="text-ink-soft dark:text-slate-400">
-                      Exhaustion Buffer
+                      {t("optionsEmpty.exhaustionBuffer")}
                     </span>
                     <span className="font-bold text-emerald-600 dark:text-emerald-400 font-mono">
                       ⏱ {c.exhaustionBuffer}
@@ -417,7 +408,7 @@ export function OptionsEmptyState({ onSpeak }: OptionsEmptyStateProps) {
                 className="w-full inline-flex items-center justify-center gap-1.5 rounded-xl border border-line dark:border-slate-700 bg-surface dark:bg-slate-800 hover:bg-surface-muted dark:hover:bg-slate-700 text-ink dark:text-white px-4 py-2.5 text-xs font-bold transition shadow-xs cursor-pointer"
               >
                 <PlusCircle className="h-3.5 w-3.5 text-brand dark:text-emerald-400" />
-                <span>Select for Tatkal Strategy</span>
+                <span>{t("optionsEmpty.selectForStrategy")}</span>
               </button>
             </div>
           ))}

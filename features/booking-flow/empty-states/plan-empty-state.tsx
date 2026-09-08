@@ -16,6 +16,7 @@ import {
   Sparkles,
 } from "lucide-react";
 import { useJourney } from "@/lib/journey";
+import { useLang } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 
 interface PlanEmptyStateProps {
@@ -24,6 +25,7 @@ interface PlanEmptyStateProps {
 
 export function PlanEmptyState({ onSpeak }: PlanEmptyStateProps) {
   const { submitGoal } = useJourney();
+  const { t } = useLang();
   const [query, setQuery] = useState("");
 
   const handleSearch = (e: React.FormEvent) => {
@@ -83,15 +85,13 @@ export function PlanEmptyState({ onSpeak }: PlanEmptyStateProps) {
         <div className="lg:col-span-8 space-y-4">
           <div className="space-y-2">
             <h1 className="text-3xl sm:text-4xl lg:text-[2.6rem] font-black tracking-tight text-ink dark:text-white font-[family-name:var(--font-outfit)] leading-tight">
-              Bas{" "}
+              {t("planEmpty.headingPrefix")}{" "}
               <span className="text-transparent bg-clip-text bg-gradient-to-r from-emerald-500 via-teal-400 to-emerald-600 dark:from-emerald-400 dark:to-teal-300">
-                boliye ya likhiye.
+                {t("planEmpty.headingHighlight")}
               </span>
             </h1>
             <p className="text-sm sm:text-base text-ink-soft dark:text-slate-400 max-w-2xl leading-relaxed">
-              No journeys planned yet. Tell your Copilot where you need to travel,
-              and we&apos;ll calculate split quotas, monitor Tatkal rush windows,
-              and guarantee instant failovers.
+              {t("planEmpty.subtitle")}
             </p>
           </div>
 
@@ -107,7 +107,7 @@ export function PlanEmptyState({ onSpeak }: PlanEmptyStateProps) {
                   type="text"
                   value={query}
                   onChange={(e) => setQuery(e.target.value)}
-                  placeholder="e.g. 'Mumbai to Delhi tomorrow morning before 9 AM' or 'Pune to BLR 3A'"
+                  placeholder={t("planEmpty.placeholder")}
                   className="w-full bg-transparent text-sm text-ink dark:text-white placeholder:text-ink-faint dark:placeholder:text-slate-500 focus:outline-none"
                 />
               </div>
@@ -122,7 +122,7 @@ export function PlanEmptyState({ onSpeak }: PlanEmptyStateProps) {
                   className="inline-flex items-center gap-1.5 rounded-xl border border-line dark:border-slate-800 bg-surface-muted/60 dark:bg-slate-800 px-3.5 py-2.5 text-xs font-bold text-ink dark:text-slate-200 hover:bg-surface-muted dark:hover:bg-slate-700 transition cursor-pointer"
                 >
                   <Mic className="h-3.5 w-3.5 text-brand dark:text-emerald-400 animate-pulse" />
-                  <span>Bolkar bataiye</span>
+                  <span>{t("planEmpty.speak")}</span>
                 </button>
 
                 <button
@@ -130,7 +130,7 @@ export function PlanEmptyState({ onSpeak }: PlanEmptyStateProps) {
                   disabled={!query.trim()}
                   className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-brand dark:bg-emerald-600 hover:bg-brand-strong dark:hover:bg-emerald-500 text-white px-4 py-2.5 text-xs font-bold shadow-xs transition disabled:opacity-40 cursor-pointer"
                 >
-                  <span>Plan Journey</span>
+                  <span>{t("planEmpty.planJourney")}</span>
                   <ArrowRight className="h-3.5 w-3.5" />
                 </button>
               </div>
@@ -141,13 +141,13 @@ export function PlanEmptyState({ onSpeak }: PlanEmptyStateProps) {
           <div className="flex flex-wrap items-center gap-2 text-xs">
             <span className="font-bold text-ink-faint dark:text-slate-500 uppercase tracking-wider text-[0.7rem] flex items-center gap-1">
               <Sparkles className="h-3 w-3 text-amber-500" />
-              Try:
+              {t("planEmpty.try")}
             </span>
             {[
-              "Mumbai → Delhi kal subah",
-              "Bengaluru → Hyderabad 3A",
-              "Delhi → Varanasi seniors ke saath",
-              "Pune → Ahmedabad Rajdhani",
+              t("planEmpty.sampleQuery1"),
+              t("planEmpty.sampleQuery2"),
+              t("planEmpty.sampleQuery3"),
+              t("planEmpty.sampleQuery4"),
             ].map((chip) => (
               <button
                 key={chip}
@@ -170,8 +170,7 @@ export function PlanEmptyState({ onSpeak }: PlanEmptyStateProps) {
             {/* Speech bubble */}
             <div className="relative rounded-xl bg-surface-muted/80 dark:bg-slate-800/80 p-3 text-xs text-ink-soft dark:text-slate-300 leading-relaxed border border-line/60 dark:border-slate-700/60">
               <p className="italic">
-                “Aap aaram se soiye, subah Tatkal window se lekar UPI auto-lock
-                tak sambhal lunga.”
+                {t("planEmpty.aaravQuote")}
               </p>
             </div>
 
@@ -192,15 +191,15 @@ export function PlanEmptyState({ onSpeak }: PlanEmptyStateProps) {
                     Aarav
                   </h3>
                   <span className="rounded bg-brand-soft dark:bg-slate-800 px-1.5 py-0.2 text-[0.65rem] font-bold text-brand dark:text-emerald-400">
-                    Copilot AI
+                    {t("planEmpty.copilotAi")}
                   </span>
                 </div>
                 <p className="text-[0.75rem] text-ink-soft dark:text-slate-400">
-                  Live IRCTC Sync Advisor
+                  {t("planEmpty.advisorTitle")}
                 </p>
                 <div className="flex items-center gap-1.5 text-[0.7rem] text-emerald-600 dark:text-emerald-400 font-semibold">
                   <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                  <span>Ready for queries</span>
+                  <span>{t("planEmpty.readyQueries")}</span>
                 </div>
               </div>
             </div>
@@ -209,7 +208,7 @@ export function PlanEmptyState({ onSpeak }: PlanEmptyStateProps) {
             <div className="grid grid-cols-2 gap-2 pt-2 border-t border-line/60 dark:border-slate-800 text-center">
               <div className="rounded-xl bg-surface-muted/50 dark:bg-slate-800/50 p-2.5">
                 <div className="text-[0.65rem] font-bold text-ink-faint dark:text-slate-500 uppercase tracking-wider">
-                  Next Window
+                  {t("planEmpty.nextWindow")}
                 </div>
                 <div className="text-xs font-bold text-ink dark:text-slate-200 mt-0.5 font-mono">
                   10:00 AM (AC)
@@ -218,7 +217,7 @@ export function PlanEmptyState({ onSpeak }: PlanEmptyStateProps) {
 
               <div className="rounded-xl bg-surface-muted/50 dark:bg-slate-800/50 p-2.5">
                 <div className="text-[0.65rem] font-bold text-ink-faint dark:text-slate-500 uppercase tracking-wider">
-                  Sync Latency
+                  {t("planEmpty.syncLatency")}
                 </div>
                 <div className="text-xs font-bold text-emerald-600 dark:text-emerald-400 mt-0.5 font-mono">
                   42 ms
@@ -234,15 +233,14 @@ export function PlanEmptyState({ onSpeak }: PlanEmptyStateProps) {
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div>
             <h2 className="text-lg sm:text-xl font-bold text-ink dark:text-white">
-              Why plan with Copilot before 10:00 AM?
+              {t("planEmpty.whyTitle")}
             </h2>
             <p className="text-xs sm:text-sm text-ink-soft dark:text-slate-400">
-              Three layers of automated intelligence engineered for the
-              120-second Tatkal rush.
+              {t("planEmpty.whySub")}
             </p>
           </div>
           <span className="font-mono text-[0.7rem] font-bold tracking-wider rounded-md bg-surface-muted dark:bg-slate-800 px-2.5 py-1 text-emerald-600 dark:text-emerald-400 border border-line dark:border-slate-700">
-            PRE-FLIGHT ENGINE 4.8
+            {t("planEmpty.preflight")}
           </span>
         </div>
 
@@ -259,15 +257,15 @@ export function PlanEmptyState({ onSpeak }: PlanEmptyStateProps) {
                 </span>
               </div>
               <h3 className="text-base font-bold text-ink dark:text-white">
-                Window Synchronization
+                {t("planEmpty.card1Title")}
               </h3>
               <p className="text-xs text-ink-soft dark:text-slate-400 leading-relaxed">
-                Automated preparation initiates ahead of quota release. Copilot briefs you at T-5 minutes, validates authorization, and stands ready for the 10:00 AM window.
+                {t("planEmpty.card1Desc")}
               </p>
             </div>
             <div className="pt-3 border-t border-line/60 dark:border-slate-800 flex items-center gap-1.5 text-xs font-semibold text-emerald-600 dark:text-emerald-400">
               <ShieldCheck className="h-3.5 w-3.5" />
-              <span>Zero manual IRCTC re-logins</span>
+              <span>{t("planEmpty.card1Badge")}</span>
             </div>
           </div>
 
@@ -283,17 +281,15 @@ export function PlanEmptyState({ onSpeak }: PlanEmptyStateProps) {
                 </span>
               </div>
               <h3 className="text-base font-bold text-ink dark:text-white">
-                Dual-Engine Failover
+                {t("planEmpty.card2Title")}
               </h3>
               <p className="text-xs text-ink-soft dark:text-slate-400 leading-relaxed">
-                If your prime train (e.g. Rajdhani 3A) exhausts quota in
-                seconds, Copilot auto-switches to your standby Duronto or Garib
-                Rath instantly without resetting master passenger lists.
+                {t("planEmpty.card2Desc")}
               </p>
             </div>
             <div className="pt-3 border-t border-line/60 dark:border-slate-800 flex items-center gap-1.5 text-xs font-semibold text-amber-600 dark:text-amber-400">
               <Zap className="h-3.5 w-3.5" />
-              <span>Dual standby preference matrix</span>
+              <span>{t("planEmpty.card2Badge")}</span>
             </div>
           </div>
 
@@ -309,17 +305,15 @@ export function PlanEmptyState({ onSpeak }: PlanEmptyStateProps) {
                 </span>
               </div>
               <h3 className="text-base font-bold text-ink dark:text-white">
-                Zero Upfront Deduction
+                {t("planEmpty.card3Title")}
               </h3>
               <p className="text-xs text-ink-soft dark:text-slate-400 leading-relaxed">
-                Unlike untrusted third-party agents, funds never leave your
-                account prematurely. Instant UPI Autopay / mandate triggers
-                strictly after seat confirmation is verified.
+                {t("planEmpty.card3Desc")}
               </p>
             </div>
             <div className="pt-3 border-t border-line/60 dark:border-slate-800 flex items-center gap-1.5 text-xs font-semibold text-emerald-600 dark:text-emerald-400">
               <ShieldCheck className="h-3.5 w-3.5" />
-              <span>Official IRCTC PG Compliant</span>
+              <span>{t("planEmpty.card3Badge")}</span>
             </div>
           </div>
         </div>
@@ -330,11 +324,10 @@ export function PlanEmptyState({ onSpeak }: PlanEmptyStateProps) {
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div>
             <h2 className="text-lg sm:text-xl font-bold text-ink dark:text-white">
-              High-Rush Indian Corridors
+              {t("planEmpty.corridorsTitle")}
             </h2>
             <p className="text-xs sm:text-sm text-ink-soft dark:text-slate-400">
-              Pre-configured Tatkal routes with live congestion scoring and seat
-              probability indicators.
+              {t("planEmpty.corridorsSub")}
             </p>
           </div>
           <button
@@ -342,7 +335,7 @@ export function PlanEmptyState({ onSpeak }: PlanEmptyStateProps) {
             onClick={() => setQuery("NDLS to BCT")}
             className="text-xs font-semibold text-brand dark:text-emerald-400 hover:underline cursor-pointer"
           >
-            Use custom station codes
+            {t("planEmpty.customCodes")}
           </button>
         </div>
 
@@ -377,7 +370,7 @@ export function PlanEmptyState({ onSpeak }: PlanEmptyStateProps) {
                 <div className="space-y-1.5 pt-1">
                   <div className="flex items-center justify-between text-[0.7rem]">
                     <span className="text-ink-soft dark:text-slate-400">
-                      Tatkal Exhaustion Pace
+                      {t("planEmpty.exhaustionPace")}
                     </span>
                     <span className="font-bold text-ink dark:text-slate-200">
                       {c.exhaustionPace}
@@ -393,9 +386,9 @@ export function PlanEmptyState({ onSpeak }: PlanEmptyStateProps) {
 
                 {/* Telemetry row */}
                 <div className="flex items-center justify-between text-[0.7rem] text-ink-faint dark:text-slate-400 pt-1">
-                  <span>Avg. Daily Tatkal: {c.seats}</span>
+                  <span>{t("planEmpty.avgDaily")}: {c.seats}</span>
                   <span className="font-semibold text-emerald-600 dark:text-emerald-400">
-                    Copilot Success: {c.successRate}
+                    {t("planEmpty.copilotSuccess")}: {c.successRate}
                   </span>
                 </div>
               </div>
@@ -405,7 +398,7 @@ export function PlanEmptyState({ onSpeak }: PlanEmptyStateProps) {
                 onClick={() => submitGoal(c.goalPrompt)}
                 className="w-full inline-flex items-center justify-between rounded-xl border border-line dark:border-slate-800 bg-surface-muted/40 dark:bg-slate-800/60 px-3.5 py-2.5 text-xs font-bold text-ink dark:text-slate-200 group-hover:bg-brand group-hover:text-white dark:group-hover:bg-emerald-600 dark:group-hover:text-white transition cursor-pointer"
               >
-                <span>Set this corridor</span>
+                <span>{t("planEmpty.setCorridor")}</span>
                 <ChevronRight className="h-4 w-4" />
               </button>
             </div>

@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 import { useStore } from "@/lib/store";
 import { useJourney } from "@/lib/journey";
+import { useLang } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 import type { BerthPreference } from "@/types";
 
@@ -29,6 +30,7 @@ interface PrepareEmptyStateProps {
 export function PrepareEmptyState({ onTravellerAdded }: PrepareEmptyStateProps) {
   const { addTraveller, travellers } = useStore();
   const { goTo } = useJourney();
+  const { t } = useLang();
 
   // Live atomic clock timer
   const [clockTime, setClockTime] = useState("20:46:55");
@@ -104,21 +106,20 @@ export function PrepareEmptyState({ onTravellerAdded }: PrepareEmptyStateProps) 
         <div className="space-y-1.5 max-w-2xl">
           <div className="flex items-center gap-2 text-xs font-bold">
             <span className="rounded-md bg-amber-500/10 text-amber-600 dark:text-amber-400 px-2 py-0.5 border border-amber-500/20 font-mono text-[0.68rem]">
-              ZERO-DELAY ENGINE
+              {t("prepareEmpty.zeroDelay")}
             </span>
             <span>•</span>
             <span className="flex items-center gap-1.5 text-emerald-600 dark:text-emerald-400">
               <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
-              <span>IRCTC Master List V3</span>
+              <span>{t("prepareEmpty.irctcList")}</span>
             </span>
           </div>
 
           <h1 className="text-2xl sm:text-3xl font-black text-ink dark:text-white font-[family-name:var(--font-outfit)]">
-            Master List & Tatkal Readiness
+            {t("prepareEmpty.title")}
           </h1>
           <p className="text-xs sm:text-sm text-ink-soft dark:text-slate-400 leading-relaxed">
-            Save your travellers and link IRCTC credentials now. When Tatkal opens
-            at 10:00 AM, there is zero time to type names or berth choices.
+            {t("prepareEmpty.sub")}
           </p>
         </div>
 
@@ -127,7 +128,7 @@ export function PrepareEmptyState({ onTravellerAdded }: PrepareEmptyStateProps) 
           <Clock className="h-4 w-4 text-emerald-500 animate-pulse" />
           <div>
             <div className="text-[0.65rem] font-bold uppercase tracking-wider text-ink-faint dark:text-slate-500">
-              ATOMIC SERVER CLOCK
+              {t("prepareEmpty.atomicClock")}
             </div>
             <div className="text-sm sm:text-base font-black text-ink dark:text-white flex items-center gap-1.5">
               <span>{clockTime}</span>
@@ -157,23 +158,19 @@ export function PrepareEmptyState({ onTravellerAdded }: PrepareEmptyStateProps) 
               <div className="flex items-center gap-1.5">
                 <span className="rounded bg-brand-soft dark:bg-slate-800 px-1.5 py-0.2 text-[0.65rem] font-bold text-brand dark:text-emerald-400 flex items-center gap-1">
                   <User className="h-2.5 w-2.5" />
-                  Copilot Proactive Advisory
+                  {t("prepareEmpty.proactiveAdvisory")}
                 </span>
               </div>
               <p className="text-xs font-semibold text-ink dark:text-white leading-relaxed">
-                “Pehle se passenger list ready rakhne se Tatkal booking{" "}
-                <span className="text-emerald-600 dark:text-emerald-400 font-bold">
-                  0.82 seconds
-                </span>{" "}
-                mein punch ho jati hai. Chaliye pehla traveller add karte hain!”
+                {t("prepareEmpty.aaravAdvice")}
               </p>
               <div className="flex flex-wrap items-center gap-2 text-[0.7rem] text-ink-soft dark:text-slate-400 pt-0.5">
                 <span className="flex items-center gap-1 text-emerald-600 dark:text-emerald-400 font-medium">
                   <Zap className="h-3 w-3" />
-                  4-seat parallel autofill ready
+                  {t("prepareEmpty.parallelAutofill")}
                 </span>
                 <span>•</span>
-                <span>Aadhaar UIDAI pre-validation</span>
+                <span>{t("prepareEmpty.uidai")}</span>
               </div>
             </div>
           </div>
@@ -188,7 +185,7 @@ export function PrepareEmptyState({ onTravellerAdded }: PrepareEmptyStateProps) 
               className="flex-1 sm:flex-none inline-flex items-center justify-center gap-1.5 rounded-xl bg-brand dark:bg-emerald-600 hover:bg-brand-strong dark:hover:bg-emerald-500 text-white px-4 py-2 text-xs font-bold transition shadow-xs cursor-pointer"
             >
               <UserPlus className="h-3.5 w-3.5" />
-              <span>Add Passenger</span>
+              <span>{t("prepareEmpty.addPassenger")}</span>
             </button>
 
             <button
@@ -197,7 +194,7 @@ export function PrepareEmptyState({ onTravellerAdded }: PrepareEmptyStateProps) 
               className="flex-1 sm:flex-none inline-flex items-center justify-center gap-1.5 rounded-xl border border-line dark:border-slate-700 bg-surface-muted/60 dark:bg-slate-800 hover:bg-surface-muted dark:hover:bg-slate-700 text-ink dark:text-slate-200 px-3.5 py-2 text-xs font-bold transition cursor-pointer"
             >
               <RefreshCw className="h-3.5 w-3.5" />
-              <span>Sync IRCTC</span>
+              <span>{t("prepareEmpty.syncIrctc")}</span>
             </button>
           </div>
         </div>
@@ -215,15 +212,13 @@ export function PrepareEmptyState({ onTravellerAdded }: PrepareEmptyStateProps) 
 
             <div className="space-y-1.5 max-w-md mx-auto">
               <span className="rounded-full bg-amber-500/10 text-amber-600 dark:text-amber-400 px-2.5 py-0.5 text-[0.65rem] font-bold uppercase tracking-wider border border-amber-500/20">
-                QUOTA SLOTS EMPTY
+                {t("prepareEmpty.quotaSlotsEmpty")}
               </span>
               <h3 className="text-lg font-bold text-ink dark:text-white">
-                No travellers saved yet
+                {t("prepareEmpty.noTravellersSaved")}
               </h3>
               <p className="text-xs text-ink-soft dark:text-slate-400 leading-relaxed">
-                Add up to 4 travellers per Tatkal requisition. Pre-validating
-                Aadhaar UIDAI guarantees instant IRCTC master-list approval
-                without captchas.
+                {t("prepareEmpty.noTravellersDesc")}
               </p>
             </div>
 
@@ -236,7 +231,7 @@ export function PrepareEmptyState({ onTravellerAdded }: PrepareEmptyStateProps) 
                 }}
                 className="w-full sm:w-auto inline-flex items-center justify-center gap-1.5 rounded-xl bg-brand-soft dark:bg-slate-800 text-brand dark:text-emerald-400 hover:bg-brand/10 dark:hover:bg-slate-700 px-4 py-2.5 text-xs font-bold transition cursor-pointer"
               >
-                <span>+ Add First Traveller (Manual)</span>
+                <span>{t("prepareEmpty.addFirstManual")}</span>
               </button>
 
               <button
@@ -245,17 +240,17 @@ export function PrepareEmptyState({ onTravellerAdded }: PrepareEmptyStateProps) 
                 className="w-full sm:w-auto inline-flex items-center justify-center gap-1.5 rounded-xl border border-line dark:border-slate-700 bg-surface-muted/40 dark:bg-slate-800/80 px-4 py-2.5 text-xs font-bold text-ink dark:text-slate-200 hover:bg-surface-muted dark:hover:bg-slate-700 transition cursor-pointer"
               >
                 <Zap className="h-3.5 w-3.5 text-amber-500" />
-                <span>Sync IRCTC (1-Click)</span>
+                <span>{t("prepareEmpty.sync1Click")}</span>
               </button>
             </div>
 
             <div className="pt-2 border-t border-line/60 dark:border-slate-800 text-[0.72rem] text-ink-faint dark:text-slate-400 flex items-center justify-center gap-2">
               <Mic className="h-3.5 w-3.5 text-brand dark:text-emerald-400 animate-pulse" />
               <span>
-                Say: <strong className="text-ink dark:text-white">&ldquo;Rahul aur Priya ko add karo&rdquo;</strong>
+                {t("prepareEmpty.sayAdd")}
               </span>
               <span className="rounded bg-surface-muted dark:bg-slate-800 px-1.5 py-0.2 text-[0.65rem] font-mono">
-                VOICE AI
+                {t("prepareEmpty.voiceAi")}
               </span>
             </div>
           </div>
@@ -269,15 +264,15 @@ export function PrepareEmptyState({ onTravellerAdded }: PrepareEmptyStateProps) 
               <div>
                 <h3 className="text-sm font-bold text-ink dark:text-white flex items-center gap-2">
                   <User className="h-4 w-4 text-brand dark:text-emerald-400" />
-                  Fast Traveller Onboarding
+                  {t("prepareEmpty.fastOnboarding")}
                 </h3>
                 <p className="text-[0.72rem] text-ink-soft dark:text-slate-400">
-                  Slot 1 of 4 • Primary Ticket Holder
+                  {t("prepareEmpty.slot1of4")}
                 </p>
               </div>
               <span className="rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 px-2.5 py-0.5 text-[0.68rem] font-bold flex items-center gap-1 border border-emerald-500/20">
                 <CheckCircle2 className="h-3 w-3" />
-                IRCTC Verified Fast-Track
+                {t("prepareEmpty.irctcFastTrack")}
               </span>
             </div>
 
@@ -288,7 +283,7 @@ export function PrepareEmptyState({ onTravellerAdded }: PrepareEmptyStateProps) 
                   htmlFor="traveller-name-input"
                   className="text-[0.7rem] font-bold text-ink-soft dark:text-slate-300 uppercase tracking-wider"
                 >
-                  Full Name (As printed on Aadhaar / Govt ID)
+                  {t("prepareEmpty.fullName")}
                 </label>
                 <div className="relative">
                   <input
@@ -307,7 +302,7 @@ export function PrepareEmptyState({ onTravellerAdded }: PrepareEmptyStateProps) 
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1">
                   <label className="text-[0.7rem] font-bold text-ink-soft dark:text-slate-300 uppercase tracking-wider">
-                    Age
+                    {t("prepareEmpty.age")}
                   </label>
                   <input
                     type="number"
@@ -321,16 +316,16 @@ export function PrepareEmptyState({ onTravellerAdded }: PrepareEmptyStateProps) 
 
                 <div className="space-y-1">
                   <label className="text-[0.7rem] font-bold text-ink-soft dark:text-slate-300 uppercase tracking-wider">
-                    Gender
+                    {t("prepareEmpty.gender")}
                   </label>
                   <select
                     value={gender}
                     onChange={(e) => setGender(e.target.value as any)}
                     className="w-full rounded-xl border border-line dark:border-slate-800 bg-surface-muted/40 dark:bg-slate-800/80 px-3 py-2 text-xs font-semibold text-ink dark:text-white focus:outline-none focus:border-brand"
                   >
-                    <option value="M">Male</option>
-                    <option value="F">Female</option>
-                    <option value="O">Other</option>
+                    <option value="M">{t("prepareEmpty.male")}</option>
+                    <option value="F">{t("prepareEmpty.female")}</option>
+                    <option value="O">{t("prepareEmpty.other")}</option>
                   </select>
                 </div>
               </div>
@@ -338,7 +333,7 @@ export function PrepareEmptyState({ onTravellerAdded }: PrepareEmptyStateProps) 
               {/* Berth Preference */}
               <div className="space-y-1.5">
                 <label className="text-[0.7rem] font-bold text-ink-soft dark:text-slate-300 uppercase tracking-wider">
-                  Berth Preference (Tatkal Auto-Downgrade OK)
+                  {t("prepareEmpty.berthPref")}
                 </label>
                 <div className="grid grid-cols-4 gap-2">
                   {(["Lower", "Middle", "Upper", "Side Lower"] as const).map((b) => (
@@ -363,16 +358,16 @@ export function PrepareEmptyState({ onTravellerAdded }: PrepareEmptyStateProps) 
               <div className="grid grid-cols-2 gap-3 items-center pt-1">
                 <div className="space-y-1">
                   <label className="text-[0.7rem] font-bold text-ink-soft dark:text-slate-300 uppercase tracking-wider">
-                    Food Preference
+                    {t("prepareEmpty.foodPref")}
                   </label>
                   <select
                     value={food}
                     onChange={(e) => setFood(e.target.value)}
                     className="w-full rounded-xl border border-line dark:border-slate-800 bg-surface-muted/40 dark:bg-slate-800/80 px-3 py-2 text-xs font-semibold text-ink dark:text-white focus:outline-none focus:border-brand"
                   >
-                    <option value="Veg Meal">Veg Meal</option>
-                    <option value="Non-Veg Meal">Non-Veg Meal</option>
-                    <option value="No Food">No Food</option>
+                    <option value="Veg Meal">{t("prepareEmpty.vegMeal")}</option>
+                    <option value="Non-Veg Meal">{t("prepareEmpty.nonVegMeal")}</option>
+                    <option value="No Food">{t("prepareEmpty.noFood")}</option>
                   </select>
                 </div>
 
@@ -383,7 +378,7 @@ export function PrepareEmptyState({ onTravellerAdded }: PrepareEmptyStateProps) 
                     onChange={(e) => setSrCitizen(e.target.checked)}
                     className="rounded border-line text-brand focus:ring-brand"
                   />
-                  <span>Sr. Citizen Concession</span>
+                  <span>{t("prepareEmpty.srCitizen")}</span>
                 </label>
               </div>
 
@@ -393,15 +388,15 @@ export function PrepareEmptyState({ onTravellerAdded }: PrepareEmptyStateProps) 
                   <ShieldCheck className="h-4 w-4 text-emerald-500" />
                   <div>
                     <div className="font-bold text-ink dark:text-white leading-tight">
-                      Aadhaar Verification (Instant Master List)
+                      {t("prepareEmpty.aadhaarVerif")}
                     </div>
                     <div className="text-[0.68rem] text-ink-soft dark:text-slate-400 font-mono mt-0.5">
-                      UIDAI Token: •••••••• 8912 - Pre-Authenticated
+                      {t("prepareEmpty.uidaiPreAuth")}
                     </div>
                   </div>
                 </div>
                 <span className="rounded bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 px-2 py-0.5 text-[0.65rem] font-bold border border-emerald-500/20">
-                  VERIFIED
+                  {t("prepareEmpty.verified")}
                 </span>
               </div>
             </div>
@@ -413,14 +408,14 @@ export function PrepareEmptyState({ onTravellerAdded }: PrepareEmptyStateProps) 
                 onClick={() => setName("")}
                 className="px-4 py-2 rounded-xl text-xs font-semibold text-ink-soft dark:text-slate-400 hover:text-ink dark:hover:text-white transition cursor-pointer"
               >
-                Discard
+                {t("prepareEmpty.discard")}
               </button>
               <button
                 type="submit"
                 className="inline-flex items-center gap-1.5 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white px-5 py-2.5 text-xs font-bold shadow-xs transition cursor-pointer"
               >
                 <Check className="h-3.5 w-3.5" />
-                <span>Save Traveller to Vault</span>
+                <span>{t("prepareEmpty.saveToVault")}</span>
               </button>
             </div>
           </form>
@@ -434,11 +429,11 @@ export function PrepareEmptyState({ onTravellerAdded }: PrepareEmptyStateProps) 
               <div>
                 <h3 className="text-sm font-bold text-ink dark:text-white flex items-center gap-2">
                   <Zap className="h-4 w-4 text-brand dark:text-emerald-400" />
-                  Tatkal Pre-Flight Audit
+                  {t("prepareEmpty.preFlightAudit")}
                 </h3>
               </div>
               <span className="rounded-full bg-amber-500/10 text-amber-600 dark:text-amber-400 px-2.5 py-0.5 text-xs font-bold border border-amber-500/20 font-mono">
-                4 / 6 Ready
+                {t("prepareEmpty.readyCount")}
               </span>
             </div>
 
@@ -450,7 +445,7 @@ export function PrepareEmptyState({ onTravellerAdded }: PrepareEmptyStateProps) 
                   <CheckCircle2 className="h-4 w-4 text-emerald-500 shrink-0" />
                   <div>
                     <div className="font-semibold text-ink dark:text-white">
-                      1. IRCTC Login Session
+                      {t("prepareEmpty.irctcSession")}
                     </div>
                     <div className="text-[0.68rem] text-ink-soft dark:text-slate-400 font-mono">
                       Session warm • User: rahulsharma***
@@ -458,7 +453,7 @@ export function PrepareEmptyState({ onTravellerAdded }: PrepareEmptyStateProps) 
                   </div>
                 </div>
                 <span className="rounded bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 px-2 py-0.5 text-[0.65rem] font-bold">
-                  Connected
+                  {t("prepareEmpty.connected")}
                 </span>
               </div>
 
@@ -468,7 +463,7 @@ export function PrepareEmptyState({ onTravellerAdded }: PrepareEmptyStateProps) 
                   <AlertTriangle className="h-4 w-4 text-amber-500 shrink-0" />
                   <div>
                     <div className="font-semibold text-ink dark:text-white">
-                      2. Master Passenger List
+                      {t("prepareEmpty.masterList")}
                     </div>
                     <div className="text-[0.68rem] text-amber-600 dark:text-amber-400">
                       0/4 Travellers Added • Booking will halt
@@ -476,7 +471,7 @@ export function PrepareEmptyState({ onTravellerAdded }: PrepareEmptyStateProps) 
                   </div>
                 </div>
                 <span className="rounded bg-amber-500/20 text-amber-700 dark:text-amber-400 px-2 py-0.5 text-[0.65rem] font-bold">
-                  Action Needed
+                  {t("prepareEmpty.actionNeeded")}
                 </span>
               </div>
 
@@ -486,7 +481,7 @@ export function PrepareEmptyState({ onTravellerAdded }: PrepareEmptyStateProps) 
                   <CheckCircle2 className="h-4 w-4 text-emerald-500 shrink-0" />
                   <div>
                     <div className="font-semibold text-ink dark:text-white">
-                      3. Payment Gateway Link
+                      {t("prepareEmpty.paymentGateway")}
                     </div>
                     <div className="text-[0.68rem] text-ink-soft dark:text-slate-400 font-mono">
                       UPI Mandate via PhonePe • 0s OTP bypass
@@ -494,7 +489,7 @@ export function PrepareEmptyState({ onTravellerAdded }: PrepareEmptyStateProps) 
                   </div>
                 </div>
                 <span className="rounded bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 px-2 py-0.5 text-[0.65rem] font-bold">
-                  Autopay Linked
+                  {t("prepareEmpty.autopayLinked")}
                 </span>
               </div>
 
@@ -504,7 +499,7 @@ export function PrepareEmptyState({ onTravellerAdded }: PrepareEmptyStateProps) 
                   <CheckCircle2 className="h-4 w-4 text-emerald-500 shrink-0" />
                   <div>
                     <div className="font-semibold text-ink dark:text-white">
-                      4. Dynamic CAPTCHA Resolver
+                      {t("prepareEmpty.captchaResolver")}
                     </div>
                     <div className="text-[0.68rem] text-ink-soft dark:text-slate-400 font-mono">
                       &lt; 400ms Local OCR Neural Engine loaded
@@ -512,7 +507,7 @@ export function PrepareEmptyState({ onTravellerAdded }: PrepareEmptyStateProps) 
                   </div>
                 </div>
                 <span className="rounded bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 px-2 py-0.5 text-[0.65rem] font-bold">
-                  Primed
+                  {t("prepareEmpty.primed")}
                 </span>
               </div>
 
@@ -522,7 +517,7 @@ export function PrepareEmptyState({ onTravellerAdded }: PrepareEmptyStateProps) 
                   <CheckCircle2 className="h-4 w-4 text-emerald-500 shrink-0" />
                   <div>
                     <div className="font-semibold text-ink dark:text-white">
-                      5. Booking Window Clock Sync
+                      {t("prepareEmpty.clockSync")}
                     </div>
                     <div className="text-[0.68rem] text-ink-soft dark:text-slate-400 font-mono">
                       Live Railway Window Sync: Active
@@ -530,7 +525,7 @@ export function PrepareEmptyState({ onTravellerAdded }: PrepareEmptyStateProps) 
                   </div>
                 </div>
                 <span className="rounded bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 px-2 py-0.5 text-[0.65rem] font-bold">
-                  Synced
+                  {t("prepareEmpty.synced")}
                 </span>
               </div>
 
@@ -542,7 +537,7 @@ export function PrepareEmptyState({ onTravellerAdded }: PrepareEmptyStateProps) 
                   </span>
                   <div>
                     <div className="font-semibold text-ink dark:text-white">
-                      6. Failover Backup Strategy
+                      {t("prepareEmpty.failoverBackup")}
                     </div>
                     <div className="text-[0.68rem] text-ink-soft dark:text-slate-400">
                       Awaiting train selection in &apos;Plan&apos; tab
@@ -550,7 +545,7 @@ export function PrepareEmptyState({ onTravellerAdded }: PrepareEmptyStateProps) 
                   </div>
                 </div>
                 <span className="rounded bg-surface-muted dark:bg-slate-800 text-ink-faint dark:text-slate-400 px-2 py-0.5 text-[0.65rem] font-bold">
-                  Pending
+                  {t("prepareEmpty.pending")}
                 </span>
               </div>
             </div>
@@ -559,7 +554,7 @@ export function PrepareEmptyState({ onTravellerAdded }: PrepareEmptyStateProps) 
             <div className="space-y-1.5 pt-2 border-t border-line/60 dark:border-slate-800 text-xs">
               <div className="flex items-center justify-between">
                 <span className="text-ink-soft dark:text-slate-400 text-[0.7rem]">
-                  Pipeline Response Latency
+                  {t("prepareEmpty.pipelineLatency")}
                 </span>
                 <span className="font-mono font-bold text-emerald-600 dark:text-emerald-400 text-[0.7rem]">
                   18ms (Hyperfast)
@@ -576,17 +571,17 @@ export function PrepareEmptyState({ onTravellerAdded }: PrepareEmptyStateProps) 
             <div className="space-y-0.5">
               <h3 className="text-xs font-bold text-ink dark:text-white uppercase tracking-wider flex items-center gap-1.5">
                 <Clock className="h-3.5 w-3.5 text-brand dark:text-emerald-400" />
-                Daily Opening Windows
+                {t("prepareEmpty.dailyWindows")}
               </h3>
               <p className="text-[0.72rem] text-ink-soft dark:text-slate-400">
-                Tatkal opens exactly 24 hours in advance from train origin:
+                {t("prepareEmpty.dailyWindowsSub")}
               </p>
             </div>
 
             <div className="grid grid-cols-2 gap-3 text-center">
               <div className="rounded-xl border border-line dark:border-slate-800 bg-surface-muted/50 dark:bg-slate-800/60 p-3">
                 <div className="text-[0.68rem] font-semibold text-ink-soft dark:text-slate-400">
-                  AC Classes (1A, 2A, 3A, CC)
+                  {t("prepareEmpty.acClasses")}
                 </div>
                 <div className="text-base font-black text-ink dark:text-white mt-1 font-mono">
                   10:00 AM
@@ -595,7 +590,7 @@ export function PrepareEmptyState({ onTravellerAdded }: PrepareEmptyStateProps) 
 
               <div className="rounded-xl border border-line dark:border-slate-800 bg-surface-muted/50 dark:bg-slate-800/60 p-3">
                 <div className="text-[0.68rem] font-semibold text-ink-soft dark:text-slate-400">
-                  Non-AC Classes (SL, 2S)
+                  {t("prepareEmpty.nonAcClasses")}
                 </div>
                 <div className="text-base font-black text-ink dark:text-white mt-1 font-mono">
                   11:00 AM
@@ -612,11 +607,10 @@ export function PrepareEmptyState({ onTravellerAdded }: PrepareEmptyStateProps) 
           <ShieldCheck className="h-5 w-5 text-emerald-600 dark:text-emerald-400 shrink-0" />
           <div>
             <div className="font-bold text-ink dark:text-white">
-              Zero Upfront Deduction Guarantee
+              {t("prepareEmpty.zeroDeduction")}
             </div>
             <p className="text-ink-soft dark:text-slate-400 text-[0.72rem]">
-              Your money stays in your account. Pre-authorization is only debited
-              when confirmed PNR is generated.
+              {t("prepareEmpty.zeroDeductionSub")}
             </p>
           </div>
         </div>
@@ -624,12 +618,12 @@ export function PrepareEmptyState({ onTravellerAdded }: PrepareEmptyStateProps) 
         <div className="flex items-center gap-3 text-[0.7rem] font-mono text-ink-faint dark:text-slate-400 shrink-0">
           <span className="flex items-center gap-1">
             <Lock className="h-3 w-3 text-emerald-500" />
-            256-Bit Vault
+            {t("prepareEmpty.vault256")}
           </span>
           <span>•</span>
           <span className="flex items-center gap-1">
             <Landmark className="h-3 w-3 text-emerald-500" />
-            RBI Compliant
+            {t("prepareEmpty.rbiCompliant")}
           </span>
         </div>
       </div>
