@@ -11,11 +11,11 @@ const buttonVariants = cva(
     variants: {
       variant: {
         primary:
-          "bg-brand text-white shadow-[var(--shadow-brand)] hover:bg-brand-strong",
+          "bg-brand text-white shadow-[var(--shadow-brand)] hover:bg-brand-strong hover-lift active-press hover:shadow-lg transition-all duration-200",
         secondary:
-          "bg-surface text-ink border border-line-strong hover:bg-surface-muted",
-        ghost: "text-ink-soft hover:text-ink hover:bg-surface-muted",
-        confirm: "bg-confirm text-white hover:brightness-95",
+          "glass-pill text-ink border border-line/70 hover:bg-surface-muted/70 hover-lift active-press transition-all duration-200",
+        ghost: "text-ink-soft hover:text-ink hover:bg-surface-muted/60 transition-all duration-200",
+        confirm: "bg-confirm text-white hover:brightness-105 shadow-xs hover:shadow-md hover-lift active-press transition-all duration-200",
       },
       size: {
         sm: "h-9 px-4 text-sm",

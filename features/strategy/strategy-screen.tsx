@@ -54,8 +54,7 @@ export function StrategyScreen() {
         <span className="text-ink-soft">{t("plan.form.dateVal")}</span>
         <span className="text-line-strong">·</span>
         <span className="rounded-[4px] bg-surface-muted px-2 py-0.5 font-medium text-ink">
-          {plan.intent.passengers}{" "}
-          {plan.intent.passengers > 1 ? t("results.travellers") : t("results.traveller")}
+          {plan.intent.passengers ? `${plan.intent.passengers} ${plan.intent.passengers > 1 ? t("results.travellers") : t("results.traveller")}` : t("results.traveller")}
           {plan.intent.preferredClass !== "any" ? ` · ${plan.intent.preferredClass}` : ""}
         </span>
       </div>
@@ -167,8 +166,7 @@ export function StrategyScreen() {
               )}
             </div>
             <div className="tabular mt-0.5 text-[0.85rem] text-ink-soft">
-              {formatFare(chosenOption.fare * plan.intent.passengers)} · {plan.intent.passengers}{" "}
-              {plan.intent.passengers > 1 ? t("results.travellers") : t("results.traveller")}
+              {formatFare(chosenOption.fare * (plan.intent.passengers || 1))} · {plan.intent.passengers ? `${plan.intent.passengers} ${plan.intent.passengers > 1 ? t("results.travellers") : t("results.traveller")}` : t("results.traveller")}
             </div>
           </div>
         </div>

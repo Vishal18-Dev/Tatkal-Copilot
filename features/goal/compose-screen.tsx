@@ -10,12 +10,8 @@ export function ComposeScreen({ initialGoal }: { initialGoal?: string }) {
   const { t } = useLang();
   return (
     <StepShell wide>
-      <div className="mx-auto max-w-3xl">
+      <div className="mx-auto max-w-5xl">
         <CopilotWorkspace initialGoal={initialGoal} />
-      </div>
-
-      <div className="mx-auto mt-10 max-w-4xl">
-        <Promises />
       </div>
     </StepShell>
   );

@@ -2,13 +2,14 @@ import type { Trip, Traveller } from "@/types";
 import type { WalletState } from "@/lib/payments/types";
 import type { IdentityReadiness } from "@/lib/identity/types";
 import type { VoiceLang } from "@/lib/voice/languages";
-import { bcp47For, fromBcp47, isVoiceLang } from "@/lib/voice/languages";
+import { bcp47For, fromBcp47, isVoiceLang, getLanguageDialogue } from "@/lib/voice/languages";
 import { parseVoiceCommand } from "@/lib/voice/commands";
 import type { SemanticCommandIntent } from "@/lib/voice/types";
 import { answerWithTools, type RoutedAnswer } from "./router";
 import {
   prepareJourney,
   requestBookingConfirmation,
+  openBookingFlow,
   useBackupOption,
   explainBookingAuthority,
   getJourneyContext,
@@ -22,6 +23,7 @@ import {
   resolveJourney,
   resolveJourneyAsync,
 } from "./tools";
+
 import type { CopilotContext, ActionPlanResult, ToolResult } from "./types";
 import { validateAgentDecision, type ProposedAgentDecision, type ValidationResult } from "@/lib/action-validator";
 import { addMessage, createConversation } from "@/lib/conversation/service";
@@ -146,6 +148,53 @@ export async function executeCopilotTurn(input: CopilotTurnInput): Promise<Copil
   // 1. Multilingual Semantic Command Parsing
   const command = parseVoiceCommand(originalText, resolvedLang);
   const recognizedIntent: SemanticCommandIntent = command.intent;
+
+  // ── Language Change Control Operation (Invariant 8 & 10) ───────────
+  if (command.intent === "language_change" && command.targetLanguage) {
+    const targetLang = command.targetLanguage;
+    const langPack = getLanguageDialogue(targetLang);
+    const ackText = langPack.switchAck;
+    conv = { ...conv, language: targetLang };
+
+    const { conversation: convWithUser, message: userMsg } = addMessage(conv, {
+      role: "user",
+      channel,
+      originalText,
+      normalizedText: originalText,
+      language: targetLang,
+      intent: "language_change",
+      status: "final",
+    });
+
+    const { conversation: updatedConv, message: assistantMsg } = addMessage(convWithUser, {
+      role: "assistant",
+      channel,
+      originalText: ackText,
+      language: targetLang,
+      status: "final",
+    });
+
+    const currentJourneyState =
+      input.journeyState ?? (input.trip ? journeyStateFromTrip(input.trip) : createJourneyState());
+
+    return {
+      ok: true,
+      channel,
+      originalText,
+      normalizedText: originalText,
+      language: targetLang,
+      intent: "language_change",
+      toolUsed: "language_switch",
+      speakText: ackText,
+      speakEnglish: ackText,
+      conversation: updatedConv,
+      userMessage: userMsg,
+      assistantMessage: assistantMsg,
+      journeyState: currentJourneyState,
+      trip: input.trip,
+    };
+  }
+
   // ── Journey State: bootstrap or thread ────────────────────────────
   // Priority: explicit journeyState input > trip snapshot > empty
   let journeyState: ConversationalJourneyState =
@@ -182,8 +231,11 @@ export async function executeCopilotTurn(input: CopilotTurnInput): Promise<Copil
   let validation: ValidationResult | undefined = undefined;
   let speakEnglish = "";
 
+  const wasPendingClarification = Boolean(journeyState.pendingClarification || input.journeyState?.pendingClarification);
+
   // ── Journey intent detection ───────────────────────────────────────
   // Trigger resolution when ANY new journey constraint was extracted,
+  // when a clarification question is being answered,
   // when the trip is stale and needs re-resolution, or when the classic
   // travel-verb patterns appear.
   const hasExtractedConstraint = Boolean(
@@ -197,23 +249,102 @@ export async function executeCopilotTurn(input: CopilotTurnInput): Promise<Copil
     extracted.timeConstraint ||
     extracted.travelDate ||
     extracted.travelClass ||
-    extracted.passengerCount
+    extracted.passengerCount ||
+    extracted.allowedQuotas ||
+    extracted.excludedQuotas
   );
 
-  const hasTravelIntent =
+  let hasTravelIntent =
     hasExtractedConstraint ||
+    wasPendingClarification ||
     tripIsStale ||
     /\b(from\s+[a-z]+|to\s+[a-z]+|reach\s+[a-z]+|jaana hai|chalo)\b/i.test(originalText);
 
   // 3. Command-first Intent Routing
   const isBackupAction = /\b(switch to backup|use backup|activate backup|take backup|go with backup|backup lagao|backup use karo)\b/i.test(originalText);
   const isQueryingBackup = /\b(show|what|tell|describe|view|see|status|kaise|dikh|bata)\b/i.test(originalText) ||
-    /बैकअप दिखाओ|പര്യായം കാണിക്കൂ|பரிந்துரை/i.test(originalText);
+    /बैकअप दिखाओ|पर्यायं കാണിക്കൂ|பரிந்துரை/i.test(originalText);
 
-  const isBookingAction = /\b(book it|book now|start booking|book this|proceed to book|ticket book|book karo)\b/i.test(originalText);
-  const isPreparationAction = /\b(prepare|prepare journey|prepare tatkal|prepare for tatkal|prepare best|setup tatkal|prepare it|prepare the best|get it ready|prepare the best one|prepare the best option)\b/i.test(originalText);
+  const isPtSwitchAction =
+    /\b(use premium tatkal|switch to premium tatkal|try premium tatkal|pt use karo|pt try karo)\b/i.test(originalText) ||
+    /प्रीमियम तत्काल लगाओ|प्रीमियम तत्काल करो/i.test(originalText);
 
-  if (isBackupAction || (recognizedIntent === "backup" && !isQueryingBackup)) {
+  const isPtQuery =
+    /\b(premium tatkal|pt)\b/i.test(originalText) &&
+    /\b(show|what|tell|can you|option|price|fare|kya hai|kitna|kaise|rule|cancellation)\b/i.test(originalText);
+
+  const isAffirmativeProceed =
+    /\b(?:proceed|go ahead|continue|chalo)\b/i.test(originalText) ||
+    /^(?:yes|yeah|yep|yup|haan?|sure|ok|okay)[,\s]*(?:proceed|with\s+(?:the\s+)?booking|book|karo|chalo)?/i.test(originalText.trim());
+
+  const isBookingAction =
+    !wasPendingClarification && (
+      isAffirmativeProceed ||
+      /\b(book it|book now|start booking|book this|proceed to book|ticket book|book karo)\b/i.test(originalText) ||
+      /\b(?:can\s+you\s+)?(?:proceed|go\s+ahead|start|continue)\s*(?:with\s+(?:the\s+)?)?(?:booking|reservation|ticket|tickets|tatkal)\b/i.test(originalText) ||
+      /\b(?:proceed|book\s+this\s+train|book\s+the\s+train|book\s+ticket)\b/i.test(originalText) ||
+      /\b(book\s+this\s+trip|book\s+the\s+trip|book\s+trip|book\s+this\s+journey|i\s+want\s+to\s+book|want\s+to\s+book|please\s+book|confirm\s+booking|confirm\s+the\s+booking|confirm\s+trip|book)\b/i.test(originalText.trim())
+    );
+  const isPreparationAction =
+    /\b(prepare|prepare journey|prepare tatkal|prepare for tatkal|prepare best|setup tatkal|prepare it|prepare the best|get it ready|prepare the best one|prepare the best option)\b/i.test(originalText) ||
+    /\b(?:can\s+you\s+)?(?:prepare|get\s+ready)\s*(?:the\s+)?(?:booking|journey|tatkal)\b/i.test(originalText);
+
+  const pendingClarificationField = input.journeyState?.pendingClarification ?? journeyState.pendingClarification;
+  const isAcknowledgement =
+    /^(?:okay|ok|okie|k|sure|yes|yeah|yep|yup|hmm|hm|right|got it|fine|alright|all right|haan|theek hai|theek|ha|achha|acha|accha|done|cool)[\.!\s]*$/i.test(
+      originalText.trim()
+    );
+
+  if (pendingClarificationField === "origin" && isAcknowledgement && !journeyState.originText) {
+    toolUsed = "clarify_origin";
+    speakEnglish = ctx.lang === "hi"
+      ? "मुझे अभी भी आपका शुरूआती स्टेशन या शहर चाहिए। आप कहाँ से निकल रहे हैं?"
+      : "I still need your starting location. Which city or area are you leaving from?";
+    journeyState.pendingClarification = "origin";
+  } else if (pendingClarificationField === "destination" && isAcknowledgement && !journeyState.destinationText) {
+    toolUsed = "clarify_destination";
+    speakEnglish = ctx.lang === "hi"
+      ? "मुझे अभी भी आपका गंतव्य चाहिए। आप कहाँ जाना चाहते हैं?"
+      : "I still need your destination. Which city or station would you like to travel to?";
+    journeyState.pendingClarification = "destination";
+  } else if (pendingClarificationField === "passengerCount" && isAcknowledgement && !journeyState.passengerCount) {
+    toolUsed = "clarify_passenger_count";
+    speakEnglish = ctx.lang === "hi"
+      ? "कुल कितने यात्री यात्रा करेंगे? कृपया संख्या बताएं।"
+      : "How many passengers will be travelling?";
+    journeyState.pendingClarification = "passengerCount";
+  } else if (isPtSwitchAction) {
+    toolUsed = "switch_to_premium_tatkal";
+    const { switchToPremiumTatkal } = await import("./tools");
+    actionPlan = switchToPremiumTatkal(ctx, journeyState);
+    speakEnglish = actionPlan.speak;
+    const tripForValidation = effectiveTrip ?? input.trip;
+    if (tripForValidation) {
+      validation = validateAgentDecision(
+        {
+          action: "switch_to_premium_tatkal",
+          reason: "User requested switch to Premium Tatkal via Copilot",
+          source: "local",
+          toolCall: {
+            name: "switchToPremiumTatkal",
+            arguments: {
+              fare: tripForValidation.backup?.fare,
+              maxFare: journeyState.maxFare,
+              maxPremiumTatkalFare: journeyState.maxPremiumTatkalFare,
+            },
+          },
+        },
+        tripForValidation,
+        new Set(),
+        isUserInitiated
+      );
+    }
+  } else if (isPtQuery) {
+    toolUsed = "explain_strategy";
+    const { explainStrategy } = await import("./tools");
+    toolResult = explainStrategy(ctx, journeyState);
+    speakEnglish = toolResult.speak;
+  } else if (isBackupAction || (recognizedIntent === "backup" && !isQueryingBackup)) {
     toolUsed = "use_backup_option";
     actionPlan = useBackupOption(ctx);
     speakEnglish = actionPlan.speak;
@@ -235,20 +366,192 @@ export async function executeCopilotTurn(input: CopilotTurnInput): Promise<Copil
     actionPlan = prepareJourney(ctx);
     speakEnglish = actionPlan.speak;
   } else if (isBookingAction) {
-    toolUsed = "request_booking_confirmation";
-    actionPlan = requestBookingConfirmation(ctx);
-    speakEnglish = actionPlan.speak;
-    const tripForValidation = effectiveTrip ?? input.trip;
-    if (tripForValidation) {
-      validation = validateAgentDecision(
-        { action: "open_booking_flow", reason: "User requested booking via Copilot", source: "local" },
-        tripForValidation,
-        new Set(),
-        isUserInitiated
+    let tripForBooking = effectiveTrip ?? (!tripIsStale ? input.trip : undefined);
+    if (!tripForBooking && journeyState.originText && journeyState.destinationText) {
+      toolResult = await resolveJourneyAsync(
+        journeyState.originText,
+        journeyState.destinationText,
+        ctx,
+        journeyState
       );
+      if (toolResult.ok && toolResult.data && (toolResult.data as JourneyResolutionResult).primary) {
+        const data = toolResult.data as JourneyResolutionResult;
+        const primary = data.primary!;
+        const backup = data.backup;
+
+        const newTrip: Trip = {
+          id: `trip_${Date.now()}`,
+          status: "upcoming",
+          from: data.origin.name,
+          fromCode: primary.boardingStation.code,
+          to: data.destination.name,
+          toCode: primary.arrivalStation.code,
+          dateLabel: "Tomorrow",
+          trainName: primary.train.name,
+          travelClass: primary.travelClass,
+          travellerIds: ["p1"],
+          boardingStationName: primary.boardingStation.name,
+          arrivalDisplay: primary.train.arrival + " · tomorrow",
+          fare: primary.fare,
+          mode: "assisted",
+          agentState: "scheduled",
+          agentEnabled: true,
+          tatkalOpensAtLabel: "10:00 AM",
+          primary: {
+            optionId: primary.optionId,
+            trainName: primary.train.name,
+            travelClass: primary.travelClass,
+            boardingStationName: primary.boardingStation.name,
+            departureDisplay: primary.train.departure,
+            arrivalDisplay: primary.train.arrival + " · tomorrow",
+            level: primary.tatkalConfirmProbability > 60 ? "High" : "Medium",
+            fare: primary.fare,
+          },
+          backup: backup ? {
+            optionId: backup.optionId,
+            trainName: backup.train.name,
+            travelClass: backup.travelClass,
+            boardingStationName: backup.boardingStation.name,
+            departureDisplay: backup.train.departure,
+            arrivalDisplay: backup.train.arrival + " · tomorrow",
+            level: backup.tatkalConfirmProbability > 60 ? "High" : "Medium",
+            fare: backup.fare,
+          } : undefined,
+          readinessDone: [],
+          planNotifications: [],
+          createdAt: new Date().toISOString(),
+        };
+        tripForBooking = newTrip;
+        input.trip = newTrip;
+        ctx.trip = newTrip;
+      }
     }
-  } else if (recognizedIntent === "confirm") {
-    const activeTrip = effectiveTrip ?? input.trip;
+    if (!tripForBooking) {
+      // No journey context — ask the user to specify where they want to travel.
+      // Never silently default to a hardcoded corridor.
+      toolUsed = "missing_journey_context";
+      speakEnglish = journeyState.originText
+        ? `Destination batao — kahan jaana hai ${journeyState.originText} se?`
+        : "To book a Tatkal ticket, I need your journey first! Kahan se kahan jaana hai?";
+      journeyState.pendingClarification = journeyState.originText ? "destination" : "origin";
+    }
+
+    if (!tripForBooking && input.trip) {
+      tripForBooking = input.trip;
+      ctx.trip = input.trip;
+    }
+
+    if (tripForBooking) {
+      ctx.trip = tripForBooking;
+      input.trip = tripForBooking;
+    }
+
+    if (isAffirmativeProceed) {
+      toolUsed = "open_booking_flow";
+      actionPlan = openBookingFlow(ctx);
+      speakEnglish = actionPlan.speak;
+      if (tripForBooking) {
+        validation = validateAgentDecision(
+          { action: "open_booking_flow", reason: "User confirmed booking via Copilot", source: "local" },
+          tripForBooking,
+          new Set(),
+          isUserInitiated
+        );
+      }
+    } else {
+      toolUsed = "request_booking_confirmation";
+      actionPlan = requestBookingConfirmation(ctx);
+      speakEnglish = actionPlan.speak;
+      if (tripForBooking) {
+        validation = validateAgentDecision(
+          { action: "open_booking_flow", reason: "User requested booking via Copilot", source: "local" },
+          tripForBooking,
+          new Set(),
+          isUserInitiated
+        );
+      }
+    }
+  } else if (recognizedIntent === "confirm" || command.kind === "confirm" || command.intent === "yes") {
+    let activeTrip = effectiveTrip ?? (!tripIsStale ? input.trip : undefined);
+    if (!activeTrip && journeyState.originText && journeyState.destinationText) {
+      toolResult = await resolveJourneyAsync(
+        journeyState.originText,
+        journeyState.destinationText,
+        ctx,
+        journeyState
+      );
+      if (toolResult.ok && toolResult.data && (toolResult.data as JourneyResolutionResult).primary) {
+        const data = toolResult.data as JourneyResolutionResult;
+        const primary = data.primary!;
+        const backup = data.backup;
+
+        const newTrip: Trip = {
+          id: `trip_${Date.now()}`,
+          status: "upcoming",
+          from: data.origin.name,
+          fromCode: primary.boardingStation.code,
+          to: data.destination.name,
+          toCode: primary.arrivalStation.code,
+          dateLabel: "Tomorrow",
+          trainName: primary.train.name,
+          travelClass: primary.travelClass,
+          travellerIds: ["p1"],
+          boardingStationName: primary.boardingStation.name,
+          arrivalDisplay: primary.train.arrival + " · tomorrow",
+          fare: primary.fare,
+          mode: "assisted",
+          agentState: "scheduled",
+          agentEnabled: true,
+          tatkalOpensAtLabel: "10:00 AM",
+          primary: {
+            optionId: primary.optionId,
+            trainName: primary.train.name,
+            travelClass: primary.travelClass,
+            boardingStationName: primary.boardingStation.name,
+            departureDisplay: primary.train.departure,
+            arrivalDisplay: primary.train.arrival + " · tomorrow",
+            level: primary.tatkalConfirmProbability > 60 ? "High" : "Medium",
+            fare: primary.fare,
+          },
+          backup: backup ? {
+            optionId: backup.optionId,
+            trainName: backup.train.name,
+            travelClass: backup.travelClass,
+            boardingStationName: backup.boardingStation.name,
+            departureDisplay: backup.train.departure,
+            arrivalDisplay: backup.train.arrival + " · tomorrow",
+            level: backup.tatkalConfirmProbability > 60 ? "High" : "Medium",
+            fare: backup.fare,
+          } : undefined,
+          readinessDone: [],
+          planNotifications: [],
+          createdAt: new Date().toISOString(),
+        };
+        activeTrip = newTrip;
+        input.trip = newTrip;
+        ctx.trip = newTrip;
+      }
+    }
+    if (!activeTrip) {
+      // No journey context — ask the user to specify their journey.
+      // Never silently default to a hardcoded corridor.
+      toolUsed = "missing_journey_context";
+      speakEnglish = journeyState.originText
+        ? `Destination batao — kahan jaana hai ${journeyState.originText} se?`
+        : "Kahan se kahan jaana hai? Please tell me your origin and destination!";
+      journeyState.pendingClarification = journeyState.originText ? "destination" : "origin";
+    }
+
+    if (!activeTrip && input.trip) {
+      activeTrip = input.trip;
+      ctx.trip = input.trip;
+    }
+
+    if (activeTrip) {
+      ctx.trip = activeTrip;
+      input.trip = activeTrip;
+    }
+
     if (activeTrip?.agentState === "backup_recommended") {
       toolUsed = "use_backup_option";
       actionPlan = useBackupOption(ctx);
@@ -259,23 +562,35 @@ export async function executeCopilotTurn(input: CopilotTurnInput): Promise<Copil
         new Set(),
         isUserInitiated
       );
-    } else if (activeTrip?.agentState === "window_open") {
-      toolUsed = "request_booking_confirmation";
-      actionPlan = requestBookingConfirmation(ctx);
-      speakEnglish = actionPlan.speak;
-      validation = validateAgentDecision(
-        { action: "open_booking_flow", reason: "User confirmed booking via Copilot", source: "local" },
-        activeTrip,
-        new Set(),
-        isUserInitiated
-      );
+    } else if (activeTrip) {
+      const isInitialBookCommand = /\b(book it|book now|start booking|can you book|will you book|please book)\b/i.test(originalText);
+      if (isInitialBookCommand) {
+        toolUsed = "request_booking_confirmation";
+        actionPlan = requestBookingConfirmation(ctx);
+        speakEnglish = actionPlan.speak;
+        validation = validateAgentDecision(
+          { action: "open_booking_flow", reason: "User requested booking via Copilot", source: "local" },
+          activeTrip,
+          new Set(),
+          isUserInitiated
+        );
+      } else {
+        toolUsed = "open_booking_flow";
+        actionPlan = openBookingFlow(ctx);
+        speakEnglish = actionPlan.speak;
+        validation = validateAgentDecision(
+          { action: "open_booking_flow", reason: "User confirmed booking via Copilot", source: "local" },
+          activeTrip,
+          new Set(),
+          isUserInitiated
+        );
+      }
     } else {
       toolUsed = "confirm_current_action";
-      speakEnglish = activeTrip
-        ? `Confirmed. I'm keeping watch over your journey on ${activeTrip.primary.trainName}.`
-        : "Confirmed. Tell me where you'd like to travel.";
+      speakEnglish = "Confirmed. Tell me where you'd like to travel.";
     }
-  } else if (recognizedIntent === "no" || recognizedIntent === "cancel" || recognizedIntent === "stop") {
+
+  } else if (!wasPendingClarification && (recognizedIntent === "no" || recognizedIntent === "cancel" || recognizedIntent === "stop" || command.kind === "reject" || command.kind === "cancel")) {
     toolUsed = "cancel_action";
     speakEnglish = "Understood. I have set that aside and will wait for your instructions.";
   } else if (/\b(retry|try again|phir se|dobara|ek baar aur)\b/i.test(originalText) || recognizedIntent === "repeat") {
@@ -296,7 +611,24 @@ export async function executeCopilotTurn(input: CopilotTurnInput): Promise<Copil
     toolUsed = "help";
     speakEnglish = "I can check your journey status, payment readiness, backup options, or Tatkal countdown. What would you like to know?";
   } else {
-    if (hasTravelIntent) {
+    const isAcknowledgement =
+      /^(?:okay|ok|okie|k|sure|yes|yeah|yep|yup|hmm|hm|right|got it|fine|alright|all right|haan|theek hai|theek|ha|achha|acha|accha|done|cool)[\.!\s]*$/i.test(
+        originalText.trim()
+      );
+
+    if (pendingClarificationField === "origin" && (!journeyState.originText || isAcknowledgement)) {
+      toolUsed = "clarify_origin";
+      speakEnglish = ctx.lang === "hi"
+        ? "मुझे अभी भी आपका शुरूआती स्टेशन या शहर चाहिए। आप कहाँ से निकल रहे हैं?"
+        : "I still need your starting location. Which city or area are you leaving from?";
+      journeyState.pendingClarification = "origin";
+    } else if (pendingClarificationField === "destination" && (!journeyState.destinationText || isAcknowledgement)) {
+      toolUsed = "clarify_destination";
+      speakEnglish = ctx.lang === "hi"
+        ? "मुझे अभी भी आपका गंतव्य चाहिए। आप कहाँ जाना चाहते हैं?"
+        : "I still need your destination. Which city or station would you like to travel to?";
+      journeyState.pendingClarification = "destination";
+    } else if (hasTravelIntent) {
       toolUsed = "resolve_journey";
 
       // ── MERGE-FIRST RESOLUTION ──────────────────────────────────────
@@ -327,6 +659,34 @@ export async function executeCopilotTurn(input: CopilotTurnInput): Promise<Copil
         if (data.primary) {
           const primary = data.primary;
           const backup = data.backup;
+
+          const { evaluateBookingStrategies } = await import("@/lib/booking/strategy-engine");
+          const strategyResult = evaluateBookingStrategies({
+            rankedJourneys: data.rankedOptions,
+            constraints: {
+              maxFare: journeyState.maxFare,
+              maxPremiumTatkalFare: journeyState.maxPremiumTatkalFare,
+              preferredClass: journeyState.travelClass,
+              preferredBoardingStation: journeyState.boardingStationPreference,
+              confirmationPriority: journeyState.confirmationPriority,
+              priceSensitivity: journeyState.priceSensitivity,
+              arrivalPriority: journeyState.arrivalPriority,
+              allowedQuotas: journeyState.allowedQuotas,
+              excludedQuotas: journeyState.excludedQuotas,
+              allowAutomaticFallback: journeyState.allowAutomaticFallback,
+            },
+            authorization: {
+              mode: effectiveTrip?.mode === "auto" ? "permissioned" : "assisted",
+              authorizedQuotas: journeyState.excludedQuotas?.includes("PT") ? ["TQ", "GN"] : ["TQ", "PT", "GN"],
+              maxFare: journeyState.maxFare,
+              maxPremiumTatkalFare: journeyState.maxPremiumTatkalFare,
+              allowAutomaticFallback: Boolean(journeyState.allowAutomaticFallback),
+              requireConfirmationForPremiumTatkal: effectiveTrip?.mode !== "auto",
+            },
+            isDemoMode: true,
+          });
+
+          const chosenBackup = strategyResult.backup;
 
           // Always create a new trip ID when the journey changes materially
           // so callers cannot accidentally reuse a stale trip by ID.
@@ -363,27 +723,108 @@ export async function executeCopilotTurn(input: CopilotTurnInput): Promise<Copil
               level: primary.tatkalConfirmProbability > 60 ? "High" : "Medium",
               fare: primary.fare,
             },
-            backup: backup
+            backup: chosenBackup
               ? {
-                  optionId: backup.optionId,
-                  trainName: backup.train.name,
-                  travelClass: backup.travelClass,
-                  boardingStationName: backup.boardingStation.name,
-                  departureDisplay: backup.train.departure,
-                  arrivalDisplay: backup.train.arrival + " · tomorrow",
-                  level: backup.tatkalConfirmProbability > 60 ? "High" : "Medium",
-                  fare: backup.fare,
+                  optionId: chosenBackup.id,
+                  trainName: chosenBackup.trainName,
+                  travelClass: (chosenBackup.travelClass as any) || primary.travelClass,
+                  boardingStationName: chosenBackup.boardingStation.name,
+                  departureDisplay: chosenBackup.departure,
+                  arrivalDisplay: chosenBackup.arrival + " · tomorrow",
+                  level: "High",
+                  fare: chosenBackup.fare.amount ?? (backup ? backup.fare : primary.fare),
                 }
-              : undefined,
+              : (backup
+                  ? {
+                      optionId: backup.optionId,
+                      trainName: backup.train.name,
+                      travelClass: backup.travelClass,
+                      boardingStationName: backup.boardingStation.name,
+                      departureDisplay: backup.train.departure,
+                      arrivalDisplay: backup.train.arrival + " · tomorrow",
+                      level: backup.tatkalConfirmProbability > 60 ? "High" : "Medium",
+                      fare: backup.fare,
+                    }
+                  : undefined),
             readinessDone: [],
             planNotifications: [],
             createdAt: new Date().toISOString(),
           };
 
+          (newTrip as any).userConstraints = {
+            maxFare: journeyState.maxFare,
+            maxPremiumTatkalFare: journeyState.maxPremiumTatkalFare,
+            confirmationPriority: journeyState.confirmationPriority,
+            priceSensitivity: journeyState.priceSensitivity,
+            arrivalPriority: journeyState.arrivalPriority,
+            allowedQuotas: journeyState.allowedQuotas,
+            excludedQuotas: journeyState.excludedQuotas,
+            allowAutomaticFallback: journeyState.allowAutomaticFallback,
+          };
+
+          (newTrip as any).strategyAuthorization = {
+            mode: effectiveTrip?.mode || "assisted",
+            authorizedQuotas: journeyState.excludedQuotas?.includes("PT") ? ["TQ", "GN"] : ["TQ", "PT", "GN"],
+            maxFare: journeyState.maxFare,
+            maxPremiumTatkalFare: journeyState.maxPremiumTatkalFare,
+            allowAutomaticFallback: Boolean(journeyState.allowAutomaticFallback),
+            requireConfirmationForPremiumTatkal: (effectiveTrip?.mode || "assisted") === "assisted",
+          };
+
+          // If strategy engine has specific constraints rationale, add it to speak output
+          if (
+            journeyState.maxFare ||
+            journeyState.maxPremiumTatkalFare ||
+            journeyState.allowedQuotas ||
+            journeyState.excludedQuotas ||
+            journeyState.confirmationPriority ||
+            journeyState.priceSensitivity
+          ) {
+            if (strategyResult.explanation) {
+              speakEnglish += ` ${strategyResult.explanation}`;
+            }
+          }
+
           // Update both the mutable input reference and the context so
           // subsequent tool calls in THIS turn see the fresh trip.
           input.trip = newTrip;
           ctx.trip = newTrip;
+
+          // If all details are in place (no pending clarification)
+          // AND the user asked to proceed/book (or confirmed):
+          const userWantsBooking =
+            /\b(proceed|book|open|start|confirm|chalo|karo)\b/i.test(originalText) ||
+            recognizedIntent === "yes";
+
+          // ── Proactive clarification for missing key booking details ──────────
+          // After resolving origin+destination, ask for passengers / class /
+          // Premium Tatkal preference if they haven't been provided yet.
+          // Only ask when the user hasn't already said "proceed".
+          if (!journeyState.pendingClarification && !userWantsBooking) {
+            if (!journeyState.passengerCount) {
+              speakEnglish += " How many passengers will be travelling?";
+              journeyState.pendingClarification = "passengerCount";
+            } else if (!journeyState.travelClass) {
+              speakEnglish += " Which class — 3A (AC 3 Tier), 2A (AC 2 Tier), or SL (Sleeper)?";
+              journeyState.pendingClarification = "travelClass";
+            } else if (!journeyState.allowedQuotas && !journeyState.excludedQuotas) {
+              speakEnglish += " Would you like to enable Premium Tatkal (guaranteed availability, slightly higher fare)?";
+              journeyState.pendingClarification = "quotaPreference";
+            }
+          }
+
+
+          if (!journeyState.pendingClarification && userWantsBooking && wasPendingClarification) {
+            toolUsed = "request_booking_confirmation";
+            actionPlan = requestBookingConfirmation(ctx);
+            speakEnglish = actionPlan.speak;
+            validation = validateAgentDecision(
+              { action: "open_booking_flow", reason: "User requested booking via Copilot", source: "local" },
+              newTrip,
+              new Set(),
+              isUserInitiated
+            );
+          }
         }
       }
     } else {

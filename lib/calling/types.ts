@@ -8,6 +8,7 @@ export type CallState =
   | "listening" // user speech being captured / transcribed
   | "thinking" // Copilot brain processing turn
   | "speaking" // Copilot's line is playing (TTS)
+  | "switching_language" // Language transition acknowledgement in progress
   | "interrupted" // user barge-in interrupted Copilot speech
   | "awaiting_reply" // waiting for the user to tap or speak a reply
   | "ended";
@@ -45,4 +46,6 @@ export interface CallSpeakRequest {
 export interface CallSpeakResult {
   audioBase64?: string;
   audioCodec?: string;
+  text?: string;
+  voiceLang?: string;
 }

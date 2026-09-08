@@ -420,6 +420,23 @@ export class TatkalAgent {
         break;
       }
 
+      case "switch_to_premium_tatkal": {
+        await this.activateBackupStrategy();
+        executedTool = "switchToPremiumTatkal";
+        break;
+      }
+
+      case "evaluate_strategy": {
+        this.callbacks.updateTrip(this.trip.id, { agentState: "backup_recommended" });
+        this.recordEvent({
+          kind: "strategy_change",
+          text: `Agent evaluating strategy options: Primary ${this.trip.primary.trainName}, Backup ${this.trip.backup?.trainName ?? "none"}`,
+          metadata: { action: "evaluate_strategy" },
+        });
+        executedTool = "evaluateStrategy";
+        break;
+      }
+
       case "evaluate_backup": {
         this.callbacks.updateTrip(this.trip.id, { agentState: "backup_recommended" });
         this.recordEvent({

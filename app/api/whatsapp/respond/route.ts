@@ -89,9 +89,13 @@ function qr(kind: QuickReply["kind"], lang: Lang): QuickReply {
 }
 
 function phraseUnderstood(intent: ReturnType<typeof parseIntentLocally>, lang: Lang): string {
+  const paxTextHi = intent.passengers ? `${intent.passengers} यात्री` : "यात्री";
+  const paxTextEn = intent.passengers
+    ? `${intent.passengers} traveller${intent.passengers > 1 ? "s" : ""}`
+    : "travellers";
   return lang === "hi"
-    ? `समझ गया — ${intent.from} से ${intent.to}, ${intent.passengers} यात्री। सबसे ज़्यादा ज़रूरी क्या है?`
-    : `Got it — ${intent.from} to ${intent.to}, ${intent.passengers} traveller${intent.passengers > 1 ? "s" : ""}. What matters most?`;
+    ? `समझ गया — ${intent.from} से ${intent.to}, ${paxTextHi}। सबसे ज़्यादा ज़रूरी क्या है?`
+    : `Got it — ${intent.from} to ${intent.to}, ${paxTextEn}. What matters most?`;
 }
 
 function phraseRecommendation(train: string, cls: string, arrival: string, lang: Lang): string {

@@ -216,7 +216,45 @@ export function requestBookingConfirmation(ctx: CopilotContext): ActionPlanResul
   };
 }
 
+/**
+ * Open the booking flow directly once confirmation has been given by the user.
+ */
+export function openBookingFlow(ctx: CopilotContext): ActionPlanResult {
+  const trip = needTrip(ctx);
+  if (!trip) {
+    return { ok: false, speak: NO_TRIP, permission: "booking", requiresConfirmation: false, error: "no_trip" };
+  }
+  const validation = validateAgentDecision(
+    { action: "open_booking_flow", reason: "Copilot user confirmed proceeding to booking", source: "local" },
+    trip,
+    new Set(),
+    true
+  );
+  if (!validation.valid) {
+    return {
+      ok: false,
+      speak:
+        trip.agentState === "confirmed"
+          ? "This journey is already confirmed — nothing more to book."
+          : "We can't start booking just yet.",
+      permission: "booking",
+      requiresConfirmation: false,
+      error: validation.code,
+    };
+  }
+  return {
+    ok: true,
+    speak: ctx.lang === "hi"
+      ? `बिल्कुल! ${trip.primary.trainName} की तत्काल बुकिंग शुरू कर रहा हूँ।`
+      : `Starting the booking flow for ${trip.primary.trainName} now.`,
+    permission: "booking",
+    requiresConfirmation: false,
+    route: { kind: "mission_control", tripId: trip.id },
+  };
+}
+
 /** Use the backup strategy — booking-level, validated, always confirmed. */
+
 export function useBackupOption(ctx: CopilotContext): ActionPlanResult {
   const trip = needTrip(ctx);
   if (!trip) {
@@ -259,6 +297,121 @@ export function explainBookingAuthority(ctx: CopilotContext): ToolResult {
     ok: true,
     speak: "I'll start your prepared booking strategy.",
     data: { mode: "auto", canAutonomouslyBook: true },
+  };
+}
+
+export function getBookingStrategies(
+  ctx: CopilotContext,
+  journeyState?: import("./journey-state").ConversationalJourneyState
+): ToolResult {
+  const trip = needTrip(ctx);
+  if (!trip) return { ok: false, speak: NO_TRIP, error: "no_trip" };
+
+  const primaryName = trip.primary.trainName;
+  const backupName = trip.backup?.trainName;
+  const fareStr = `₹${trip.fare.toLocaleString("en-IN")}`;
+  const maxFareStr = journeyState?.maxFare ? ` within your ₹${journeyState.maxFare} limit` : "";
+
+  let speak = `Your primary strategy is Regular Tatkal on ${primaryName} in ${trip.primary.travelClass} (${fareStr}${maxFareStr}).`;
+  if (backupName) {
+    speak += ` If unavailable, Copilot will evaluate Premium Tatkal or ${backupName} as your backup strategy.`;
+  }
+
+  return {
+    ok: true,
+    speak,
+    data: {
+      primary: trip.primary,
+      backup: trip.backup,
+      constraints: {
+        maxFare: journeyState?.maxFare,
+        maxPremiumTatkalFare: journeyState?.maxPremiumTatkalFare,
+        priceSensitivity: journeyState?.priceSensitivity,
+        confirmationPriority: journeyState?.confirmationPriority,
+        excludedQuotas: journeyState?.excludedQuotas,
+      },
+    },
+  };
+}
+
+export function switchToPremiumTatkal(
+  ctx: CopilotContext,
+  journeyState?: import("./journey-state").ConversationalJourneyState
+): ActionPlanResult {
+  const trip = needTrip(ctx);
+  if (!trip) {
+    return { ok: false, speak: NO_TRIP, permission: "booking", requiresConfirmation: true, error: "no_trip" };
+  }
+
+  const ptFare = trip.backup?.fare ?? Math.round(trip.fare * 1.35);
+  const validation = validateAgentDecision(
+    {
+      action: "switch_to_premium_tatkal",
+      reason: "User requested switch to Premium Tatkal",
+      source: "local",
+      toolCall: {
+        name: "switchToPremiumTatkal",
+        arguments: {
+          fare: ptFare,
+          maxFare: journeyState?.maxFare,
+          maxPremiumTatkalFare: journeyState?.maxPremiumTatkalFare,
+        },
+      },
+    },
+    trip,
+    new Set(),
+    true
+  );
+
+  if (!validation.valid) {
+    return {
+      ok: false,
+      speak: `Cannot switch to Premium Tatkal: ${validation.reason}`,
+      permission: "booking",
+      requiresConfirmation: true,
+      error: validation.code,
+    };
+  }
+
+  return {
+    ok: true,
+    speak: `Premium Tatkal is available for ₹${ptFare.toLocaleString("en-IN")}. Note that confirmed Premium Tatkal tickets are non-refundable on cancellation. Would you like me to proceed?`,
+    permission: "booking",
+    requiresConfirmation: true,
+    route: { kind: "mission_control", tripId: trip.id },
+  };
+}
+
+export function explainStrategy(
+  ctx: CopilotContext,
+  journeyState?: import("./journey-state").ConversationalJourneyState
+): ToolResult {
+  const trip = needTrip(ctx);
+  if (!trip) return { ok: false, speak: NO_TRIP, error: "no_trip" };
+
+  const isPtExcluded = journeyState?.excludedQuotas?.includes("PT");
+  let ptNote = "";
+  if (isPtExcluded) {
+    ptNote = " You have explicitly excluded Premium Tatkal.";
+  } else if (journeyState?.maxPremiumTatkalFare) {
+    ptNote = ` Premium Tatkal is permitted up to ₹${journeyState.maxPremiumTatkalFare}.`;
+  } else if (journeyState?.maxFare) {
+    ptNote = ` Total fare ceiling is set to ₹${journeyState.maxFare}.`;
+  }
+
+  const speak = `I'll try regular Tatkal first on ${trip.primary.trainName}.${ptNote} If Tatkal runs out, Copilot will switch to your authorized backup option.`;
+
+  return {
+    ok: true,
+    speak,
+    data: {
+      tripId: trip.id,
+      primaryTrain: trip.primary.trainName,
+      backupTrain: trip.backup?.trainName,
+      ptExcluded: isPtExcluded,
+      maxFare: journeyState?.maxFare,
+      maxPtFare: journeyState?.maxPremiumTatkalFare,
+    },
   };
 }
 
@@ -319,10 +472,30 @@ export function resolveJourney(
     directOnly: journeyState?.directOnly,
     priority: journeyState?.priority,
   });
+
+  let probeNote = "";
+  let pendingClarification: ConversationalJourneyState["pendingClarification"] = undefined;
+
+  if (ranking.primary) {
+    if (!journeyState?.travelDate) {
+      pendingClarification = "travelDate";
+      probeNote = ctx.lang === "hi"
+        ? " आप कब यात्रा करना चाहते हैं — कल, या किसी और दिन?"
+        : " When are you planning to travel — tomorrow, or on another date?";
+    } else {
+      probeNote = ctx.lang === "hi"
+        ? " आपकी यात्रा की प्राथमिकताएं सेट हैं। क्या मैं तत्काल बुकिंग के साथ आगे बढ़ूँ?"
+        : " All details are in place. Shall I proceed with the booking?";
+    }
+  }
+
   return {
     ok: Boolean(ranking.primary),
-    speak: ranking.explanation,
-    data: ranking,
+    speak: ranking.explanation + probeNote,
+    data: {
+      ...ranking,
+      pendingClarification,
+    },
   };
 }
 
@@ -383,10 +556,29 @@ export async function resolveJourneyAsync(
     priority: journeyState?.priority,
   });
 
+  let asyncProbeNote = "";
+  let asyncPendingClarification: ConversationalJourneyState["pendingClarification"] = undefined;
+
+  if (ranking.primary) {
+    if (!journeyState?.travelDate) {
+      asyncPendingClarification = "travelDate";
+      asyncProbeNote = ctx.lang === "hi"
+        ? " आप कब यात्रा करना चाहते हैं — कल, या किसी और दिन?"
+        : " When are you planning to travel — tomorrow, or on another date?";
+    } else {
+      asyncProbeNote = ctx.lang === "hi"
+        ? " आपकी यात्रा की प्राथमिकताएं सेट हैं। क्या मैं तत्काल बुकिंग के साथ आगे बढ़ूँ?"
+        : " All details are in place. Shall I proceed with the booking?";
+    }
+  }
+
   return {
     ok: Boolean(ranking.primary),
-    speak: ranking.explanation,
-    data: ranking,
+    speak: ranking.explanation + asyncProbeNote,
+    data: {
+      ...ranking,
+      pendingClarification: asyncPendingClarification,
+    },
   };
 }
 
@@ -405,7 +597,12 @@ export const COPILOT_TOOLS: Record<string, CopilotToolMeta> = {
   resolve_journey: { name: "resolve_journey", purpose: "Resolve places, candidate stations, and ranked trains.", inputs: ["originQuery", "destQuery"], output: "Ranked trains, stations, and rationale.", permission: "informational", requiresConfirmation: false },
   prepare_journey: { name: "prepare_journey", purpose: "Start preparing the journey.", inputs: ["trip"], output: "A route into Mission Control.", permission: "preparation", requiresConfirmation: false },
   request_booking_confirmation: { name: "request_booking_confirmation", purpose: "Ask to start booking (validated).", inputs: ["trip"], output: "A confirmation-gated plan.", permission: "booking", requiresConfirmation: true },
+  open_booking_flow: { name: "open_booking_flow", purpose: "Start the booking flow when confirmed by user.", inputs: ["trip"], output: "A confirmed route into booking window.", permission: "booking", requiresConfirmation: false },
   use_backup_option: { name: "use_backup_option", purpose: "Ask to use the backup (validated).", inputs: ["trip"], output: "A confirmation-gated plan.", permission: "booking", requiresConfirmation: true },
+
+  get_booking_strategies: { name: "get_booking_strategies", purpose: "Report evaluated booking strategies.", inputs: ["trip"], output: "Primary, backup, and quota options.", permission: "informational", requiresConfirmation: false },
+  switch_to_premium_tatkal: { name: "switch_to_premium_tatkal", purpose: "Switch to Premium Tatkal strategy (validated).", inputs: ["trip"], output: "A confirmation-gated plan for Premium Tatkal.", permission: "booking", requiresConfirmation: true },
+  explain_strategy: { name: "explain_strategy", purpose: "Explain rationale behind chosen booking strategy.", inputs: ["trip"], output: "Strategy explanation and fare limits.", permission: "informational", requiresConfirmation: false },
 };
 
 /** Tool names that never require confirmation — pure reads. */

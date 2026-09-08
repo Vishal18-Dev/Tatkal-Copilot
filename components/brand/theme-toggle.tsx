@@ -17,7 +17,7 @@ export function ThemeToggle() {
       onClick={cycle}
       aria-label={t(`theme.${preference}`)}
       title={t(`theme.${preference}`)}
-      className="grid h-9 w-9 shrink-0 place-items-center rounded-full border border-line-strong bg-surface text-ink-soft transition-colors hover:bg-surface-muted hover:text-ink"
+      className="grid h-9 w-9 shrink-0 place-items-center rounded-full border border-line/60 glass-pill text-ink-soft transition-all hover-lift active-press hover:text-ink cursor-pointer"
     >
       <Icon className="h-4 w-4" strokeWidth={2} />
     </button>

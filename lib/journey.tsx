@@ -23,6 +23,10 @@ import { generatePlan } from "@/lib/ai";
 import { useStore } from "@/lib/store";
 
 export type Step =
+  | "plan"
+  | "options"
+  | "prepare"
+  | "book"
   | "compose"
   | "thinking"
   | "strategy"
@@ -31,12 +35,10 @@ export type Step =
   | "authorize";
 
 export const STEP_ORDER: Step[] = [
-  "compose",
-  "thinking",
-  "strategy",
-  "vault",
-  "review",
-  "authorize",
+  "plan",
+  "options",
+  "prepare",
+  "book",
 ];
 
 export interface BookingResult {
@@ -55,17 +57,20 @@ interface JourneyState {
   mode: BookingMode;
   authorization: BookingAuthorization | null;
   bookingResult: BookingResult | null;
+  autoFallbackEnabled: boolean;
 }
 
 interface JourneyCtx extends JourneyState {
   goTo: (step: Step) => void;
   submitGoal: (goal: string) => void;
+  setPlan: (plan: Plan) => void;
   chooseOption: (id: string) => void;
   togglePassenger: (id: string) => void;
   setSelected: (ids: string[]) => void;
   setMode: (m: BookingMode) => void;
   setAuthorization: (a: BookingAuthorization) => void;
   setBookingResult: (r: BookingResult) => void;
+  setAutoFallbackEnabled: (enabled: boolean) => void;
   selectedPassengers: Traveller[];
   recommendedOption: StrategyOption | null;
   chosenOption: StrategyOption | null;
@@ -74,6 +79,22 @@ interface JourneyCtx extends JourneyState {
 }
 
 const Ctx = createContext<JourneyCtx | null>(null);
+
+export function matchSpokenPassengers(text: string, travellers: Traveller[]): string[] {
+  if (!text || !travellers.length) return [];
+  const lower = text.toLowerCase();
+  const matchedIds: string[] = [];
+  for (const t of travellers) {
+    const firstName = t.name.split(" ")[0].toLowerCase();
+    const fullName = t.name.toLowerCase();
+    const reFirst = new RegExp(`\\b${firstName}\\b`, "i");
+    const reFull = new RegExp(`\\b${fullName}\\b`, "i");
+    if (reFirst.test(lower) || reFull.test(lower)) {
+      matchedIds.push(t.id);
+    }
+  }
+  return matchedIds;
+}
 
 export function JourneyProvider({
   children,
@@ -85,7 +106,7 @@ export function JourneyProvider({
   const { travellers, preferences } = useStore();
 
   const [state, setState] = useState<JourneyState>(() => ({
-    step: initialGoal ? "thinking" : "compose",
+    step: initialGoal ? "plan" : "plan",
     goal: initialGoal ?? "",
     plan: null,
     planning: !!initialGoal,
@@ -95,6 +116,7 @@ export function JourneyProvider({
     mode: preferences.defaultMode,
     authorization: null,
     bookingResult: null,
+    autoFallbackEnabled: true,
   }));
 
   // Kick off planning if an initial goal was provided (once).
@@ -107,44 +129,62 @@ export function JourneyProvider({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initialGoal]);
 
-  // Preselect the user's first two travellers once they're available.
-  useEffect(() => {
-    setState((s) => {
-      if (s.selectedPassengerIds.length > 0 || travellers.length === 0) return s;
-      return { ...s, selectedPassengerIds: travellers.slice(0, 2).map((t) => t.id) };
-    });
-  }, [travellers]);
-
   const runPlan = useCallback((goal: string) => {
+    const spokenPassengerIds = matchSpokenPassengers(goal, travellers);
     generatePlan(goal)
       .then((plan) =>
         setState((s) => ({
           ...s,
           plan,
           chosenOptionId: plan.recommendedId,
+          selectedPassengerIds: spokenPassengerIds.length > 0 ? spokenPassengerIds : s.selectedPassengerIds,
           planning: false,
           planError: false,
         }))
       )
       .catch(() => setState((s) => ({ ...s, planning: false, planError: true })));
-  }, []);
+  }, [travellers]);
 
   const goTo = useCallback((step: Step) => {
-    setState((s) => ({ ...s, step }));
+    let normalized = step;
+    if (step === "compose" || step === "thinking") normalized = "plan";
+    else if (step === "strategy") normalized = "options";
+    else if (step === "vault") normalized = "prepare";
+    else if (step === "review" || step === "authorize") normalized = "book";
+
+    setState((s) => ({ ...s, step: normalized }));
     if (typeof window !== "undefined")
       window.scrollTo({ top: 0, behavior: "smooth" });
   }, []);
 
+  const setPlan = useCallback((plan: Plan) => {
+    const spokenPassengerIds = matchSpokenPassengers(plan.intent.restated || "", travellers);
+    setState((s) => ({
+      ...s,
+      plan,
+      chosenOptionId: plan.recommendedId,
+      selectedPassengerIds: spokenPassengerIds.length > 0 ? spokenPassengerIds : s.selectedPassengerIds,
+      planning: false,
+      planError: false,
+    }));
+  }, [travellers]);
+
+  const setAutoFallbackEnabled = useCallback((autoFallbackEnabled: boolean) => {
+    setState((s) => ({ ...s, autoFallbackEnabled }));
+  }, []);
+
   const submitGoal = useCallback(
     (goal: string) => {
+      const spokenPassengerIds = matchSpokenPassengers(goal, travellers);
       setState((s) => ({
         ...s,
         goal,
-        step: "thinking",
+        step: "plan",
         planning: true,
         planError: false,
         plan: null,
         chosenOptionId: null,
+        selectedPassengerIds: spokenPassengerIds,
         bookingResult: null,
         authorization: null,
       }));
@@ -152,7 +192,7 @@ export function JourneyProvider({
         window.scrollTo({ top: 0, behavior: "smooth" });
       runPlan(goal);
     },
-    [runPlan]
+    [runPlan, travellers]
   );
 
   const chooseOption = useCallback(
@@ -193,22 +233,21 @@ export function JourneyProvider({
     []
   );
 
-  const restart = useCallback(
-    () =>
-      setState((s) => ({
-        step: "compose",
-        goal: "",
-        plan: null,
-        planning: false,
-        planError: false,
-        chosenOptionId: null,
-        selectedPassengerIds: s.selectedPassengerIds,
-        mode: preferences.defaultMode,
-        authorization: null,
-        bookingResult: null,
-      })),
-    [preferences.defaultMode]
-  );
+  const restart = useCallback(() => {
+    setState((s) => ({
+      step: "plan",
+      goal: "",
+      plan: null,
+      planning: false,
+      planError: false,
+      chosenOptionId: null,
+      selectedPassengerIds: [],
+      mode: "assisted",
+      authorization: null,
+      bookingResult: null,
+      autoFallbackEnabled: true,
+    }));
+  }, []);
 
   const selectedPassengers = useMemo(
     () => travellers.filter((t) => state.selectedPassengerIds.includes(t.id)),
@@ -244,6 +283,8 @@ export function JourneyProvider({
       setMode,
       setAuthorization,
       setBookingResult,
+      setPlan,
+      setAutoFallbackEnabled,
       selectedPassengers,
       recommendedOption,
       chosenOption,
@@ -254,6 +295,8 @@ export function JourneyProvider({
       state,
       goTo,
       submitGoal,
+      setPlan,
+      setAutoFallbackEnabled,
       chooseOption,
       togglePassenger,
       setSelected,
@@ -269,6 +312,10 @@ export function JourneyProvider({
   );
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
+}
+
+export function useOptionalJourney(): JourneyCtx | null {
+  return useContext(Ctx);
 }
 
 export function useJourney(): JourneyCtx {

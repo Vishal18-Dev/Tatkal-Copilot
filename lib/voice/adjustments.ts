@@ -73,10 +73,10 @@ export function composeGoal(intent: TravelIntent, adjustment?: AdjustmentKind): 
   const pref =
     adjustment === "cheaper" ? "the cheapest confirmed option" : priorityPhrase(intent.priority);
 
-  const who = passengers > 1 ? "passengers" : "passenger";
+  const paxClause = passengers ? `${passengers} ${passengers > 1 ? "passengers" : "passenger"}` : "passengers";
   const classClause = travelClass === "any" ? "" : ` in ${travelClass}`;
   const deadline = intent.arrivalDeadline ? ` reaching before ${intent.arrivalDeadline}` : "";
-  return `from ${intent.from} to ${intent.to}, ${passengers} ${who}${classClause}${deadline}, ${pref}`;
+  return `from ${intent.from} to ${intent.to}, ${paxClause}${classClause}${deadline}, ${pref}`;
 }
 
 function priorityPhrase(priority: TravelIntent["priority"]): string {

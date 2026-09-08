@@ -55,15 +55,22 @@ export function OptionCard({
     >
       {/* Badge row */}
       <div className="flex items-center justify-between gap-2">
-        <span
-          className={cn(
-            "inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[0.8rem] font-semibold",
-            tag.cls
+        <div className="flex items-center gap-1.5 flex-wrap">
+          <span
+            className={cn(
+              "inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[0.8rem] font-semibold",
+              tag.cls
+            )}
+          >
+            <span aria-hidden>{tag.emoji}</span>
+            {option.tagLabel}
+          </span>
+          {option.quota === "PT" && (
+            <span className="inline-flex items-center gap-1 rounded-full bg-caution-soft px-2.5 py-0.5 text-xs font-semibold text-caution">
+              ⚡ {t("premiumTatkal.dynamicFare")}
+            </span>
           )}
-        >
-          <span aria-hidden>{tag.emoji}</span>
-          {option.tagLabel}
-        </span>
+        </div>
         <span className="rounded-[4px] bg-surface-muted px-2 py-0.5 font-mono text-[0.85rem] text-ink-soft">
           {option.subtitle}
         </span>
@@ -173,7 +180,7 @@ export function OptionCard({
       <div className="mt-auto flex items-center justify-between gap-4 border-t border-line pt-4">
         <div>
           <div className="text-[0.7rem] font-semibold uppercase tracking-wide text-ink-faint">
-            {t("results.est")}
+            {option.quota === "PT" ? t("premiumTatkal.dynamicFare") : t("results.est")}
           </div>
           <div className="tabular text-2xl font-bold text-brand-ink">{formatFare(option.fare)}</div>
         </div>

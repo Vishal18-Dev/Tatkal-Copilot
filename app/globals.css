@@ -1,5 +1,7 @@
 @import "tailwindcss";
 
+@custom-variant dark (&:where([data-theme=dark], [data-theme=dark] *, .dark, .dark *));
+
 /* ============================================================
    Tatkal Copilot — Design System (V2)
    Language: calm, warm, premium — Indian railway inspired.
@@ -63,6 +65,15 @@
 
   /* Easing */
   --ease-out-soft: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-spring: cubic-bezier(0.16, 1, 0.3, 1);
+
+  /* Glassmorphism primitives (light defaults) */
+  --glass-bg: rgba(255, 255, 255, 0.75);
+  --glass-bg-subtle: rgba(255, 255, 255, 0.45);
+  --glass-border: rgba(255, 255, 255, 0.65);
+  --glass-border-subtle: rgba(231, 232, 238, 0.7);
+  --glass-highlight: rgba(255, 255, 255, 0.95);
+  --glass-shadow: 0 8px 32px 0 rgba(20, 30, 50, 0.08);
 }
 
 :root {
@@ -106,6 +117,14 @@
     --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.3), 0 10px 26px -14px rgba(0, 0, 0, 0.5);
     --shadow-lift: 0 2px 6px rgba(0, 0, 0, 0.35), 0 22px 48px -20px rgba(0, 0, 0, 0.6);
     --shadow-brand: 0 10px 26px -12px rgba(77, 124, 199, 0.45);
+
+    /* Dark Glassmorphism */
+    --glass-bg: rgba(18, 22, 31, 0.75);
+    --glass-bg-subtle: rgba(18, 22, 31, 0.45);
+    --glass-border: rgba(255, 255, 255, 0.1);
+    --glass-border-subtle: rgba(255, 255, 255, 0.05);
+    --glass-highlight: rgba(255, 255, 255, 0.2);
+    --glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.5);
   }
 }
 
@@ -136,10 +155,24 @@
   --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.3), 0 10px 26px -14px rgba(0, 0, 0, 0.5);
   --shadow-lift: 0 2px 6px rgba(0, 0, 0, 0.35), 0 22px 48px -20px rgba(0, 0, 0, 0.6);
   --shadow-brand: 0 10px 26px -12px rgba(77, 124, 199, 0.45);
+
+  /* Dark Glassmorphism */
+  --glass-bg: rgba(18, 22, 31, 0.75);
+  --glass-bg-subtle: rgba(18, 22, 31, 0.45);
+  --glass-border: rgba(255, 255, 255, 0.1);
+  --glass-border-subtle: rgba(255, 255, 255, 0.05);
+  --glass-highlight: rgba(255, 255, 255, 0.2);
+  --glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.5);
 }
 
 * {
   border-color: var(--color-line);
+}
+
+html {
+  scroll-behavior: smooth;
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-line-strong) transparent;
 }
 
 html,
@@ -153,6 +186,144 @@ body {
   font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
+}
+
+/* ============================================================
+   Glassmorphism & Surface Utilities
+   State-of-the-art frosted glass with specular rim highlights,
+   deep ambient shadows, and fluid spring transitions.
+   ============================================================ */
+
+.glass-panel {
+  background: var(--glass-bg);
+  backdrop-filter: blur(20px) saturate(190%);
+  -webkit-backdrop-filter: blur(20px) saturate(190%);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--glass-shadow);
+}
+
+.glass-card {
+  background: var(--glass-bg);
+  backdrop-filter: blur(16px) saturate(180%);
+  -webkit-backdrop-filter: blur(16px) saturate(180%);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--shadow-card);
+  transition: transform 220ms var(--ease-spring),
+              border-color 220ms ease,
+              box-shadow 220ms ease;
+}
+.glass-card:hover {
+  transform: translateY(-2px);
+  border-color: var(--glass-highlight);
+  box-shadow: var(--shadow-lift);
+}
+
+.glass-dock {
+  background: var(--glass-bg);
+  backdrop-filter: blur(24px) saturate(200%);
+  -webkit-backdrop-filter: blur(24px) saturate(200%);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--shadow-lift);
+}
+
+.glass-pill {
+  background: var(--glass-bg-subtle);
+  backdrop-filter: blur(12px) saturate(160%);
+  -webkit-backdrop-filter: blur(12px) saturate(160%);
+  border: 1px solid var(--glass-border-subtle);
+  transition: all 180ms var(--ease-spring);
+}
+
+.glass-subtle {
+  background: var(--glass-bg-subtle);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border: 1px solid var(--glass-border-subtle);
+}
+
+/* Ambient Radial Glow */
+.bg-radial-glow {
+  background-image: radial-gradient(
+    circle 800px at 50% -10%,
+    rgba(27, 58, 99, 0.08),
+    transparent 70%
+  );
+}
+:root[data-theme="dark"] .bg-radial-glow,
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .bg-radial-glow {
+    background-image: radial-gradient(
+      circle 800px at 50% -10%,
+      rgba(77, 124, 199, 0.12),
+      transparent 70%
+    );
+  }
+}
+
+.glow-brand {
+  box-shadow: 0 0 35px -5px rgba(27, 58, 99, 0.25);
+}
+:root[data-theme="dark"] .glow-brand,
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .glow-brand {
+    box-shadow: 0 0 35px -5px rgba(77, 124, 199, 0.35);
+  }
+}
+
+/* Micro-interaction helpers */
+.hover-lift {
+  transition: transform 200ms var(--ease-spring), box-shadow 200ms ease;
+}
+.hover-lift:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-lift);
+}
+
+.active-press {
+  transition: transform 120ms ease;
+}
+.active-press:active {
+  transform: scale(0.97);
+}
+
+.transition-spring {
+  transition: all 250ms var(--ease-spring);
+}
+
+/* Custom modern glass scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--color-line-strong);
+  border-radius: 9999px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+  transition: background-color 200ms ease;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-ink-faint);
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+
+/* Respect reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto !important;
+  }
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }
 
 /* Fluid display type used across hero + headlines */
@@ -270,26 +441,4 @@ body {
     transparent 2px,
     transparent 12px
   );
-}
-
-/* Respect reduced motion */
-@media (prefers-reduced-motion: reduce) {
-  *,
-  *::before,
-  *::after {
-    animation-duration: 0.01ms !important;
-    animation-iteration-count: 1 !important;
-    transition-duration: 0.01ms !important;
-  }
-}
-
-/* Custom scrollbar for a refined feel */
-::-webkit-scrollbar {
-  width: 10px;
-  height: 10px;
-}
-::-webkit-scrollbar-thumb {
-  background: var(--color-line-strong);
-  border-radius: 999px;
-  border: 3px solid var(--color-canvas);
 }

@@ -33,13 +33,12 @@ function systemPrefersDark(): boolean {
 
 function apply(preference: ThemePreference) {
   const root = document.documentElement;
-  if (preference === "system") {
-    root.removeAttribute("data-theme");
-    root.style.colorScheme = "light dark";
-  } else {
-    root.setAttribute("data-theme", preference);
-    root.style.colorScheme = preference;
-  }
+  const isDark =
+    preference === "dark" ||
+    (preference === "system" && systemPrefersDark());
+  root.setAttribute("data-theme", isDark ? "dark" : "light");
+  root.classList.toggle("dark", isDark);
+  root.style.colorScheme = isDark ? "dark" : "light";
 }
 
 /**
@@ -48,7 +47,7 @@ function apply(preference: ThemePreference) {
  * provider does below, kept in sync manually since it runs outside React.
  */
 export function ThemeScript() {
-  const code = `(function(){try{var p=localStorage.getItem("${STORAGE_KEY}")||"system";var root=document.documentElement;if(p==="system"){root.style.colorScheme="light dark";}else{root.setAttribute("data-theme",p);root.style.colorScheme=p;}}catch(e){}})();`;
+  const code = `(function(){try{var p=localStorage.getItem("${STORAGE_KEY}")||"system";var root=document.documentElement;var isDark=p==="dark"||(p==="system"&&window.matchMedia("(prefers-color-scheme: dark)").matches);root.setAttribute("data-theme",isDark?"dark":"light");if(isDark){root.classList.add("dark");}else{root.classList.remove("dark");}root.style.colorScheme=isDark?"dark":"light";}catch(e){}})();`;
   return <Script id="theme-init" strategy="beforeInteractive">{code}</Script>;
 }
 

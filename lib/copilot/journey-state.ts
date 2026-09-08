@@ -18,6 +18,10 @@
  *     `executeCopilotTurn` on each subsequent call.
  */
 
+import type { BookingQuota } from "@/lib/booking/types";
+import { isInvalidPlaceCandidate } from "@/lib/geo/place-guard";
+import { resolveLocation } from "@/lib/geo/location-resolver";
+
 /* ------------------------------------------------------------------ */
 /* Types                                                               */
 /* ------------------------------------------------------------------ */
@@ -55,6 +59,7 @@ export interface ConversationalJourneyState {
    * Does NOT override `originText` — they are distinct concepts.
    */
   boardingStationPreference?: string;
+  preferredBoardingStation?: string;
   /** Negative station constraint code / name ("don't want Pune station"). */
   excludeStationCode?: string;
   excludeStationText?: string;
@@ -74,14 +79,30 @@ export interface ConversationalJourneyState {
   maxStationDistanceKm?: number;
   /** Whether direct train only is required ("no transfers"). */
   directOnly?: boolean;
-  /** Pending clarification field requested by Copilot ("origin" | "destination"). */
-  pendingClarification?: "origin" | "destination";
+  /** Maximum acceptable fare for ANY booking strategy */
+  maxFare?: number;
+  /** Specific maximum acceptable fare ceiling for Premium Tatkal */
+  maxPremiumTatkalFare?: number;
+  /** Confirmation priority: "low" | "medium" | "high" */
+  confirmationPriority?: "low" | "medium" | "high";
+  /** Price sensitivity: "low" | "medium" | "high" */
+  priceSensitivity?: "low" | "medium" | "high";
+  /** Arrival priority: "low" | "medium" | "high" */
+  arrivalPriority?: "low" | "medium" | "high";
+  /** Allowed booking quotas (e.g. ["TQ", "PT"]) */
+  allowedQuotas?: BookingQuota[];
+  /** Excluded booking quotas (e.g. ["PT"] if user says "don't use premium tatkal") */
+  excludedQuotas?: BookingQuota[];
+  /** Whether user permits automatic fallback to Premium Tatkal or alternate */
+  allowAutomaticFallback?: boolean;
+  /** Pending clarification field requested by Copilot. */
+  pendingClarification?: "origin" | "destination" | "travelDate" | "travelClass" | "passengerCount" | "quotaPreference";
   /**
    * Opaque fingerprint of the material constraints.
    *
    * Changes whenever origin, destination, travelDate, timeConstraint,
    * passengerCount, travelClass, boardingStationPreference, excludeStationCode,
-   * priority, allowClassDowngrade, maxStationDistanceKm, or directOnly change.
+   * priority, allowClassDowngrade, maxStationDistanceKm, directOnly, or strategy constraints change.
    *
    * RULE: A primary/backup recommendation is valid ONLY for the
    * resolutionId under which it was produced.  A caller must re-resolve
@@ -109,6 +130,15 @@ export interface ExtractedJourneyConstraints {
   allowClassDowngrade?: boolean;
   maxStationDistanceKm?: number;
   directOnly?: boolean;
+  preferredBoardingStation?: string;
+  maxFare?: number;
+  maxPremiumTatkalFare?: number;
+  confirmationPriority?: "low" | "medium" | "high";
+  priceSensitivity?: "low" | "medium" | "high";
+  arrivalPriority?: "low" | "medium" | "high";
+  allowedQuotas?: BookingQuota[];
+  excludedQuotas?: BookingQuota[];
+  allowAutomaticFallback?: boolean;
   /** True when the utterance opens with a correction phrase. */
   isCorrection: boolean;
   /** Which semantic fields were explicitly addressed. */
@@ -147,7 +177,7 @@ export function computeResolutionId(
     (state.destinationText ?? "").toLowerCase().trim(),
     (state.travelDate ?? "").toLowerCase().trim(),
     tc ? `${tc.kind}:${tc.hour}:${tc.minute}` : "",
-    String(state.passengerCount ?? 1),
+    String(state.passengerCount ?? "unknown"),
     (state.travelClass ?? "").toLowerCase().trim(),
     (state.boardingStationPreference ?? "").toLowerCase().trim(),
     (state.excludeStationCode ?? state.excludeStationText ?? "").toLowerCase().trim(),
@@ -155,6 +185,14 @@ export function computeResolutionId(
     String(state.allowClassDowngrade ?? false),
     String(state.maxStationDistanceKm ?? ""),
     String(state.directOnly ?? false),
+    String(state.maxFare ?? ""),
+    String(state.maxPremiumTatkalFare ?? ""),
+    String(state.confirmationPriority ?? ""),
+    String(state.priceSensitivity ?? ""),
+    String(state.arrivalPriority ?? ""),
+    (state.allowedQuotas ?? []).join(","),
+    (state.excludedQuotas ?? []).join(","),
+    String(state.allowAutomaticFallback ?? ""),
   ];
   return parts.join("|");
 }
@@ -183,7 +221,7 @@ export function journeyStateFromTrip(trip: {
     originText: trip.from,
     destinationText: trip.to,
     travelClass: trip.travelClass,
-    passengerCount: trip.travellerIds?.length ?? 1,
+    passengerCount: trip.travellerIds && trip.travellerIds.length > 0 ? trip.travellerIds.length : undefined,
   };
   return {
     ...partial,
@@ -212,7 +250,67 @@ const RESIDENT_OF_RE =
 const BOARD_FROM_RE =
   /\bboard(?:ing)?\s+from\s+([a-z][a-z\s]+?)(?=\s+(?:but|and|,|\.)|\s*$)/i;
 
-// Passenger count
+// Passenger count words and helper
+export const PAX_NUMBER_WORDS: Record<string, number> = {
+  one: 1, ek: 1, single: 1, solo: 1, myself: 1,
+  two: 2, do: 2, double: 2, pair: 2, couple: 2,
+  three: 3, teen: 3,
+  four: 4, char: 4,
+  five: 5, paanch: 5, panch: 5,
+  six: 6, chheh: 6, che: 6,
+};
+
+export function parseConversationalPassengerCount(text: string): number | undefined {
+  const lower = text.toLowerCase();
+
+  // Pattern 0: "X adults and Y children" / "X adults, Y child"
+  const comboMatch = lower.match(/\b(\d+)\s*(?:adults?|persons?|people)\s+(?:and|,)?\s*(\d+)\s*(?:child(?:ren)?|kids?)\b/i);
+  if (comboMatch) {
+    const adults = parseInt(comboMatch[1], 10);
+    const children = parseInt(comboMatch[2], 10);
+    const total = adults + children;
+    if (total > 0 && total <= 6) return total;
+  }
+
+  // Pattern 1: "ticket is for two passengers", "booking for 2 people", "tickets for two", "for 2 travellers"
+  const phraseMatch = lower.match(
+    /\b(?:tickets?|booking)?\s*(?:is\s+)?(?:for\s+)?(\d+|one|two|three|four|five|six|ek|do|teen|char|paanch|chheh)\s+(?:passengers?|travell?ers?|people|persons?|adults?|seats?|tickets?|log|jana|jan)\b/i
+  );
+  if (phraseMatch) {
+    const raw = phraseMatch[1].toLowerCase();
+    const parsed = parseInt(raw, 10);
+    const count = !isNaN(parsed) ? parsed : PAX_NUMBER_WORDS[raw];
+    if (count && count > 0 && count <= 6) return count;
+  }
+
+  // Pattern 2: "hum do log", "hum 2 log", "we two"
+  const humMatch = lower.match(/\b(?:hum|we)\s+(\d+|one|two|three|four|five|six|ek|do|teen|char)\s*(?:log|people|jana|jan)?\b/i);
+  if (humMatch) {
+    const raw = humMatch[1].toLowerCase();
+    const parsed = parseInt(raw, 10);
+    const count = !isNaN(parsed) ? parsed : PAX_NUMBER_WORDS[raw];
+    if (count && count > 0 && count <= 6) return count;
+  }
+
+  // Pattern 3: "for two people", "for 2" (in explicit passenger context)
+  const forMatch = lower.match(/\b(?:ticket\s+for|booking\s+for)\s+(\d+|one|two|three|four|five|six|ek|do|teen|char)\b/i);
+  if (forMatch) {
+    const raw = forMatch[1].toLowerCase();
+    const parsed = parseInt(raw, 10);
+    const count = !isNaN(parsed) ? parsed : PAX_NUMBER_WORDS[raw];
+    if (count && count > 0 && count <= 6) return count;
+  }
+
+  // Pattern 4: generic "2 passengers", "2 adults", "3 travellers", "4 people", "2 tickets"
+  const genericMatch = lower.match(/\b(\d+)\s*(?:passengers?|travell?ers?|people|persons?|adults?|seats?|tickets?)\b/i);
+  if (genericMatch) {
+    const count = parseInt(genericMatch[1], 10);
+    if (count > 0 && count <= 6) return count;
+  }
+
+  return undefined;
+}
+
 const PAX_RE =
   /\b(\d+)\s+(?:passengers?|travell?ers?|people|persons?|adults?)\b/i;
 
@@ -242,8 +340,12 @@ const PRIORITY_SAFEST_RE = /\b(safest|safest option|highest confirmation|best ch
 const ALLOW_CLASS_DOWNGRADE_RE = /\b(any class|all classes|any class is fine|open to any class|sl is fine|sleeper is fine|any class fine|any class okay)\b/i;
 const MAX_DISTANCE_RE = /\b(?:within|max|maximum|under|less than|no more than)\s+(\d+)\s*km\b/i;
 const DIRECT_ONLY_RE = /\b(direct train|direct only|no connection|no transfers|no connecting train|without connection)\b/i;
+const USE_STATION_ONLY_RE =
+  /\b(?:use|board\s+from|from)\s+([a-zA-Z]+(?:\s+[a-zA-Z]+)*?)\s+(?:station\s+)?(?:only|hi)\b/i;
+const HI_BOARD_STATION_RE =
+  /\b([a-zA-Z]+(?:\s+[a-zA-Z]+)*?)\s*(?:station\s+se\s+hi\s+board|station\s+se\s+board|se\s+hi\s+board)\b/i;
 const PREFER_STATION_RE =
-  /\b(?:prefer|preferring|rather|use)\s+(?:to\s+use\s+|to\s+board\s+from\s+|from\s+)?([a-zA-Z][a-zA-Z\s]+?)\s*(?:station|jn|junction)?(?:\s+|$|\.|,)/i;
+  /\b(?:prefer|preferring|rather|use)\s+(?:to\s+use\s+|to\s+board\s+from\s+|from\s+)?([a-zA-Z]+(?:\s+[a-zA-Z]+)*?)\s*(?:station|jn|junction)?(?:\s+|$|\.|,)/i;
 
 /* ------------------------------------------------------------------ */
 /* Time parsing                                                        */
@@ -319,7 +421,7 @@ function parseTimeConstraint(text: string): JourneyTimeConstraint | undefined {
  */
 export function extractJourneyConstraints(
   text: string,
-  pendingClarification?: "origin" | "destination"
+  pendingClarification?: ConversationalJourneyState["pendingClarification"]
 ): ExtractedJourneyConstraints {
   const correctedFields: string[] = [];
   const isCorrection = CORRECTION_RE.test(text);
@@ -338,16 +440,24 @@ export function extractJourneyConstraints(
   let allowClassDowngrade: boolean | undefined;
   let maxStationDistanceKm: number | undefined;
   let directOnly: boolean | undefined;
+  let allowedQuotas: BookingQuota[] | undefined;
+  let excludedQuotas: BookingQuota[] | undefined;
+  let allowAutomaticFallback: boolean | undefined;
 
   // ── Pending clarification contextual resolution ───────────────────
   // When Copilot explicitly asked "Where are you starting from?" or "Where would you like to travel?",
   // interpret short standalone utterances relative to that pending question.
+  const ignorableWords = [
+    "the", "a", "an", "yes", "no", "ok", "okay", "okie", "sure", "cancel", "stop",
+    "hmm", "hm", "right", "got it", "fine", "alright", "all right", "haan", "theek hai",
+    "theek", "ha", "achha", "acha", "accha", "yep", "yeah", "yup", "done", "cool"
+  ];
+
   if (pendingClarification === "origin") {
     const isExplicitToVerb = /\b(?:to|reach|go\s+to|tickets?\s+to)\s+[a-zA-Z]/i.test(text);
     if (!isExplicitToVerb) {
       const cleaned = text.replace(/^[,\s\.]*|[,\s\.]*$/g, "").trim();
       const stripped = cleaned.replace(/^(?:from|starting\s+from|start\s+from|i'm\s+in|i\s+am\s+in|in|at|living\s+in|live\s+in)\s+/i, "").trim();
-      const ignorableWords = ["the", "a", "an", "yes", "no", "ok", "sure", "cancel", "stop"];
       if (stripped && !ignorableWords.includes(stripped.toLowerCase())) {
         originText = stripped;
         correctedFields.push("origin");
@@ -358,11 +468,88 @@ export function extractJourneyConstraints(
     if (!isExplicitFromVerb) {
       const cleaned = text.replace(/^[,\s\.]*|[,\s\.]*$/g, "").trim();
       const stripped = cleaned.replace(/^(?:to|going\s+to|reach|want\s+to\s+go\s+to|for)\s+/i, "").trim();
-      const ignorableWords = ["the", "a", "an", "yes", "no", "ok", "sure", "cancel", "stop"];
       if (stripped && !ignorableWords.includes(stripped.toLowerCase())) {
         destinationText = stripped;
         correctedFields.push("destination");
       }
+    }
+  } else if (pendingClarification === "travelDate") {
+    const dateM = text.toLowerCase().match(DATE_RE);
+    if (dateM) {
+      travelDate = dateM[1] === "day after tomorrow" ? "day_after_tomorrow" : dateM[1];
+      correctedFields.push("travelDate");
+    } else {
+      const cleaned = text.replace(/^[,\s\.]*|[,\s\.]*$/g, "").trim();
+      const ignorableWords = ["the", "a", "an", "cancel", "stop"];
+      const isAffirmative = /^(?:yes|proceed|go ahead|haan|sure|ok|okay|yep|yeah|chalo)\b/i.test(cleaned);
+      if (isAffirmative) {
+        travelDate = "tomorrow";
+        correctedFields.push("travelDate");
+      } else if (cleaned && !ignorableWords.includes(cleaned.toLowerCase())) {
+        travelDate = cleaned;
+        correctedFields.push("travelDate");
+      }
+    }
+  } else if (pendingClarification === "travelClass") {
+    const classM = text.toLowerCase().match(CLASS_RE);
+    if (classM) {
+      const raw = classM[1].replace(/\s+/g, "").toUpperCase();
+      const classMap: Record<string, string> = {
+        SLEEPER: "SL",
+        FIRSTCLASS: "1A",
+        SECONDCLASS: "2A",
+        THIRDCLASS: "3A",
+      };
+      travelClass = classMap[raw] ?? raw;
+      correctedFields.push("travelClass");
+    } else if (/^(?:3a|2a|1a|sl|3e|cc|2s|ec)$/i.test(text.trim())) {
+      travelClass = text.trim().toUpperCase();
+      correctedFields.push("travelClass");
+    }
+    const parsedPax = parseConversationalPassengerCount(text);
+    if (parsedPax !== undefined) {
+      passengerCount = parsedPax;
+      correctedFields.push("passengerCount");
+    }
+  } else if (pendingClarification === "passengerCount") {
+    const parsedPax = parseConversationalPassengerCount(text);
+    if (parsedPax !== undefined) {
+      passengerCount = parsedPax;
+      correctedFields.push("passengerCount");
+    } else {
+      const num = parseInt(text.trim(), 10);
+      if (!isNaN(num) && num > 0 && num <= 6) {
+        passengerCount = num;
+        correctedFields.push("passengerCount");
+      } else {
+        const matched = PAX_NUMBER_WORDS[text.toLowerCase().trim()];
+        if (matched) {
+          passengerCount = matched;
+          correctedFields.push("passengerCount");
+        }
+      }
+    }
+  } else if (pendingClarification === "quotaPreference") {
+    if (/\b(?:yes|haan|ha|yeah|yup|sure|ok|okay|include|keep|definitely|chahiye|kar do|add|enable|proceed|go\s+ahead|please)\b/i.test(text)) {
+      allowedQuotas = ["TQ", "PT"];
+      allowAutomaticFallback = true;
+      correctedFields.push("allowedQuotas");
+    } else if (/\b(?:no|nahi|nah|don't|only\s+regular|only\s+tatkal|skip|mat|exclude)\b/i.test(text)) {
+      excludedQuotas = ["PT"];
+      allowedQuotas = ["TQ", "GN"];
+      correctedFields.push("excludedQuotas");
+    }
+  }
+
+  if (!allowedQuotas && !excludedQuotas) {
+    if (/\b(?:use|include|enable|with|keep)\s+(?:premium\s+tatkal|pt)\b/i.test(text)) {
+      allowedQuotas = ["TQ", "PT"];
+      allowAutomaticFallback = true;
+      correctedFields.push("allowedQuotas");
+    } else if (/\b(?:don't\s+use|do\s+not\s+use|skip|no|without|exclude)\s+(?:premium\s+tatkal|pt)\b/i.test(text)) {
+      excludedQuotas = ["PT"];
+      allowedQuotas = ["TQ", "GN"];
+      correctedFields.push("excludedQuotas");
     }
   }
 
@@ -406,10 +593,17 @@ export function extractJourneyConstraints(
   }
 
   // ── Boarding preference (check before residential so "board from X" wins)
-  const boardM = text.match(BOARD_FROM_RE) ?? text.match(PREFER_STATION_RE);
+  let preferredBoardingStation: string | undefined;
+  const boardM =
+    text.match(USE_STATION_ONLY_RE) ??
+    text.match(HI_BOARD_STATION_RE) ??
+    text.match(BOARD_FROM_RE) ??
+    text.match(PREFER_STATION_RE);
   if (boardM) {
     boardingStationPreference = boardM[1].trim();
+    preferredBoardingStation = boardingStationPreference;
     correctedFields.push("boardingStationPreference");
+    correctedFields.push("preferredBoardingStation");
   }
 
   // ── Residential context ("I live in Pune", "I'm in Pune")
@@ -422,63 +616,81 @@ export function extractJourneyConstraints(
   // ── Explicit "from X to Y" or "to Y from X" patterns
   const fromToM =
     text.match(
-      /\b(?:from|starting\s+from|start\s+from)\s+([a-zA-Z][a-zA-Z\s]+?)\s+(?:to|reach|for)\s+([a-zA-Z][a-zA-Z\s]+?)(?:\s+(?:tomorrow|today|kal|by|before|in|at)|\.|,|$)/i
+      /\b(?:from|starting\s+from|start\s+from)\s+([a-zA-Z][a-zA-Z\s]+?)\s+(?:to|reach|for)\s+([a-zA-Z][a-zA-Z\s]+?)(?:\s+(?:tomorrow|today|kal|parso|early|morning|shaam|evening|night|subah|before|after|by|in|at|\d+[a-zA-Z]*|[1-3][aA]|sl|cc|ec|2s)|\.|,|$)/i
     ) ??
     text.match(
-      /^\s*(?:actually|no,?\s*|make\s+it)?\s*([A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)\s+to\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)(?:\s+(?:tomorrow|today|kal|by|before|in|at)|\.|,|$)/
+      /^\s*(?:actually|no,?\s*|make\s+it)?\s*([a-zA-Z]+(?:\s+[a-zA-Z]+)?)\s+to\s+([a-zA-Z]+(?:\s+[a-zA-Z]+)?)(?:\s+(?:tomorrow|today|kal|parso|early|morning|shaam|evening|night|subah|before|after|by|in|at|\d+[a-zA-Z]*|[1-3][aA]|sl|cc|ec|2s)|\.|,|$)/i
     );
   if (fromToM) {
-    originText = fromToM[1].replace(/^(?:actually|no|make\s+it)\s+/i, "").trim();
-    destinationText = fromToM[2].trim();
-    if (!correctedFields.includes("origin")) correctedFields.push("origin");
-    if (!correctedFields.includes("destination")) correctedFields.push("destination");
+    const candOrig = fromToM[1].replace(/^(?:actually|no|make\s+it)\s+/i, "").trim();
+    const candDest = fromToM[2].trim();
+    if (!isInvalidPlaceCandidate(candOrig) && !isInvalidPlaceCandidate(candDest)) {
+      originText = candOrig;
+      destinationText = candDest;
+      if (!correctedFields.includes("origin")) correctedFields.push("origin");
+      if (!correctedFields.includes("destination")) correctedFields.push("destination");
+    }
   }
 
   if (!originText || !destinationText) {
     const toFromM = text.match(
-      /(?:to|reach|go\s+to)\s+([a-zA-Z][a-zA-Z\s]+?)\s+(?:from|starting\s+from)\s+([a-zA-Z][a-zA-Z\s]+?)(?:\s+(?:tomorrow|today|kal|by|before|in|at)|\.|,|$)/i
+      /(?:travel\s+to|tickets?\s+to|going\s+to|go\s+to|reach|\bto\b)\s+([a-zA-Z][a-zA-Z\s]+?)\s+(?:from|starting\s+from|start\s+from)\s+([a-zA-Z][a-zA-Z\s]+?)(?:\s+(?:tomorrow|today|kal|by|before|in|at)|\.|,|$)/i
     );
     if (toFromM) {
-      destinationText = toFromM[1].trim();
-      originText = toFromM[2].trim();
-      if (!correctedFields.includes("origin")) correctedFields.push("origin");
-      if (!correctedFields.includes("destination")) correctedFields.push("destination");
+      const candDest = toFromM[1].trim();
+      const candOrig = toFromM[2].trim();
+      if (!isInvalidPlaceCandidate(candOrig) && !isInvalidPlaceCandidate(candDest)) {
+        destinationText = candDest;
+        originText = candOrig;
+        if (!correctedFields.includes("origin")) correctedFields.push("origin");
+        if (!correctedFields.includes("destination")) correctedFields.push("destination");
+      }
     }
   }
 
   if (!originText || !destinationText) {
     const inReachM = text.match(
-      /(?:i'm\s+at|i\s+am\s+at|i'm\s+in|i\s+am\s+in|in|at|live\s+in)\s+([a-zA-Z][a-zA-Z\s]+?)\s+(?:and\s+need\s+to\s+reach|and\s+want\s+to\s+go\s+to|and\s+going\s+to|need\s+to\s+reach|going\s+to|and\s+i\s+want\s+to\s+go\s+to|i\s+want\s+to\s+go\s+to|want)\s+([a-zA-Z][a-zA-Z\s]+?)(?:\s+(?:tomorrow|today|kal|by|before|in|at|instead|though)|\.|,|$)/i
+      /\b(?:i'm\s+at|i\s+am\s+at|i'm\s+in|i\s+am\s+in|\bin\b|\bat\b|live\s+in)\s+([a-zA-Z][a-zA-Z\s]+?)\s+(?:and\s+need\s+to\s+reach|and\s+want\s+to\s+go\s+to|and\s+going\s+to|need\s+to\s+reach|going\s+to|and\s+i\s+want\s+to\s+go\s+to|i\s+want\s+to\s+go\s+to|want\s+to\s+reach|want\s+to\s+go\s+to)\s+([a-zA-Z][a-zA-Z\s]+?)(?:\s+(?:tomorrow|today|kal|by|before|in|at|instead|though)|\.|,|$)/i
     );
     if (inReachM) {
-      originText = inReachM[1].trim();
-      destinationText = inReachM[2].trim();
-      if (!correctedFields.includes("origin")) correctedFields.push("origin");
-      if (!correctedFields.includes("destination")) correctedFields.push("destination");
+      const candOrig = inReachM[1].trim();
+      const candDest = inReachM[2].trim();
+      if (!isInvalidPlaceCandidate(candOrig) && !isInvalidPlaceCandidate(candDest)) {
+        originText = candOrig;
+        destinationText = candDest;
+        if (!correctedFields.includes("origin")) correctedFields.push("origin");
+        if (!correctedFields.includes("destination")) correctedFields.push("destination");
+      }
     }
   }
 
-  // ── Destination-only verb ("go to Delhi", "take me to Delhi", "want Delhi", etc.)
+  // ── Destination-only verb ("go to Delhi", "take me to Delhi", "tickets to Delhi", etc.)
   // Skip if text is expressing negative station preference or pending clarification was origin (unless explicit correction)
   if (!destinationText && !excludeStationText && (pendingClarification !== "origin" || isCorrection)) {
     const toOnlyM = text.match(
-      /(?:take\s+me\s+to|travel\s+to|tickets?\s+to|going\s+to|go\s+to|reach|want\s+to\s+go\s+to|i\s+want\s+to\s+go\s+to|i\s+need\s+to\s+go\s+to|i\s+want|\bto\b|\btowards\b)\s+([a-zA-Z][a-zA-Z\s]+?)(?:\s+(?:tomorrow|today|kal|by|before|in|at|instead|though|and|from|with|for|as)|\.|,|$)/i
+      /(?:take\s+me\s+to|travel\s+to|tickets?\s+to|going\s+to|go\s+to|reach|want\s+to\s+go\s+to|i\s+want\s+to\s+go\s+to|i\s+need\s+to\s+go\s+to|\b(?:i\s+want|want)(?!\s+(?:to\b|a\b|the\b|my\b|our\b|tickets?\b|trains?\b))|\btowards\b)\s+([a-zA-Z][a-zA-Z\s]+?)(?:\s+(?:tomorrow|today|kal|by|before|in|at|instead|though|and|from|with|for|as)|\.|,|$)/i
     );
-    if (toOnlyM && !["the", "a", "an"].includes(toOnlyM[1].trim().toLowerCase())) {
-      destinationText = toOnlyM[1].trim();
-      if (!correctedFields.includes("destination"))
-        correctedFields.push("destination");
+    if (toOnlyM) {
+      const candidate = toOnlyM[1].trim();
+      if (!isInvalidPlaceCandidate(candidate)) {
+        destinationText = candidate;
+        if (!correctedFields.includes("destination"))
+          correctedFields.push("destination");
+      }
     }
   }
 
-  // ── Standalone origin ("from Mumbai", "starting from Chennai", "I'm travelling from Mumbai")
+  // ── Standalone origin ("from Mumbai", "starting from Chennai", "I want to start my journey from Pune")
   if (!originText && !boardingStationPreference && !excludeStationText && (pendingClarification !== "destination" || isCorrection)) {
     const originCorrM = text.match(
-      /(?:from|starting\s+from|start\s+from)\s+([A-Za-z][a-z\s]+?)(?:\s|,|\.|$)/i
+      /(?:start(?:ing)?\s+(?:my\s+|a\s+|the\s+)?journey\s+from|from|starting\s+from|start\s+from)\s+([A-Za-z][a-z\s]+?)(?:\s|,|\.|$)/i
     );
     if (originCorrM && !fromToM) {
-      originText = originCorrM[1].trim();
-      if (!correctedFields.includes("origin")) correctedFields.push("origin");
+      const cand = originCorrM[1].trim();
+      if (!isInvalidPlaceCandidate(cand)) {
+        originText = cand;
+        if (!correctedFields.includes("origin")) correctedFields.push("origin");
+      }
     }
   }
 
@@ -516,9 +728,9 @@ export function extractJourneyConstraints(
   }
 
   // ── Passenger count
-  const paxM = text.match(PAX_RE);
-  if (paxM) {
-    passengerCount = parseInt(paxM[1], 10);
+  const parsedPax = parseConversationalPassengerCount(text);
+  if (parsedPax !== undefined) {
+    passengerCount = parsedPax;
     correctedFields.push("passengerCount");
   }
 
@@ -536,11 +748,116 @@ export function extractJourneyConstraints(
     correctedFields.push("travelClass");
   }
 
+  // ── Strategy Constraints Extraction (TASK 5H)
+  let maxFare: number | undefined;
+  let maxPremiumTatkalFare: number | undefined;
+  let confirmationPriority: "low" | "medium" | "high" | undefined;
+  let priceSensitivity: "low" | "medium" | "high" | undefined;
+  let arrivalPriority: "low" | "medium" | "high" | undefined;
+
+
+  // 1. Quota allowance & exclusions
+  const lowerText = text.toLowerCase();
+  const isExcludePt =
+    /\b(?:don't|do\s+not|never|exclude|skip|no|without|mat)\s+(?:use\s+|want\s+|try\s+|lena\s+|lo\s+)?(?:premium\s+tatkal|pt)\b/i.test(text) ||
+    /(?:premium\s+tatkal|pt|प्रीमियम\s+तत्काल)[\s\S]*?(?:mat\s+use|mat\s+lagao|nahi\s+chahiye|mat\s+karo|mat\s+lena|mat\s+lo|mat\s+le|nahi\s+lena|मत\s+use|मत\s+लगाओ|नहीं\s+चाहिए|मत\s+लेना)/i.test(text) ||
+    /(?:mat\s+lena|mat\s+lo|mat\s+karo|nahi\s+chahiye|मत\s+लेना|नहीं\s+चाहिए)[\s\S]*?(?:premium\s+tatkal|pt|प्रीमियम\s+तत्काल)/i.test(text);
+
+  const isAllowPt =
+    /\b(?:use|try|consider|allow|prefer)\s+(?:premium\s+tatkal|pt)\b/i.test(text) ||
+    /\b(?:premium\s+tatkal|pt)\b[\s\S]*?(?:is\s+okay|is\s+fine|chalega|try\s+kar\s+lena|if\s+needed|if\s+necessary|nahi\s+mila\s+toh)/i.test(text) ||
+    /(?:प्रीमियम\s+तत्काल|pt)[\s\S]*?(?:try\s+कर\s+लेना|चलेगा|chalega|try\s+kar\s+lena)/i.test(text);
+
+  if (isExcludePt) {
+    excludedQuotas = ["PT"];
+    allowedQuotas = ["TQ", "GN"];
+    correctedFields.push("excludedQuotas");
+  } else if (isAllowPt) {
+    allowedQuotas = ["TQ", "PT"];
+    correctedFields.push("allowedQuotas");
+  }
+
+  // 2. Automatic fallback
+  if (
+    /\b(automatic fallback|automatically|switch automatically|khud switch|khud kar lena|auto fallback|can switch)\b/i.test(text) ||
+    /(?:खुद\s+स्विच|ऑटोमैटिक|अपने\s+आप)/i.test(text)
+  ) {
+    allowAutomaticFallback = true;
+    correctedFields.push("allowAutomaticFallback");
+  }
+
+  // 3. Fares & Ceilings
+  // Check for Hindi word amounts
+  const has4000 = /4000|chaar\s*hazar|char\s*hazar|चार\s*हज़ार|चार\s*हजार/i.test(text);
+  const has3000 = /3000|teen\s*hazar|तीन\s*हज़ार|तीन\s*हजार/i.test(text);
+  const has2500 = /2500|dhai\s*hazar|ढाई\s*हज़ार/i.test(text);
+  const has2000 = /2000|do\s*hazar|दो\s*हज़ार|दो\s*हजार/i.test(text);
+  const has5000 = /5000|paanch\s*hazar|पांच\s*हज़ार/i.test(text);
+
+  let detectedAmount: number | undefined;
+  if (has4000) detectedAmount = 4000;
+  else if (has3000) detectedAmount = 3000;
+  else if (has2500) detectedAmount = 2500;
+  else if (has2000) detectedAmount = 2000;
+  else if (has5000) detectedAmount = 5000;
+  else {
+    const amountMatch = text.match(/[₹Rs\.]*\s*(\d{3,6})/);
+    if (amountMatch) detectedAmount = parseInt(amountMatch[1], 10);
+  }
+
+  if (detectedAmount) {
+    const isPtSpecific =
+      /(?:premium\s+tatkal|pt|प्रीमियम\s+तत्काल)[\s\S]*?(?:up\s+to|below|under|max|spend|tak|se\s+zyada\s+nahi|तक|से\s+ज़्यादा\s+नहीं)/i.test(text) ||
+      /(?:up\s+to|below|under|max|spend)[\s\S]*?(?:premium\s+tatkal|pt)/i.test(text);
+
+    if (isPtSpecific) {
+      maxPremiumTatkalFare = detectedAmount;
+      correctedFields.push("maxPremiumTatkalFare");
+    } else {
+      maxFare = detectedAmount;
+      correctedFields.push("maxFare");
+    }
+  }
+
+  // 4. Price Sensitivity
+  if (
+    /\b(cheapest|cheapest option|lowest fare|less fare|budget option|sasta|sabse sasta|as cheap as possible)\b/i.test(text) ||
+    /सस्ता|कम\s+किराया/i.test(text)
+  ) {
+    priceSensitivity = "high";
+    correctedFields.push("priceSensitivity");
+  } else if (
+    /\b(don't care about price|price doesn't matter|don't mind paying extra|don't mind paying more|pay more|cost doesn't matter|paisa koi issue nahi|paise ki chinta nahi)\b/i.test(text) ||
+    /पैसे\s+की\s+चिंता\s+नहीं|पैसा\s+कोई\s+इशू\s+नहीं/i.test(text)
+  ) {
+    priceSensitivity = "low";
+    correctedFields.push("priceSensitivity");
+  }
+
+  // 5. Confirmation Priority
+  if (
+    /\b(highest chance|best chance|highest confirmation|highest probability|need to get there|must reach|need to reach|absolutely need|pakka confirm|confirmed ticket|sabse zyada chance|sabse jyada chance|confirm hone ke)\b/i.test(text) ||
+    /पक्का\s+कन्फर्म|कन्फर्म\s+चाहिए|ज़रूर\s+पहुंचना|सबसे\s+ज़्यादा\s+चांस/i.test(text)
+  ) {
+    confirmationPriority = "high";
+    correctedFields.push("confirmationPriority");
+  }
+
+  // 6. Arrival Priority
+  if (
+    /\b(reach before|arrive before|reach by|early morning|urgent arrival|pehle pahunchna)\b/i.test(text) ||
+    /पहले\s+पहुंचना|सुबह\s+पहुंचना/i.test(text)
+  ) {
+    arrivalPriority = "high";
+    correctedFields.push("arrivalPriority");
+  }
+
   return {
     originText,
     destinationText,
     residentOf,
     boardingStationPreference,
+    preferredBoardingStation,
     excludeStationCode,
     excludeStationText,
     priority,
@@ -551,6 +868,14 @@ export function extractJourneyConstraints(
     allowClassDowngrade,
     maxStationDistanceKm,
     directOnly,
+    maxFare,
+    maxPremiumTatkalFare,
+    confirmationPriority,
+    priceSensitivity,
+    arrivalPriority,
+    allowedQuotas,
+    excludedQuotas,
+    allowAutomaticFallback,
     isCorrection,
     correctedFields,
   };
@@ -637,6 +962,7 @@ export function mergeJourneyConstraints(
     const norm = extracted.boardingStationPreference.toLowerCase().trim();
     if (norm !== (existing.boardingStationPreference ?? "").toLowerCase().trim()) {
       next.boardingStationPreference = extracted.boardingStationPreference;
+      next.preferredBoardingStation = extracted.preferredBoardingStation ?? extracted.boardingStationPreference;
       changedFields.push("boardingStationPreference");
     }
     if (!extracted.originText && !extracted.residentOf) {
@@ -673,6 +999,9 @@ export function mergeJourneyConstraints(
   if (extracted.travelDate && extracted.travelDate !== existing.travelDate) {
     next.travelDate = extracted.travelDate;
     changedFields.push("travelDate");
+    if (next.pendingClarification === "travelDate") {
+      next.pendingClarification = undefined;
+    }
   }
 
   // 8. Time constraint
@@ -697,12 +1026,18 @@ export function mergeJourneyConstraints(
   ) {
     next.passengerCount = extracted.passengerCount;
     changedFields.push("passengerCount");
+    if (next.pendingClarification === "passengerCount") {
+      next.pendingClarification = undefined;
+    }
   }
 
   // 10. Travel class
   if (extracted.travelClass && extracted.travelClass !== existing.travelClass) {
     next.travelClass = extracted.travelClass;
     changedFields.push("travelClass");
+    if (next.pendingClarification === "travelClass") {
+      next.pendingClarification = undefined;
+    }
   }
 
   // 11. Allow class downgrade
@@ -723,12 +1058,93 @@ export function mergeJourneyConstraints(
     changedFields.push("directOnly");
   }
 
+  // 14. Max Fare limit
+  if (extracted.maxFare !== undefined && extracted.maxFare !== existing.maxFare) {
+    next.maxFare = extracted.maxFare;
+    changedFields.push("maxFare");
+  }
+
+  // 15. Max Premium Tatkal Fare limit
+  if (extracted.maxPremiumTatkalFare !== undefined && extracted.maxPremiumTatkalFare !== existing.maxPremiumTatkalFare) {
+    next.maxPremiumTatkalFare = extracted.maxPremiumTatkalFare;
+    changedFields.push("maxPremiumTatkalFare");
+  }
+
+  // 16. Confirmation priority
+  if (extracted.confirmationPriority && extracted.confirmationPriority !== existing.confirmationPriority) {
+    next.confirmationPriority = extracted.confirmationPriority;
+    changedFields.push("confirmationPriority");
+  }
+
+  // 17. Price sensitivity
+  if (extracted.priceSensitivity && extracted.priceSensitivity !== existing.priceSensitivity) {
+    next.priceSensitivity = extracted.priceSensitivity;
+    changedFields.push("priceSensitivity");
+  }
+
+  // 18. Arrival priority
+  if (extracted.arrivalPriority && extracted.arrivalPriority !== existing.arrivalPriority) {
+    next.arrivalPriority = extracted.arrivalPriority;
+    changedFields.push("arrivalPriority");
+  }
+
+  // 19. Allowed quotas
+  if (extracted.allowedQuotas) {
+    next.allowedQuotas = extracted.allowedQuotas;
+    changedFields.push("allowedQuotas");
+    if (next.pendingClarification === "quotaPreference") {
+      next.pendingClarification = undefined;
+    }
+  }
+
+  // 20. Excluded quotas
+  if (extracted.excludedQuotas) {
+    next.excludedQuotas = extracted.excludedQuotas;
+    changedFields.push("excludedQuotas");
+    if (next.pendingClarification === "quotaPreference") {
+      next.pendingClarification = undefined;
+    }
+  }
+
+  // 21. Automatic fallback
+  if (extracted.allowAutomaticFallback !== undefined && extracted.allowAutomaticFallback !== existing.allowAutomaticFallback) {
+    next.allowAutomaticFallback = extracted.allowAutomaticFallback;
+    changedFields.push("allowAutomaticFallback");
+  }
+
   // Recompute resolutionId
   const newId = computeResolutionId(next);
   const materialChange = newId !== existing.resolutionId;
   next.resolutionId = newId;
 
   return { state: next, materialChange, changedFields };
+}
+
+/**
+ * Compare two place names, considering casing, substrings, and railway/city aliases
+ * (e.g. Bangalore vs Bengaluru, Delhi vs New Delhi, Bombay vs Mumbai).
+ */
+export function placesMatch(placeA: string, placeB: string): boolean {
+  if (!placeA || !placeB) return true;
+  const normA = placeA.toLowerCase().trim();
+  const normB = placeB.toLowerCase().trim();
+  if (normA === normB || normA.includes(normB) || normB.includes(normA)) {
+    return true;
+  }
+  const locA = resolveLocation(normA);
+  const locB = resolveLocation(normB);
+  if (locA && locB) {
+    if (locA.matchedStationCode && locB.matchedStationCode && locA.matchedStationCode === locB.matchedStationCode) {
+      return true;
+    }
+    if (locA.city && locB.city && locA.city.toLowerCase() === locB.city.toLowerCase()) {
+      return true;
+    }
+    if (locA.name && locB.name && locA.name.toLowerCase() === locB.name.toLowerCase()) {
+      return true;
+    }
+  }
+  return false;
 }
 
 /**
@@ -748,15 +1164,14 @@ export function isTripStale(
   const normStateFrom = (state.originText ?? "").toLowerCase().trim();
   const originMismatch =
     Boolean(normStateFrom) &&
-    !normTripFrom.includes(normStateFrom) &&
-    !normStateFrom.includes(normTripFrom);
+    !placesMatch(normTripFrom, normStateFrom);
 
   const normTripTo = trip.to.toLowerCase().trim();
   const normStateTo = (state.destinationText ?? "").toLowerCase().trim();
   const destMismatch =
     Boolean(normStateTo) &&
-    !normTripTo.includes(normStateTo) &&
-    !normStateTo.includes(normTripTo);
+    !placesMatch(normTripTo, normStateTo);
 
   return Boolean(originMismatch || destMismatch);
 }
+

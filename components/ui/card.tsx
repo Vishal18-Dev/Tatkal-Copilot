@@ -12,10 +12,10 @@ export const Card = React.forwardRef<HTMLDivElement, CardProps>(
   ({ className, lift, ...props }, ref) => (
     <motion.div
       ref={ref}
-      whileHover={lift ? { y: -4 } : undefined}
-      transition={{ type: "spring", stiffness: 400, damping: 30 }}
+      whileHover={lift ? { y: -3 } : undefined}
+      transition={{ type: "spring", stiffness: 450, damping: 32 }}
       className={cn(
-        "rounded-[var(--radius-lg)] bg-surface border border-line shadow-[var(--shadow-card)]",
+        "rounded-[var(--radius-xl)] glass-card border border-line/70 shadow-[var(--shadow-card)] transition-colors duration-200",
         className
       )}
       {...props}

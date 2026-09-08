@@ -63,19 +63,24 @@ export interface CallingProvider {
  * audio in-browser; this represents "the call was placed" so the exact
  * interface a real telephony provider implements is exercised in the demo.
  */
-export class MockCallingProvider implements CallingProvider {
-  readonly id = "mock-calling";
+export class DemoCallingProvider implements CallingProvider {
+  readonly id = "demo-calling";
   readonly isReal = false;
 
   channelLabel(lang: Lang): string {
-    return lang === "hi" ? "प्रोएक्टिव कॉल · डेमो" : "Proactive call · Demo";
+    return lang === "hi" ? "प्रोएक्टिव कॉल · डेमो" : "Proactive call · Browser Demo";
   }
 
   async placeCall(_ctx: OutboundCallContext): Promise<PlacedCall> {
     void _ctx;
-    return { ok: true, simulated: true, sessionId: `sim_${Math.random().toString(36).slice(2, 8)}` };
+    return { ok: true, simulated: true, sessionId: `demo_${Math.random().toString(36).slice(2, 8)}` };
   }
 }
+
+/**
+ * Backward-compatible alias for MockCallingProvider.
+ */
+export const MockCallingProvider = DemoCallingProvider;
 
 /**
  * The seam where real telephony plugs in. Intentionally a stub: a production

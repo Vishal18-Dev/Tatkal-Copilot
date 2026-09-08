@@ -27,6 +27,7 @@ export type VoiceState =
   | "result"
   | "confirming"
   | "speaking"
+  | "switching_language"
   | "rest_listening"
   | "error";
 
@@ -68,6 +69,8 @@ export interface VoiceRespondResult {
   journeyState?: ConversationalJourneyState;
   trip?: Trip;
   voiceState?: "awaiting_clarification" | "showing_results" | "no_results" | "showing_info";
+  actionPlan?: import("@/lib/copilot/types").ActionPlanResult;
+  toolUsed?: string;
 }
 
 /** What /api/voice/transcribe hands back to the client. */
@@ -87,6 +90,7 @@ export type SemanticCommandIntent =
   | "cheaper"
   | "change"
   | "stop"
+  | "language_change"
   | "unknown";
 
 /** A recognized spoken intent once we're past the initial goal capture. */
@@ -98,6 +102,7 @@ export type VoiceCommandKind =
   | "backup"
   | "cheaper"
   | "change"
+  | "language_change"
   | "unknown";
 
 export interface VoiceCommand {
@@ -105,6 +110,7 @@ export interface VoiceCommand {
   intent: SemanticCommandIntent;
   raw: string;
   language?: VoiceLang;
+  targetLanguage?: VoiceLang;
   confidence?: number;
 }
 
@@ -177,10 +183,10 @@ export const VOICE_ACCEPTED_MIME_PREFIXES = ["audio/webm", "audio/mp4", "audio/o
    without cutting people off mid-sentence.
 ------------------------------------------------------------------ */
 /** RMS amplitude (0–1) above which we count the frame as speech. */
-export const VOICE_VAD_RMS_THRESHOLD = 0.02;
+export const VOICE_VAD_RMS_THRESHOLD = 0.01;
 /** Trailing silence that ends a turn, once speech has been heard. */
-export const VOICE_VAD_SILENCE_MS = 1400;
+export const VOICE_VAD_SILENCE_MS = 1000;
 /** Minimum speech before a turn can auto-end (guards against a stray blip). */
-export const VOICE_VAD_MIN_SPEECH_MS = 500;
+export const VOICE_VAD_MIN_SPEECH_MS = 300;
 /** Delay before the mic re-opens after the agent finishes a reply. */
 export const VOICE_HANDS_FREE_RESUME_MS = 650;

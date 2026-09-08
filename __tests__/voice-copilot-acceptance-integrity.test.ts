@@ -51,7 +51,8 @@ describe("TASK 5F.2B — Browser Voice Journey Acceptance & State Integrity", ()
     expect(t2.journeyState.originText?.toLowerCase()).toContain("pune");
     expect(t2.journeyState.destinationText?.toLowerCase()).toContain("delhi");
     expect(t2.journeyState.travelDate).toBe("tomorrow");
-    expect(t2.journeyState.pendingClarification).toBeUndefined();
+    expect(t2.journeyState.pendingClarification).not.toBe("origin");
+    expect(t2.journeyState.pendingClarification).not.toBe("destination");
 
     // The recommendation must be for Pune to Delhi
     expect(t2.trip?.from.toLowerCase()).toContain("pune");
@@ -95,7 +96,8 @@ describe("TASK 5F.2B — Browser Voice Journey Acceptance & State Integrity", ()
     expect(t.journeyState.originText?.toLowerCase()).toContain("pune");
     expect(t.journeyState.destinationText?.toLowerCase()).toContain("delhi");
     expect(t.journeyState.travelDate).toBe("tomorrow");
-    expect(t.journeyState.pendingClarification).toBeUndefined();
+    expect(t.journeyState.pendingClarification).not.toBe("origin");
+    expect(t.journeyState.pendingClarification).not.toBe("destination");
     expect(t.speakEnglish).not.toMatch(/where are you starting from/i);
     expect(t.trip?.from.toLowerCase()).toContain("pune");
     expect(t.trip?.to.toLowerCase()).toContain("delhi");

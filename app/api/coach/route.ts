@@ -1,11 +1,9 @@
 import { NextResponse } from "next/server";
-import OpenAI from "openai";
 import { coachFor } from "@/lib/agent";
 import type { AgentState, Trip } from "@/types";
 
 export const runtime = "nodejs";
 
-const MODEL = process.env.OPENAI_MODEL || "gpt-4o-mini";
 
 /* ------------------------------------------------------------------
    AI Coach API — takes a user question + journey context and returns
@@ -56,64 +54,13 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "message required" }, { status: 400 });
   }
 
-  // 1. Try OpenAI if key is present
-  const apiKey = process.env.OPENAI_API_KEY;
-  if (apiKey) {
-    try {
-      const client = new OpenAI({ apiKey });
-      const contextStr = JSON.stringify(journeyContext, null, 2);
-
-      const completion = await client.chat.completions.create({
-        model: MODEL,
-        temperature: 0.5,
-        max_tokens: 300,
-        messages: [
-          {
-            role: "system",
-            content: `You are the AI Coach inside Tatkal Copilot, an Indian railway Tatkal ticket booking assistant. You speak warmly and clearly to Manoj, a 54-year-old traveller. 
-
-Your responses must be:
-- Grounded ONLY in the journey context provided below. Never invent train names, times, prices, or probabilities.
-- 2-4 sentences maximum. Plain, reassuring language.
-- Never mention raw percentages — use confidence words only: Very High, High, Medium, Low.
-- Never claim real IRCTC integration. This is a demo/prototype.
-
-CRITICAL AUTHORIZATION MODE RULES:
-- If mode = "assisted":
-  * Before window open: "I'll watch the clock and make sure you're there when Tatkal opens."
-  * At window open: "The window is open. Your plan is ready. Tap Start booking when you're ready."
-  * Primary failure: "Your primary train is unavailable. Your backup is ready. Tap Use backup when you're ready."
-  * NEVER say "I've started booking" unless user initiated booking.
-- If mode = "auto" or "permissioned":
-  * Before window open: "I'll start the prepared booking strategy when Tatkal opens."
-  * At window open: "The window is open. I'm starting your prepared booking strategy now."
-  * Primary failure: "Your primary strategy is unavailable. I'm evaluating your backup."
-  * Backup activation: "Your primary option failed. I've switched to your prepared backup strategy."
-  * NEVER say "Tap Start booking" in Permissioned mode.
-
-Current journey context:
-${contextStr}`,
-          },
-          { role: "user", content: message },
-        ],
-      });
-
-      const response = completion.choices[0]?.message?.content;
-      if (response) {
-        return NextResponse.json({ response, source: "gpt" });
-      }
-    } catch (err) {
-      console.warn("[api/coach] GPT failed, checking Gemini fallback:", err);
-    }
-  }
-
-  // 2. Try Gemini fallback if OpenAI failed or key is absent
+  // 1. Try Gemini
   const geminiResponse = await callGeminiCoach(message, journeyContext);
   if (geminiResponse) {
     return NextResponse.json({ response: geminiResponse, source: "gemini" });
   }
 
-  // 3. Graceful degradation — return deterministic coach
+  // 2. Graceful degradation — return deterministic coach
   return NextResponse.json({
     response: coachFor(
       journeyContext?.agentState ?? "scheduled",

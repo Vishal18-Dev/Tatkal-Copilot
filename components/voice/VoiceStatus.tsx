@@ -14,6 +14,7 @@ const STATE_KEY: Record<VoiceState, string> = {
   result: "voice.resultReady",
   confirming: "voice.confirming",
   speaking: "voice.speaking",
+  switching_language: "voice.thinking",
   error: "voice.error.generic",
 };
 

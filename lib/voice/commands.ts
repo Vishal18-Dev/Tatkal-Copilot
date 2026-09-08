@@ -26,6 +26,8 @@ import type { VoiceLang } from "./languages";
    - STOP     (Halt speech / pause)
    ============================================================ */
 
+import { parseLanguageSwitchCommand } from "./languages";
+
 export const INTENT_TO_KIND: Record<SemanticCommandIntent, VoiceCommandKind> = {
   yes: "confirm",
   confirm: "confirm",
@@ -36,6 +38,7 @@ export const INTENT_TO_KIND: Record<SemanticCommandIntent, VoiceCommandKind> = {
   backup: "backup",
   cheaper: "cheaper",
   change: "change",
+  language_change: "language_change",
   unknown: "unknown",
 };
 
@@ -75,7 +78,7 @@ const COMMAND_DICTIONARY: CommandPattern[] = [
   {
     intent: "backup",
     lang: "en",
-    words: ["backup", "plan b", "alternative", "second option", "backup train", "backup option", "other train", "alternate route"],
+    words: ["backup", "plan b", "alternative", "second option", "backup train", "backup option", "other train", "alternate route", "premium tatkal", "pt option", "premium tatkal option", "try premium tatkal"],
   },
   {
     intent: "cheaper",
@@ -122,7 +125,7 @@ const COMMAND_DICTIONARY: CommandPattern[] = [
   {
     intent: "backup",
     lang: "hi",
-    words: ["बैकअप", "दूसरा विकल्प", "दूसरा ट्रेन", "विकल्प", "backup", "doosra vikalp", "dusri train", "alternative", "dusra rasta"],
+    words: ["बैकअप", "दूसरा विकल्प", "दूसरा ट्रेन", "विकल्प", "प्रीमियम तत्काल", "प्रीमियम तत्काल विकल्प", "backup", "doosra vikalp", "dusri train", "alternative", "dusra rasta", "premium tatkal", "pt option"],
   },
   {
     intent: "cheaper",
@@ -557,6 +560,19 @@ export function parseVoiceCommand(
   text: string,
   preferredLang?: VoiceLang | null
 ): VoiceCommand {
+  // 1. First-class control intent check: Language switch must be resolved BEFORE normal command processing
+  const langSwitch = parseLanguageSwitchCommand(text);
+  if (langSwitch.isSwitch && langSwitch.targetLang) {
+    return {
+      kind: "language_change",
+      intent: "language_change",
+      raw: text,
+      language: preferredLang ?? undefined,
+      targetLanguage: langSwitch.targetLang,
+      confidence: 1.0,
+    };
+  }
+
   const norm = normalize(text);
   if (!norm) {
     return { kind: "unknown", intent: "unknown", raw: text, confidence: 0 };

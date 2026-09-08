@@ -7,7 +7,17 @@ import type { Trip } from "@/types";
 import type { Conversation } from "@/lib/conversation/types";
 import { createConversation } from "@/lib/conversation/service";
 import { executeCopilotTurn } from "@/lib/copilot/unified-agent";
-import { isVoiceLang, type VoiceLang } from "@/lib/voice/languages";
+import {
+  parseLanguageSwitchCommand,
+  getLanguageDialogue,
+  isVoiceLang,
+  type VoiceLang,
+} from "@/lib/voice/languages";
+import {
+  createSpeechLifecycle,
+  type SpeechLifecycleController,
+  type SpeechCancelReason,
+} from "@/lib/voice/speech-lifecycle";
 
 export interface CallLine {
   id: string;
@@ -42,8 +52,8 @@ export function useCallConversation(
   const stateRef = useRef(state);
   stateRef.current = state;
 
-  const audioRef = useRef<HTMLAudioElement | null>(null);
-  const genRef = useRef(0);
+  const speechLifecycleRef = useRef<SpeechLifecycleController | null>(null);
+  const lastTurnTextRef = useRef<{ text: string; time: number }>({ text: "", time: 0 });
   const activeLangRef = useRef<VoiceLang>(isVoiceLang(lang) ? lang : "en");
   const conversationRef = useRef(conversation);
   conversationRef.current = conversation;
@@ -70,11 +80,16 @@ export function useCallConversation(
   const isProcessingTurnRef = useRef(false);
   const latestWebSpeechTextRef = useRef<string>("");
 
-  const cleanupAudio = useCallback(() => {
-    if (audioRef.current) {
-      audioRef.current.pause();
-      audioRef.current = null;
-    }
+  useEffect(() => {
+    speechLifecycleRef.current = createSpeechLifecycle("call_conversation", activeLangRef.current);
+    return () => {
+      speechLifecycleRef.current?.cancelSpeech("teardown");
+      speechLifecycleRef.current = null;
+    };
+  }, []);
+
+  const cleanupAudio = useCallback((reason: SpeechCancelReason = "barge_in") => {
+    speechLifecycleRef.current?.cancelSpeech(reason);
   }, []);
 
   const cleanupMic = useCallback(() => {
@@ -109,7 +124,7 @@ export function useCallConversation(
   }, []);
 
   const fullCleanup = useCallback(() => {
-    cleanupAudio();
+    cleanupAudio("teardown");
     cleanupMic();
   }, [cleanupAudio, cleanupMic]);
 
@@ -117,49 +132,66 @@ export function useCallConversation(
 
   /** Halt agent speech immediately (Barge-in) */
   const interrupt = useCallback(() => {
-    cleanupAudio();
+    cleanupAudio("barge_in");
     setState("interrupted");
     setTimeout(() => {
       setState("listening");
     }, 150);
   }, [cleanupAudio]);
 
-  /** Speak text aloud via Sarvam TTS, then execute callback */
+  /** Speak text aloud via Sarvam TTS or browser TTS bounded by authoritative speech lifecycle */
   const speakText = useCallback(
-    async (text: string, myGen: number, onFinished?: () => void) => {
-      cleanupAudio();
+    async (text: string, onFinished?: () => void) => {
+      let lifecycle = speechLifecycleRef.current;
+      if (!lifecycle) {
+        lifecycle = createSpeechLifecycle("call_conversation", activeLangRef.current);
+        speechLifecycleRef.current = lifecycle;
+      }
       cleanupMic();
       setState("speaking");
       setInterimText(null);
+
+      const { generation, signal } = lifecycle.startSpeechRequest("call_speak");
 
       try {
         const res = await fetch("/api/calling/speak", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ text, lang: activeLangRef.current }),
+          body: JSON.stringify({ text, voiceLang: activeLangRef.current }),
+          signal,
         });
+        if (!lifecycle.isGenerationActive(generation)) return;
+
         const data = (await res.json().catch(() => ({}))) as { audioBase64?: string; audioCodec?: string };
-        if (myGen !== genRef.current) return;
+        if (!lifecycle.isGenerationActive(generation)) return;
 
         if (data.audioBase64) {
-          const audio = new Audio(`data:audio/${data.audioCodec ?? "mp3"};base64,${data.audioBase64}`);
-          audioRef.current = audio;
-          await new Promise<void>((resolve) => {
-            audio.onended = () => resolve();
-            audio.onerror = () => resolve();
-            audio.play().catch(() => resolve());
-          });
+          await lifecycle.playAudioBase64(
+            data.audioBase64,
+            data.audioCodec ?? "mp3",
+            generation
+          );
+          if (lifecycle.isGenerationActive(generation)) {
+            onFinished?.();
+          }
         } else {
-          // Natural speech delay fallback
-          await new Promise((r) => setTimeout(r, Math.min(3200, 800 + text.length * 35)));
+          // Browser TTS fallback
+          await lifecycle.playBrowserSpeech(text, activeLangRef.current, generation);
+          if (lifecycle.isGenerationActive(generation)) {
+            onFinished?.();
+          }
         }
+      } catch {
+        // Ignored if cancelled
       } finally {
-        if (myGen === genRef.current) {
-          onFinished?.();
+        if (lifecycle.isGenerationActive(generation)) {
+          if (stateRef.current === "speaking") {
+            setState("listening");
+          }
         }
       }
     },
-    [cleanupAudio, cleanupMic]
+    [cleanupMic]
   );
 
   /** Process a completed spoken or typed user turn through Unified Copilot Brain */
@@ -168,11 +200,53 @@ export function useCallConversation(
       const trimmed = userText.trim();
       if (!trimmed) return;
       if (isProcessingTurnRef.current) return;
+
+      // Invariant 11: Turn deduplication — ignore duplicates within 2000ms
+      const now = Date.now();
+      if (
+        lastTurnTextRef.current.text === trimmed.toLowerCase() &&
+        now - lastTurnTextRef.current.time < 2000
+      ) {
+        return;
+      }
+      lastTurnTextRef.current = { text: trimmed.toLowerCase(), time: now };
+
       isProcessingTurnRef.current = true;
 
       try {
-        genRef.current += 1;
-        const myGen = genRef.current;
+        let lifecycle = speechLifecycleRef.current;
+        if (!lifecycle) {
+          lifecycle = createSpeechLifecycle("call_conversation", activeLangRef.current);
+          speechLifecycleRef.current = lifecycle;
+        }
+
+        // Invariant 8 & 9: Language switching is a CONTROL operation and MUST be resolved before normal journey-agent execution
+        const switchCmd = parseLanguageSwitchCommand(trimmed);
+        if (switchCmd.isSwitch) {
+          const targetLang = switchCmd.targetLanguage;
+          lifecycle.cancelSpeech("language_switch");
+          lifecycle.conversationLanguage = targetLang;
+          lifecycle.targetLanguage = targetLang;
+          lifecycle.voiceState = "switching_language";
+          activeLangRef.current = targetLang;
+          setState("switching_language");
+
+          const langPack = getLanguageDialogue(targetLang);
+          const ack = langPack.switchAck;
+          setLines((prev) => [
+            ...prev,
+            { id: `line_user_${Date.now()}`, role: "user", text: trimmed },
+            { id: `ack_${Date.now()}`, role: "agent", text: ack },
+          ]);
+
+          await speakText(ack, () => {
+            if (stateRef.current !== "ended") {
+              setState("listening");
+              if (lifecycle) lifecycle.voiceState = "listening";
+            }
+          });
+          return;
+        }
 
         // 1. Add user line to conversation log
         setLines((prev) => [...prev, { id: `line_user_${Date.now()}`, role: "user", text: trimmed }]);
@@ -186,7 +260,7 @@ export function useCallConversation(
               ? "तत्काल कोपायलट का उपयोग करने के लिए धन्यवाद। शुभ यात्रा!"
               : "Thank you for using Tatkal Copilot. Have a safe journey!";
           setLines((prev) => [...prev, { id: `farewell_${Date.now()}`, role: "agent", text: farewell }]);
-          await speakText(farewell, myGen, () => {
+          await speakText(farewell, () => {
             setState("ended");
             cleanupMic();
           });
@@ -205,8 +279,6 @@ export function useCallConversation(
             geolocation,
           });
 
-          if (myGen !== genRef.current) return;
-
           setConversation(copilotResult.conversation);
           if (copilotResult.trip) {
             tripRef.current = copilotResult.trip;
@@ -216,8 +288,8 @@ export function useCallConversation(
           setLines((prev) => [...prev, { id: `agent_${Date.now()}`, role: "agent", text: reply }]);
 
           // 4. Speak response, then automatically return to listening (Hands-free loop!)
-          await speakText(reply, myGen, () => {
-            if (myGen === genRef.current && stateRef.current !== "ended") {
+          await speakText(reply, () => {
+            if (stateRef.current !== "ended") {
               setState("listening");
             }
           });
@@ -225,8 +297,8 @@ export function useCallConversation(
           console.warn("[calling/conversation] turn error:", err);
           const fallbackMsg = "I had trouble processing that. Could you repeat?";
           setLines((prev) => [...prev, { id: `err_${Date.now()}`, role: "agent", text: fallbackMsg }]);
-          await speakText(fallbackMsg, myGen, () => {
-            if (myGen === genRef.current && stateRef.current !== "ended") {
+          await speakText(fallbackMsg, () => {
+            if (stateRef.current !== "ended") {
               setState("listening");
             }
           });
@@ -391,7 +463,7 @@ export function useCallConversation(
             setInterimText("Listening to you...");
 
             // If audio was currently speaking, trigger barge-in!
-            if (audioRef.current && !audioRef.current.paused) {
+            if (speechLifecycleRef.current?.isSpeaking) {
               interrupt();
             }
           }
@@ -446,19 +518,18 @@ export function useCallConversation(
   }, [cleanupMic, startListening]);
 
   const accept = useCallback(async () => {
-    genRef.current += 1;
-    const myGen = genRef.current;
+    speechLifecycleRef.current?.cancelSpeech("new_turn");
     setLines([]);
     setState("connecting");
     await new Promise((r) => setTimeout(r, 400));
-    if (myGen !== genRef.current) return;
+    if (stateRef.current === "ended") return;
 
     // Speak initial briefing / greeting
     const startStep = script.steps.start;
     setLines([{ id: startStep.id, role: "agent", text: startStep.text }]);
-    await speakText(startStep.text, myGen, () => {
+    await speakText(startStep.text, () => {
       // Immediately enter Hands-free Listening mode!
-      if (myGen === genRef.current) {
+      if (stateRef.current !== "ended") {
         setState("listening");
         void startListening();
       }
@@ -466,7 +537,6 @@ export function useCallConversation(
   }, [script, speakText, startListening]);
 
   const decline = useCallback(() => {
-    genRef.current += 1;
     fullCleanup();
     setState("ended");
   }, [fullCleanup]);

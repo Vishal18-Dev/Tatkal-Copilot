@@ -54,6 +54,8 @@ export async function POST(req: Request) {
     journeyState: turnResult.journeyState,
     trip: turnResult.trip,
     voiceState,
+    actionPlan: turnResult.actionPlan,
+    toolUsed: turnResult.toolUsed,
   };
 
   const hasKey = !!process.env.SARVAM_API_KEY;
@@ -121,7 +123,7 @@ function buildPlanFromTurnResult(
       toCode: trip?.toCode || "DEST",
       date: journeyState?.travelDate || "Tomorrow",
       arrivalDeadline: journeyState?.timeConstraint ? journeyState.timeConstraint.raw : null,
-      passengers: journeyState?.passengerCount || 1,
+      passengers: journeyState?.passengerCount,
       preferredClass: (journeyState?.travelClass as any) || "3A",
       priority: journeyState?.priority === "fastest" ? "arrival-time" : (journeyState?.priority || "safest"),
       flexibility: 0.6,

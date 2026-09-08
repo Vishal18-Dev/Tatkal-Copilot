@@ -17,6 +17,7 @@ import {
   type IdentityReadiness,
 } from "@/lib/identity";
 import { walletProvider, DEFAULT_WALLET, type WalletState } from "@/lib/payments";
+import { CANONICAL_DEMO_TRIP_ID, createCanonicalDemoTrip } from "@/lib/demo/scenarios";
 import type {
   User,
   Session,
@@ -67,12 +68,14 @@ const defaultPreferences: UserPreferences = {
 };
 
 function seedData(): UserData {
+  const travellers = savedPassengers.map((p) => ({ ...p }));
+  const demoTrip = createCanonicalDemoTrip(travellers.map((p) => p.id));
   return {
     preferences: { ...defaultPreferences },
     // Guest starts with the canonical sample travellers — editable/removable.
-    travellers: savedPassengers.map((p) => ({ ...p })),
+    travellers,
     savedJourneys: [],
-    trips: [],
+    trips: [demoTrip],
     activity: [],
     notifications: [],
     identity: { ...DEFAULT_IDENTITY },
@@ -86,11 +89,17 @@ function loadData(id: string): UserData {
     const raw = localStorage.getItem(dataKey(id));
     if (raw) {
       const parsed = JSON.parse(raw) as Partial<UserData>;
+      const loadedTravellers = parsed.travellers ?? savedPassengers.map((p) => ({ ...p }));
+      let loadedTrips = (parsed.trips ?? []).map(normalizeTrip);
+      // Guarantee the canonical demo travel is always available
+      if (!loadedTrips.some((t) => t.id === CANONICAL_DEMO_TRIP_ID)) {
+        loadedTrips = [createCanonicalDemoTrip(loadedTravellers.map((p) => p.id)), ...loadedTrips];
+      }
       return {
         preferences: { ...defaultPreferences, ...parsed.preferences },
-        travellers: parsed.travellers ?? [],
+        travellers: loadedTravellers,
         savedJourneys: parsed.savedJourneys ?? [],
-        trips: (parsed.trips ?? []).map(normalizeTrip),
+        trips: loadedTrips,
         activity: parsed.activity ?? [],
         notifications: parsed.notifications ?? [],
         identity: { ...DEFAULT_IDENTITY, ...parsed.identity },
@@ -100,8 +109,7 @@ function loadData(id: string): UserData {
   } catch {
     /* corrupt — fall through to seed */
   }
-  // Fresh guest gets seed travellers; a fresh authed user starts empty.
-  return id === "guest" ? seedData() : { ...seedData(), travellers: [] };
+  return seedData();
 }
 
 /** Backfill agent/plan fields on trips saved by older versions. */
@@ -194,6 +202,8 @@ interface StoreCtx {
   resetIdentity: () => void;
   /** Debit the Rail Wallet for a (simulated) booking — the recovery rail. */
   debitWallet: (amount: number) => Promise<{ ok: boolean; newBalance: number }>;
+  /** Add funds to the Rail Wallet (simulated demo wallet). */
+  creditWallet: (amount: number) => { ok: boolean; newBalance: number };
 
   addTraveller: (t: Omit<Traveller, "id">) => Traveller;
   updateTraveller: (id: string, patch: Omit<Traveller, "id">) => void;
@@ -204,6 +214,7 @@ interface StoreCtx {
 
   addTrip: (t: Omit<Trip, "id" | "createdAt">) => Trip;
   updateTrip: (id: string, patch: Partial<Trip>) => void;
+  deleteTrip: (id: string) => void;
   getTrip: (id: string) => Trip | undefined;
   tripsByStatus: (status: TripStatus) => Trip[];
   seedDemoPlan: () => Trip;
@@ -467,6 +478,19 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     [patch]
   );
 
+  const creditWallet = useCallback(
+    (amount: number) => {
+      const current = dataRef.current.wallet.balance;
+      const newBalance = Math.max(0, current + Math.max(0, amount));
+      patch((d) => ({
+        ...d,
+        wallet: { ...d.wallet, balance: newBalance, lastUpdated: new Date().toISOString() },
+      }));
+      return { ok: true, newBalance };
+    },
+    [patch]
+  );
+
   const addTraveller = useCallback(
     (t: Omit<Traveller, "id">) => {
       const traveller: Traveller = { ...t, id: genId("t") };
@@ -531,6 +555,22 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       patch((d) => ({ ...d, trips: [trip, ...d.trips] }));
       return trip;
     },
+    [patch]
+  );
+
+  const deleteTrip = useCallback(
+    (id: string) =>
+      patch((d) => {
+        const remaining = d.trips.filter((x) => x.id !== id);
+        const nextTrips =
+          id === CANONICAL_DEMO_TRIP_ID
+            ? [createCanonicalDemoTrip(d.travellers.map((p) => p.id)), ...remaining]
+            : remaining;
+        return {
+          ...d,
+          trips: nextTrips,
+        };
+      }),
     [patch]
   );
 
@@ -678,6 +718,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       setIdentity,
       resetIdentity,
       debitWallet,
+      creditWallet,
       addTraveller,
       updateTraveller,
       deleteTraveller,
@@ -685,6 +726,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       deleteJourney,
       addTrip,
       updateTrip,
+      deleteTrip,
       getTrip,
       tripsByStatus,
       seedDemoPlan,
@@ -707,6 +749,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       setIdentity,
       resetIdentity,
       debitWallet,
+      creditWallet,
       addTraveller,
       updateTraveller,
       deleteTraveller,
@@ -714,6 +757,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       deleteJourney,
       addTrip,
       updateTrip,
+      deleteTrip,
       getTrip,
       tripsByStatus,
       seedDemoPlan,

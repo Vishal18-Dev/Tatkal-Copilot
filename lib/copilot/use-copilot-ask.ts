@@ -99,7 +99,8 @@ export function useCopilotAsk(getContext: () => CopilotContext) {
         if (myGen !== genRef.current) return;
         push("agent", data.text ?? english);
         if (data.audioBase64) {
-          const audio = new Audio(`data:audio/${data.audioCodec ?? "mp3"};base64,${data.audioBase64}`);
+          const codec = data.audioCodec === "mp3" || !data.audioCodec ? "mpeg" : data.audioCodec;
+          const audio = new Audio(`data:audio/${codec};base64,${data.audioBase64}`);
           audioRef.current = audio;
           await new Promise<void>((resolve) => {
             audio.onended = () => resolve();

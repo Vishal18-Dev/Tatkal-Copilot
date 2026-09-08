@@ -7,7 +7,7 @@ describe("Genuine 10-Language Voice Command Engine (Item 2)", () => {
   const ALL_10_LANGUAGES: VoiceLang[] = ["en", "hi", "mr", "kn", "ta", "te", "gu", "pa", "ur", "ml"];
 
   // 1. Minimum test matrix across all 10 languages for the 9 required commands
-  const commandMatrix: Record<Exclude<SemanticCommandIntent, "unknown">, Record<VoiceLang, string[]>> = {
+  const commandMatrix: Record<Exclude<SemanticCommandIntent, "unknown" | "language_change">, Record<VoiceLang, string[]>> = {
     yes: {
       en: ["yes", "yeah", "sure", "ok", "okay"],
       hi: ["हाँ", "हां", "हाँजी", "theek hai", "haan"],
@@ -119,7 +119,7 @@ describe("Genuine 10-Language Voice Command Engine (Item 2)", () => {
   };
 
   describe("All 9 required commands across all 10 languages", () => {
-    const intents: Array<Exclude<SemanticCommandIntent, "unknown">> = [
+    const intents: Array<Exclude<SemanticCommandIntent, "unknown" | "language_change">> = [
       "yes",
       "no",
       "cancel",

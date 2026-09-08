@@ -1,6 +1,7 @@
 import type { GeoCoordinates, ResolvedLocation, ExtractedTravelQuery } from "./types";
 import { googleLocationProvider } from "./providers/google-location-provider";
 import { demoLocationProvider } from "./providers/demo-location-provider";
+import { isInvalidPlaceCandidate } from "./place-guard";
 
 /** Haversine formula to compute great-circle distance in kilometers */
 export function haversineDistanceKm(coord1: GeoCoordinates, coord2: GeoCoordinates): number {
@@ -21,6 +22,7 @@ export function haversineDistanceKm(coord1: GeoCoordinates, coord2: GeoCoordinat
  * Async location resolution utilizing GoogleLocationProvider with fallback.
  */
 export async function resolveLocationAsync(text: string): Promise<ResolvedLocation | null> {
+  if (isInvalidPlaceCandidate(text)) return null;
   return googleLocationProvider.resolvePlaceAsync(text);
 }
 
@@ -28,6 +30,7 @@ export async function resolveLocationAsync(text: string): Promise<ResolvedLocati
  * Resolve a text mention into a structured ResolvedLocation.
  */
 export function resolveLocation(text: string): ResolvedLocation | null {
+  if (isInvalidPlaceCandidate(text)) return null;
   return googleLocationProvider.resolvePlace(text);
 }
 
@@ -52,40 +55,76 @@ export function extractTravelPlaces(text: string): ExtractedTravelQuery {
 
   const fromToMatch = clean.match(/(?:from|starting from|start from)\s+([a-zA-Z\s,]+?)\s+(?:to|reach|for)\s+([a-zA-Z\s,]+?)(?:tomorrow|today|kal|by|before|in|\.|$)/i);
   if (fromToMatch) {
-    originText = fromToMatch[1].trim();
-    destinationText = fromToMatch[2].trim();
+    const orig = fromToMatch[1].trim();
+    const dest = fromToMatch[2].trim();
+    if (!isInvalidPlaceCandidate(orig) && !isInvalidPlaceCandidate(dest)) {
+      originText = orig;
+      destinationText = dest;
+    }
   }
 
   if (!originText || !destinationText) {
-    const toFromMatch = clean.match(/(?:to|reach|go to)\s+([a-zA-Z\s,]+?)\s+(?:from|starting from)\s+([a-zA-Z\s,]+?)(?:tomorrow|today|kal|by|before|in|\.|$)/i);
+    const toFromMatch = clean.match(/(?:travel\s+to|tickets?\s+to|going\s+to|go\s+to|reach|\bto\b)\s+([a-zA-Z\s,]+?)\s+(?:from|starting\s+from|start\s+from)\s+([a-zA-Z\s,]+?)(?:tomorrow|today|kal|by|before|in|\.|$)/i);
     if (toFromMatch) {
-      destinationText = toFromMatch[1].trim();
-      originText = toFromMatch[2].trim();
+      const dest = toFromMatch[1].trim();
+      const orig = toFromMatch[2].trim();
+      if (!isInvalidPlaceCandidate(orig) && !isInvalidPlaceCandidate(dest)) {
+        destinationText = dest;
+        originText = orig;
+      }
     }
   }
 
   if (!originText || !destinationText) {
     const inReachMatch = clean.match(/(?:i am in|i'm in|in|at|live in)\s+([a-zA-Z\s,]+?)\s+(?:and need to reach|and want to go to|and going to|need to reach|going to|and i want to go to|i want to go to)\s+([a-zA-Z\s,]+?)(?:tomorrow|today|kal|by|before|in|\.|$)/i);
     if (inReachMatch) {
-      originText = inReachMatch[1].trim();
-      destinationText = inReachMatch[2].trim();
+      const orig = inReachMatch[1].trim();
+      const dest = inReachMatch[2].trim();
+      if (!isInvalidPlaceCandidate(orig) && !isInvalidPlaceCandidate(dest)) {
+        originText = orig;
+        destinationText = dest;
+      }
     }
   }
 
   if (!originText || !destinationText) {
     const hindiMatch = clean.match(/([a-zA-Z\u0900-\u097F\s,]+?)\s+(?:se)\s+([a-zA-Z\u0900-\u097F\s,]+?)\s+(?:jaana|jana|pahuchna|reach)/i);
     if (hindiMatch) {
-      originText = hindiMatch[1].trim();
-      destinationText = hindiMatch[2].trim();
+      const orig = hindiMatch[1].trim();
+      const dest = hindiMatch[2].trim();
+      if (!isInvalidPlaceCandidate(orig) && !isInvalidPlaceCandidate(dest)) {
+        originText = orig;
+        destinationText = dest;
+      }
     }
   }
 
   if (!destinationText) {
-    const toOnlyMatch = clean.match(/(?:take me to|travel to|tickets? to|going to|go to|reach)\s+([a-zA-Z\s,]+?)(?:tomorrow|today|kal|by|before|in|\.|$)/i) ||
+    const toOnlyMatch = clean.match(/(?:take\s+me\s+to|travel\s+to|tickets?\s+to|going\s+to|go\s+to|reach)\s+([a-zA-Z\s,]+?)(?:tomorrow|today|kal|by|before|in|\.|$)/i) ||
       clean.match(/([a-zA-Z\u0900-\u097F\s,]+?)\s+(?:jaana hai|jana hai|ki ticket)/i);
     if (toOnlyMatch) {
-      destinationText = toOnlyMatch[1].trim();
+      const dest = toOnlyMatch[1].trim();
+      if (!isInvalidPlaceCandidate(dest)) {
+        destinationText = dest;
+      }
     }
+  }
+
+  if (!originText) {
+    const originMatch = clean.match(/(?:start(?:ing)?\s+(?:my\s+|a\s+|the\s+)?journey\s+from|from|starting\s+from|start\s+from)\s+([a-zA-Z\s,]+?)(?:tomorrow|today|kal|by|before|in|\.|$)/i);
+    if (originMatch) {
+      const orig = originMatch[1].trim();
+      if (!isInvalidPlaceCandidate(orig)) {
+        originText = orig;
+      }
+    }
+  }
+
+  if (destinationText && isInvalidPlaceCandidate(destinationText)) {
+    destinationText = undefined;
+  }
+  if (originText && isInvalidPlaceCandidate(originText)) {
+    originText = undefined;
   }
 
   if (originText && /\b(where i am|my location|current location|here|idhar se|yahan se)\b/i.test(originText)) {

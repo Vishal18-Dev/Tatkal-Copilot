@@ -85,6 +85,12 @@ describe("extractJourneyConstraints — unit", () => {
     expect(c.destinationText?.toLowerCase()).toContain("delhi");
   });
 
+  it("extracts 'I want to start my journey from Pune' as origin Pune with NO destination", () => {
+    const c = extractJourneyConstraints("I want to start my journey from Pune.");
+    expect(c.originText?.toLowerCase()).toContain("pune");
+    expect(c.destinationText).toBeUndefined();
+  });
+
   it("extracts residential context into residentOf, not origin", () => {
     const c = extractJourneyConstraints("I live in Pune");
     expect(c.residentOf?.toLowerCase()).toContain("pune");

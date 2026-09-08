@@ -43,18 +43,25 @@ function parseArrivalDeadline(text: string): string | null {
   return `${String(h).padStart(2, "0")}:${String(min).padStart(2, "0")}`;
 }
 
-function parsePassengers(text: string): number {
+import { parseConversationalPassengerCount } from "./copilot/journey-state";
+
+function parsePassengers(text: string): number | undefined {
+  const conversational = parseConversationalPassengerCount(text);
+  if (conversational !== undefined) return conversational;
+
   const t = text.toLowerCase();
   const numMatch = t.match(/(\d+)\s*(?:tickets?|seats?|people|passengers?|of us)/);
   if (numMatch) return Math.min(6, Math.max(1, parseInt(numMatch[1], 10)));
-  let count = 1;
-  if (/\bwife|husband|spouse|partner\b/.test(t)) count += 1;
-  if (/\bparents\b/.test(t)) count = Math.max(count, 3);
-  if (/\bwith (?:my )?family\b/.test(t)) count = Math.max(count, 4);
-  if (/\balone|just me|myself\b/.test(t)) count = 1;
+
+  if (/\balone|just me|myself\b/.test(t)) return 1;
+
+  let count: number | undefined = undefined;
+  if (/\bwife|husband|spouse|partner\b/.test(t)) count = (count || 1) + 1;
+  if (/\bparents\b/.test(t)) count = Math.max(count || 1, 3);
+  if (/\bwith (?:my )?family\b/.test(t)) count = Math.max(count || 1, 4);
   const kids = t.match(/(\d+)\s*(?:kids?|children|child)/);
-  if (kids) count += parseInt(kids[1], 10);
-  return Math.min(6, count);
+  if (kids) count = (count || 1) + parseInt(kids[1], 10);
+  return count ? Math.min(6, count) : undefined;
 }
 
 function parseClass(text: string): TravelClass | "any" {
@@ -134,12 +141,12 @@ export function parseIntentLocally(goal: string): TravelIntent {
 
 function buildRestatement(p: {
   to: string;
-  passengers: number;
+  passengers?: number;
   priority: TravelIntent["priority"];
   preferredClass: TravelClass | "any";
   deadline: string | null;
 }): string {
-  const who = p.passengers === 1 ? "you" : `${p.passengers} travellers`;
+  const who = !p.passengers ? "travellers" : p.passengers === 1 ? "you" : `${p.passengers} travellers`;
   const cls = p.preferredClass === "any" ? "" : ` in ${p.preferredClass}`;
   const when = p.deadline ? ` before ${p.deadline}` : "";
   const goalWord =

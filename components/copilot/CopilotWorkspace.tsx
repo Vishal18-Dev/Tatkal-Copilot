@@ -20,7 +20,6 @@ import {
   HelpCircle,
   Clock,
   Radio,
-  Train,
   Users,
   Compass,
   Lock,
@@ -32,7 +31,7 @@ import { useVoiceConversation } from "@/lib/voice/conversation";
 import { adjustmentLabel, suggestedQuestions } from "@/lib/voice/adjustments";
 import { useLang } from "@/lib/i18n";
 import { useVoiceLang } from "@/lib/voice/voice-lang";
-import { useJourney } from "@/lib/journey";
+import { useOptionalJourney } from "@/lib/journey";
 import { useStore } from "@/lib/store";
 import { cn, formatFare } from "@/lib/utils";
 import { CopilotAvatar } from "./CopilotAvatar";
@@ -54,18 +53,23 @@ export function CopilotWorkspace({
   const { t, lang } = useLang();
   const { voiceLang, locked, observeDetected } = useVoiceLang();
   const router = useRouter();
-  const { submitGoal, chooseOption, goTo } = useJourney();
+  const journey = useOptionalJourney();
+  const submitGoal = journey?.submitGoal ?? ((g: string) => router.push(`/app/plan?goal=${encodeURIComponent(g)}`));
+  const chooseOption = journey?.chooseOption ?? (() => {});
+  const goTo = journey?.goTo ?? (() => router.push("/app/plan"));
   const { identity, wallet } = useStore();
 
   const [inputGoal, setInputGoal] = useState(initialGoal ?? "");
   const [showHistory, setShowHistory] = useState(false);
+  const [showManual, setShowManual] = useState(false);
   const [prepActive, setPrepActive] = useState(false);
+  const [continuousMode, setContinuousMode] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
   const convo = useVoiceConversation({
     voiceLang,
     locked,
-    continuous: false,
+    continuous: continuousMode,
     onDetectLang: observeDetected,
     onConfirm: (goalText, plan) => {
       if (plan.options.length > 0) {
@@ -89,6 +93,7 @@ export function CopilotWorkspace({
     reset,
     tapAdjustment,
     askByTap,
+    sendText,
     replay,
   } = convo;
 
@@ -103,28 +108,76 @@ export function CopilotWorkspace({
   useEffect(() => {
     if (initialGoal && !startedGoalRef.current) {
       startedGoalRef.current = true;
+      setContinuousMode(true);
       void convo.start();
       const timer = setTimeout(() => {
-        convo.askByTap(initialGoal);
+        void convo.sendText(initialGoal);
       }, 300);
       return () => clearTimeout(timer);
     }
   }, [initialGoal, convo]);
+
+  // When actionPlan or booking confirmation triggers, activate preparation view automatically
+  useEffect(() => {
+    if (
+      result?.toolUsed === "open_booking_flow" ||
+      (result?.actionPlan?.route && !result.actionPlan.requiresConfirmation)
+    ) {
+      if (result.plan && result.plan.options.length > 0) {
+        const opt =
+          result.recommended && result.recommended.id !== "no_candidate"
+            ? result.recommended
+            : result.plan.options[0];
+        handlePrepareTatkal(result.plan, opt);
+      } else {
+        router.push("/app/plan");
+      }
+    } else if (
+      result?.actionPlan?.route ||
+      result?.toolUsed === "request_booking_confirmation" ||
+      result?.toolUsed === "prepare_journey"
+    ) {
+      setPrepActive(true);
+      if (result.plan && result.plan.options.length > 0) {
+        const opt =
+          result.recommended && result.recommended.id !== "no_candidate"
+            ? result.recommended
+            : result.plan.options[0];
+        if (opt) {
+          chooseOption(opt.id);
+        }
+      }
+    }
+  }, [result, chooseOption]);
 
   function handleFormSubmit(e?: React.FormEvent) {
     e?.preventDefault();
     const text = inputGoal.trim();
     if (!text || busy) return;
     setInputGoal("");
-    askByTap(text);
+
+    const isAffirmative = /^(?:yes|proceed|go ahead|haan|continue|confirm|sure)\b/i.test(text);
+    if (isAffirmative && result?.plan && result.plan.options.length > 0) {
+      const opt =
+        result.recommended && result.recommended.id !== "no_candidate"
+          ? result.recommended
+          : result.plan.options[0];
+      handlePrepareTatkal(result.plan, opt);
+      return;
+    }
+
+    void sendText(text);
   }
 
   function handleMicPress() {
     if (listening) {
+      setContinuousMode(false);
       void stop();
     } else if (speaking) {
       stopSpeaking();
+      setContinuousMode(false);
     } else {
+      setContinuousMode(true);
       void start();
     }
   }
@@ -132,20 +185,37 @@ export function CopilotWorkspace({
   function handlePrepareTatkal(plan: Plan, option: StrategyOption) {
     setPrepActive(true);
     chooseOption(option.id);
+    if (journey?.setPlan) {
+      journey.setPlan(plan);
+    }
     if (onPrepareTatkal) {
       onPrepareTatkal(plan, option);
     } else {
-      submitGoal(
-        `from ${plan.intent.from} to ${plan.intent.to}, ${plan.intent.passengers} passenger in ${plan.intent.preferredClass}`
-      );
+      // Store the voice-resolved plan in sessionStorage so the plan page
+      // can restore it directly — without calling submitGoal() which resets
+      // plan to null and re-runs generatePlan(), throwing away all voice context.
+      try {
+        sessionStorage.setItem(
+          "tatkal_voice_result",
+          JSON.stringify({
+            plan,
+            chosenOptionId: option.id,
+            journeyState: result?.journeyState,
+          })
+        );
+      } catch {
+        /* ignore — private browsing / Safari ITP */
+      }
+      router.push("/app/plan?from_voice=1");
     }
   }
+
 
   const originText = result?.journeyState?.originText ?? result?.plan.intent.from;
   const destText = result?.journeyState?.destinationText ?? result?.plan.intent.to;
   const travelDate = result?.journeyState?.travelDate ?? result?.plan.intent.date ?? "Tomorrow";
   const travelClass = result?.journeyState?.travelClass ?? result?.plan.intent.preferredClass ?? "3A";
-  const paxCount = result?.journeyState?.passengerCount ?? result?.plan.intent.passengers ?? 1;
+  const paxCount = result?.journeyState?.passengerCount ?? result?.plan.intent.passengers;
 
   const hasRoute = Boolean(originText && destText);
   const options = result?.plan.options ?? [];
@@ -154,297 +224,337 @@ export function CopilotWorkspace({
 
   const activeTranscript = interimTranscript || (turns.length > 0 ? turns[turns.length - 1]?.text : "");
 
+  useEffect(() => {
+    if (interimTranscript && interimTranscript.trim()) {
+      setInputGoal(interimTranscript.trim());
+    }
+  }, [interimTranscript]);
+
+  useEffect(() => {
+    const lastUserTurn = turns.filter((t) => t.role === "user").slice(-1)[0];
+    if (lastUserTurn?.text) {
+      setInputGoal(lastUserTurn.text);
+    }
+  }, [turns]);
+
+  const lastAgentTurn = turns.filter((t) => t.role === "agent").slice(-1)[0];
+  const agentSpeech =
+    result?.responseText ||
+    lastAgentTurn?.text ||
+    (listening
+      ? "Sun raha hoon... Aap aaram se boliye!"
+      : busy
+      ? "IRCTC live quota aur trains check kar raha hoon..."
+      : "Namaste! Main aapka Tatkal Copilot hoon.");
+
+  const agentSubtext =
+    listening
+      ? "Taking note of stations, date, and quota preferences..."
+      : busy
+      ? "Synchronizing schedule with railway booking window..."
+      : result
+      ? "Verified direct trains and Tatkal readiness ready for review."
+      : "Batayein kahan jaana hai — Tatkal quota, countdown aur failover booking main sambhal lunga.";
+
   return (
-    <div className={cn("mx-auto max-w-4xl space-y-7", className)}>
+    <div className={cn("mx-auto max-w-5xl space-y-8", className)}>
       {/* Top Banner Bar */}
-      <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-ink-faint">
-        <span className="flex items-center gap-2 font-semibold tracking-wide uppercase text-brand">
-          <span className="h-2 w-2 rounded-full bg-brand animate-pulse" />
-          {listening ? `● ${t("workspace.liveAudioStream")}` : `● ${t("workspace.ingress")}`}
-        </span>
-
-        <div className="flex items-center gap-3">
-          {listening ? (
-            <span className="flex items-center gap-1.5 text-[0.7rem] font-medium text-ink-soft">
-              <Lock className="h-3.5 w-3.5 text-confirm" /> {t("workspace.ephemeralSession")}
-            </span>
-          ) : (
-            <VoiceLangSelect />
-          )}
-        </div>
-      </div>
-
-      {/* Main Title Section */}
-      <div className="text-center space-y-1">
-        <h1 className="text-2xl font-bold tracking-tight text-brand-ink sm:text-3xl">
-          {t("workspace.title")}
-        </h1>
-        <p className="text-sm text-ink-soft">
-          {t("workspace.sub")}
-        </p>
-      </div>
-
-      {/* Persona Banner — Aarav */}
-      <div className="rounded-[var(--radius-lg)] border border-brand/20 bg-gradient-to-r from-surface to-brand-soft/40 p-4 shadow-sm">
-        <div className="flex flex-wrap items-center justify-between gap-4">
-          <div className="flex items-center gap-3.5">
-            <CopilotAvatar state={state} voiceState={voiceState as any} size="md" />
-            <div>
-              <div className="flex items-center gap-2">
-                <span className="text-base font-bold text-brand-ink">Aarav</span>
-                <span className="rounded-full bg-brand/10 px-2 py-0.5 text-[0.68rem] font-bold uppercase tracking-wider text-brand">
-                  {t("agent.guide")}
-                </span>
-              </div>
-              <p className="mt-0.5 text-xs text-ink-soft">
-                "{t("workspace.personaSub")}"
-              </p>
-            </div>
-          </div>
-
-          <span className="inline-flex items-center gap-1.5 rounded-full bg-confirm-soft px-3 py-1 text-xs font-semibold text-confirm shrink-0">
-            <span className="h-2 w-2 rounded-full bg-confirm animate-ping" /> {t("agent.activeReady")}
+      <div className="flex flex-wrap items-center justify-between gap-3 text-xs text-ink-faint border-b border-line/60 pb-3">
+        <div className="flex items-center gap-2 font-semibold tracking-wide text-brand">
+          <span className="inline-flex items-center gap-1.5 rounded-full bg-brand-soft px-3 py-1 text-[0.72rem] font-bold text-brand">
+            <span>🇮🇳</span>
+            <span>TATKAL BOOKING, AB ASAAN</span>
+            <span className="text-ink-faint">·</span>
+            <span className="text-brand font-medium">Bolkar ya Likhkar</span>
           </span>
         </div>
+
+        <div className="flex items-center gap-3">
+          <VoiceLangSelect />
+        </div>
       </div>
 
-      {/* Hero Natural Language Input Box */}
-      <div className="rounded-[var(--radius-lg)] border border-line-strong bg-surface p-4 shadow-[var(--shadow-card)] transition focus-within:border-brand focus-within:ring-4 focus-within:ring-brand/10 space-y-3">
-        <form onSubmit={handleFormSubmit} className="space-y-3">
-          <div className="relative flex items-center">
-            <input
-              ref={inputRef}
-              type="text"
-              value={inputGoal}
-              onChange={(e) => setInputGoal(e.target.value)}
-              placeholder={
-                listening
-                  ? t("workspace.listeningPlaceholder")
-                  : t("workspace.placeholder")
-              }
-              className="w-full bg-transparent pr-12 text-[1.02rem] text-ink placeholder:text-ink-faint focus:outline-none"
-            />
-
-            <button
-              type="button"
-              onClick={handleMicPress}
-              aria-label={listening ? t("voice.stop") : t("voice.openLabel")}
-              className={cn(
-                "absolute right-0 inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold text-white transition-all shadow-sm",
-                listening ? "bg-danger animate-pulse" : "bg-brand hover:bg-brand-strong"
-              )}
-            >
-              <Mic className="h-4 w-4" />
-              <span>{t("voice.speakShort")}</span>
-            </button>
+      {/* Hero Section: Two-Column Layout (Matching Design) */}
+      <div className="grid gap-8 lg:grid-cols-12 items-start">
+        {/* Left Column: Input and Suggestions */}
+        <div className="lg:col-span-7 space-y-4">
+          <div className="space-y-2">
+            <div className="inline-flex items-center gap-1.5 rounded-full bg-[#FF6A00]/10 px-2.5 py-0.5 text-[0.72rem] font-bold text-[#FF6A00]">
+              <Sparkles className="h-3 w-3" />
+              <span>Tatkal Copilot</span>
+            </div>
+            <h1 className="text-2xl font-extrabold tracking-tight text-brand-ink sm:text-3xl lg:text-[2.1rem] leading-[1.2]">
+              Train journey plan kijiye, ab apni{" "}
+              <span className="bg-gradient-to-r from-[#FF6A00] via-[#FF8A00] to-[#FFA040] bg-clip-text text-transparent">
+                bhasha mein
+              </span>
+              .
+            </h1>
+            <p className="text-xs sm:text-sm text-ink-soft leading-relaxed">
+              Tatkal Copilot is your proactive railway assistant. Just speak or write like family — I'll check live quotas, monitor the Tatkal window, and secure your tickets with zero morning rush panic.
+            </p>
           </div>
 
-          {/* Sub-bar Action Buttons */}
-          <div className="flex flex-wrap items-center justify-between gap-3 border-t border-line/60 pt-3">
-            <div className="flex items-center gap-2 text-xs text-ink-faint">
-              <span className={cn("h-2 w-2 rounded-full", listening ? "bg-danger animate-ping" : "bg-confirm")} />
-              <span>{listening ? t("workspace.micActive") : t("workspace.ingressActive")}</span>
-            </div>
+          {/* Unified Hero Input Card */}
+          <div className="rounded-2xl border border-line-strong bg-surface p-4 shadow-sm transition focus-within:border-brand focus-within:ring-4 focus-within:ring-brand/10 space-y-3">
+            <form onSubmit={handleFormSubmit} className="space-y-3">
+              <div className="relative flex items-start gap-3">
+                <textarea
+                  rows={2}
+                  value={inputGoal}
+                  onChange={(e) => setInputGoal(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && !e.shiftKey) {
+                      e.preventDefault();
+                      handleFormSubmit();
+                    }
+                  }}
+                  placeholder={
+                    listening
+                      ? 'Listening... speak naturally (e.g. "Mumbai to Delhi tomorrow morning")'
+                      : 'e.g., "Mumbai to Delhi tomorrow morning before 8 AM" or "Delhi se Varanasi 3A kal shaam"'
+                  }
+                  className="w-full resize-none bg-transparent text-sm sm:text-base text-ink placeholder:text-ink-faint focus:outline-none leading-relaxed pt-1"
+                />
 
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={handleMicPress}
-                className={cn(
-                  "inline-flex items-center gap-1.5 rounded-full border px-4 py-1.5 text-xs font-semibold transition-colors",
-                  listening
-                    ? "border-danger bg-danger/10 text-danger hover:bg-danger/20"
-                    : "border-brand/30 bg-brand-soft/50 text-brand hover:bg-brand-soft"
-                )}
-              >
-                <Mic className="h-3.5 w-3.5" />
-                {listening ? t("voice.stop") : t("goal.speakTitle")}
-              </button>
-
-              <button
-                type="submit"
-                disabled={!inputGoal.trim() && !listening}
-                className="inline-flex items-center gap-1.5 rounded-full bg-brand px-4 py-1.5 text-xs font-semibold text-white shadow-[var(--shadow-brand)] transition-colors hover:bg-brand-strong disabled:opacity-40"
-              >
-                {t("planning.findBestTrain")} <ArrowRight className="h-3.5 w-3.5" />
-              </button>
-            </div>
-          </div>
-        </form>
-      </div>
-
-      {/* Voice Capturing Intent Live Card (Matching Image 2 Mockup) */}
-      {(listening || busy || speaking || activeTranscript) && (
-        <motion.div
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="grid gap-4 md:grid-cols-2"
-        >
-          {/* Left Panel: Capturing Intent */}
-          <div className="rounded-[var(--radius-lg)] border border-brand/30 bg-surface p-4 shadow-sm space-y-3">
-            <div className="flex items-center justify-between border-b border-line pb-2">
-              <div className="flex items-center gap-2 text-xs font-bold text-brand uppercase tracking-wider">
-                <Mic className="h-4 w-4 animate-pulse text-danger" />
-                {t("workspace.capturingIntent")}
+                {/* Circular Orange Mic Button */}
+                <button
+                  type="button"
+                  onClick={handleMicPress}
+                  aria-label={listening ? "Stop listening" : "Start speaking"}
+                  className={cn(
+                    "relative h-11 w-11 shrink-0 rounded-full flex items-center justify-center text-white shadow-md transition-all active:scale-95",
+                    listening
+                      ? "bg-danger animate-pulse ring-4 ring-danger/20"
+                      : speaking
+                      ? "bg-confirm ring-4 ring-confirm/20"
+                      : "bg-[#FF6A00] hover:bg-[#E55F00] ring-4 ring-[#FF6A00]/20"
+                  )}
+                >
+                  {listening ? (
+                    <Mic className="h-5 w-5 animate-pulse" />
+                  ) : speaking ? (
+                    <Volume2 className="h-5 w-5 animate-bounce" />
+                  ) : (
+                    <Mic className="h-5 w-5" />
+                  )}
+                </button>
               </div>
-              <span className="text-[0.68rem] text-ink-faint font-mono">{t("workspace.nlpEngine")}</span>
+
+              {/* Sub-bar Inside Card */}
+              <div className="flex flex-wrap items-center justify-between gap-3 border-t border-line/60 pt-3 text-xs">
+                <div className="flex items-center gap-2 text-ink-soft">
+                  <span
+                    className={cn(
+                      "h-2 w-2 rounded-full",
+                      listening ? "bg-danger animate-ping" : speaking ? "bg-confirm animate-pulse" : "bg-confirm"
+                    )}
+                  />
+                  <span className="font-medium text-[0.76rem]">
+                    {listening
+                      ? "Listening active · Instant voice decoding"
+                      : busy
+                      ? "Processing route with IRCTC live clock..."
+                      : speaking
+                      ? "Aarav is speaking..."
+                      : "Listening active · Instant voice decoding"}
+                  </span>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={handleMicPress}
+                    className={cn(
+                      "inline-flex items-center gap-1.5 rounded-full border px-3.5 py-1.5 text-xs font-semibold transition-colors",
+                      listening
+                        ? "border-danger/40 bg-danger/10 text-danger hover:bg-danger/20"
+                        : "border-brand/20 bg-brand-soft/70 text-brand hover:bg-brand-soft"
+                    )}
+                  >
+                    <Sparkles className="h-3.5 w-3.5 text-brand" />
+                    <span>Bolkar bataiye</span>
+                  </button>
+
+                  <button
+                    type="submit"
+                    disabled={!inputGoal.trim() && !listening}
+                    className="inline-flex items-center gap-1.5 rounded-full bg-[#0B1527] px-4 py-1.5 text-xs font-semibold text-white shadow-sm transition-all hover:bg-[#15234A] disabled:opacity-40"
+                  >
+                    <span>Find best train</span>
+                    <ArrowRight className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+              </div>
+            </form>
+          </div>
+
+          {/* Try Asking Suggestions */}
+          <div className="space-y-1.5 pt-1">
+            <div className="text-[0.68rem] font-bold uppercase tracking-wider text-ink-faint">
+              TRY ASKING:
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {[
+                "Mumbai to Delhi kal subah",
+                "Delhi to Varanasi 3A kal shaam",
+                "Bengaluru to Chennai early morning",
+                "Seniors ke saath travel",
+              ].map((q) => (
+                <button
+                  key={q}
+                  type="button"
+                  onClick={() => {
+                    setInputGoal(q);
+                    void sendText(q);
+                  }}
+                  className="rounded-full border border-line-strong bg-surface px-3 py-1 text-xs font-medium text-ink transition-colors hover:border-brand hover:bg-brand-soft/50 hover:text-brand-ink"
+                >
+                  "{q}"
+                </button>
+              ))}
+            </div>
+            <div className="pt-1 text-[0.72rem] text-ink-faint flex items-center gap-1.5">
+              <span className="h-1.5 w-1.5 rounded-full bg-confirm" />
+              <span>Nishulk · Zero typing needed · Har Indian language mein bol sakte hain</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Right Column: Aarav Sharma Copilot Card */}
+        <div className="lg:col-span-5">
+          <div className="rounded-2xl border border-line-strong bg-surface p-5 shadow-sm space-y-4 text-center relative overflow-hidden">
+            {/* Top Speech Bubble */}
+            <div className="rounded-xl border border-[#FFE0B2] dark:border-brand/20 bg-[#FFF8EE] dark:bg-brand-soft/20 p-3 text-left space-y-1 relative shadow-2xs">
+              <div className="text-xs font-bold text-brand-ink flex items-start gap-1">
+                <span className="text-[#FF6A00] font-serif text-sm leading-none">“</span>
+                <span className="flex-1 leading-snug">{agentSpeech}</span>
+                <span className="text-[#FF6A00] font-serif text-sm leading-none">”</span>
+              </div>
+              <p className="text-[0.7rem] text-ink-soft pl-2.5">
+                {agentSubtext}
+              </p>
             </div>
 
-            <div className="text-base font-semibold text-brand-ink leading-relaxed">
-              "{activeTranscript || 'Need to go from Mumbai to Delhi tomorrow morning, 2 travellers, prefer reaching early'}"
+            {/* Center Avatar */}
+            <div className="relative mx-auto w-32 h-32 flex items-center justify-center">
+              <div className="relative h-28 w-28 rounded-full p-1 bg-gradient-to-b from-[#FFAE66] to-[#FFD8B3] shadow-md">
+                <img
+                  src="/aarav-namaste.jpg"
+                  alt="Aarav · Tatkal Copilot"
+                  className="h-full w-full rounded-full object-cover shadow-xs"
+                />
+              </div>
             </div>
 
-            {/* Detected Chips */}
-            <div className="flex flex-wrap gap-1.5 pt-1">
-              <span className="inline-flex items-center gap-1 rounded-full bg-brand-soft px-2.5 py-1 text-[0.72rem] font-semibold text-brand">
-                🛫 MMCT (Mumbai Central)
-              </span>
-              <span className="inline-flex items-center gap-1 rounded-full bg-brand-soft px-2.5 py-1 text-[0.72rem] font-semibold text-brand">
-                🚅 NDLS (New Delhi)
-              </span>
-              <span className="inline-flex items-center gap-1 rounded-full bg-surface-muted border border-line px-2.5 py-1 text-[0.72rem] font-medium text-ink-soft">
-                📅 {t("workspace.tomorrowTatkal")}
-              </span>
-              <span className="inline-flex items-center gap-1 rounded-full bg-surface-muted border border-line px-2.5 py-1 text-[0.72rem] font-medium text-ink-soft">
-                👥 {t("workspace.adultsCount", { count: paxCount })}
+            {/* Status badge below avatar */}
+            <div>
+              <span className="inline-flex items-center gap-1.5 rounded-full border border-line bg-surface-muted/80 px-3 py-0.5 text-[0.68rem] font-bold text-ink-soft">
+                <span
+                  className={cn(
+                    "h-2 w-2 rounded-full",
+                    listening ? "bg-danger animate-ping" : speaking ? "bg-confirm animate-pulse" : "bg-confirm"
+                  )}
+                />
+                <span>
+                  {listening ? "Aarav is listening..." : speaking ? "Aarav is speaking..." : busy ? "Aarav is analyzing..." : "LIVE COPILOT"}
+                </span>
               </span>
             </div>
 
-            {/* Controls */}
-            <div className="flex flex-wrap gap-2 pt-2">
+            {/* Name & Title */}
+            <div className="space-y-0.5">
+              <div className="flex items-center justify-center gap-2">
+                <span className="text-base font-extrabold text-brand-ink">Aarav</span>
+                <span className="rounded-full bg-[#FF6A00]/10 px-2 py-0.5 text-[0.65rem] font-extrabold uppercase tracking-wider text-[#FF6A00]">
+                  TATKAL COPILOT
+                </span>
+              </div>
+              <p className="text-[0.72rem] text-ink-soft">
+                Live Railway Search Active · Hinglish, Hindi, English
+              </p>
+            </div>
+
+            {/* Capability Pills */}
+            <div className="flex flex-wrap items-center justify-center gap-2 pt-1">
+              <span className="inline-flex items-center gap-1 rounded-full bg-surface-muted border border-line px-3 py-1 text-[0.7rem] font-medium text-ink">
+                ⚡ Fast Track Tatkal
+              </span>
+              <span className="inline-flex items-center gap-1 rounded-full bg-surface-muted border border-line px-3 py-1 text-[0.7rem] font-medium text-ink">
+                🛡️ Biometric Gated
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Manual Search Link */}
+      <div className="text-center pt-1">
+        <button
+          type="button"
+          onClick={() => setShowManual((s) => !s)}
+          className="inline-flex items-center gap-1.5 text-xs font-semibold text-ink-soft hover:text-brand transition-colors"
+        >
+          <span>🔀 Or use manual station codes, quotas & dates</span>
+        </button>
+      </div>
+
+      {/* Manual Input Expandable Drawer */}
+      {showManual && (
+        <motion.div
+          initial={{ opacity: 0, height: 0 }}
+          animate={{ opacity: 1, height: "auto" }}
+          className="rounded-2xl border border-line-strong bg-surface p-4 space-y-3"
+        >
+          <div className="grid gap-3 sm:grid-cols-4">
+            <div>
+              <label className="text-[0.72rem] font-semibold text-ink-soft">From Station</label>
+              <input
+                type="text"
+                placeholder="e.g. MMCT / Mumbai"
+                defaultValue={originText || ""}
+                onChange={(e) => setInputGoal(`From ${e.target.value} to ${destText || "Delhi"}`)}
+                className="mt-1 w-full rounded-lg border border-line bg-surface-muted px-3 py-1.5 text-xs text-ink focus:outline-none focus:border-brand"
+              />
+            </div>
+            <div>
+              <label className="text-[0.72rem] font-semibold text-ink-soft">To Station</label>
+              <input
+                type="text"
+                placeholder="e.g. NDLS / Delhi"
+                defaultValue={destText || ""}
+                onChange={(e) => setInputGoal(`From ${originText || "Mumbai"} to ${e.target.value}`)}
+                className="mt-1 w-full rounded-lg border border-line bg-surface-muted px-3 py-1.5 text-xs text-ink focus:outline-none focus:border-brand"
+              />
+            </div>
+            <div>
+              <label className="text-[0.72rem] font-semibold text-ink-soft">Class</label>
+              <select
+                defaultValue={travelClass || "3A"}
+                className="mt-1 w-full rounded-lg border border-line bg-surface-muted px-3 py-1.5 text-xs text-ink focus:outline-none focus:border-brand"
+              >
+                <option value="3A">3A (AC 3 Tier)</option>
+                <option value="2A">2A (AC 2 Tier)</option>
+                <option value="1A">1A (First AC)</option>
+                <option value="SL">SL (Sleeper)</option>
+              </select>
+            </div>
+            <div className="flex items-end">
               <button
                 type="button"
                 onClick={handleFormSubmit}
-                className="inline-flex items-center gap-1 rounded-full bg-brand px-3.5 py-1.5 text-xs font-semibold text-white shadow-sm hover:bg-brand-strong"
+                className="w-full rounded-lg bg-brand px-3 py-1.5 text-xs font-semibold text-white hover:bg-brand-strong"
               >
-                {t("workspace.doneSpeaking")} <ArrowRight className="h-3.5 w-3.5" />
+                Search Trains
               </button>
-              <button
-                type="button"
-                onClick={handleMicPress}
-                className="inline-flex items-center gap-1 rounded-full bg-danger/10 border border-danger/30 px-3.5 py-1.5 text-xs font-semibold text-danger hover:bg-danger/20"
-              >
-                {t("workspace.tapToStop")}
-              </button>
-              <button
-                type="button"
-                onClick={() => reset()}
-                className="inline-flex items-center gap-1 text-xs text-ink-faint hover:text-ink"
-              >
-                <Keyboard className="h-3.5 w-3.5" /> {t("workspace.typeInstead")}
-              </button>
-            </div>
-          </div>
-
-          {/* Right Panel: MMCT • Platform 1 & Atomic Clock */}
-          <div className="rounded-[var(--radius-lg)] border border-line-strong bg-surface p-4 shadow-sm space-y-3">
-            <div className="flex items-center justify-between border-b border-line pb-2">
-              <div className="flex items-center gap-2 text-xs font-bold text-ink uppercase tracking-wider">
-                <span className="h-2 w-2 rounded-full bg-confirm" />
-                MMCT • Platform 1
-              </div>
-              <span className="text-[0.68rem] font-semibold text-ink-faint bg-surface-muted px-2 py-0.5 rounded">
-                {t("workspace.trackIdle")}
-              </span>
-            </div>
-
-            <div className="rounded-lg bg-brand-ink text-white p-3 space-y-1">
-              <div className="flex items-center justify-between text-xs font-semibold">
-                <span className="flex items-center gap-1.5 text-confirm">
-                  <Train className="h-4 w-4" /> WAP-7 • 12951
-                </span>
-                <span className="text-[0.68rem] text-white/70">{t("workspace.steamReady")}</span>
-              </div>
-              <div className="text-[0.72rem] text-white/80">
-                {t("workspace.locoReady")}
-              </div>
-            </div>
-
-            {/* Route timeline */}
-            <div className="space-y-1.5 text-xs text-ink-soft pl-2 border-l-2 border-brand/30">
-              <div className="flex justify-between font-semibold text-ink">
-                <span>● Mumbai Central (MMCT)</span>
-                <span>05:00 PM</span>
-              </div>
-              <div className="text-[0.7rem] text-ink-faint italic pl-3">
-                {t("workspace.synthesizingHalts")}
-              </div>
-              <div className="flex justify-between font-semibold text-ink">
-                <span>● New Delhi (NDLS)</span>
-                <span>~08:30 AM</span>
-              </div>
-            </div>
-
-            {/* Atomic Clock Widget */}
-            <div className="rounded-lg border border-brand/20 bg-brand-soft/40 p-2.5 flex items-center justify-between text-xs">
-              <div className="flex items-center gap-2 font-mono font-bold text-brand-ink">
-                <Clock className="h-4 w-4 text-brand" />
-                <span>{t("workspace.atomicClock")} 09:58:42 AM</span>
-              </div>
-              <span className="rounded-full bg-confirm-soft px-2.5 py-0.5 text-[0.68rem] font-semibold text-confirm">
-                {t("workspace.acOpensIn")}
-              </span>
             </div>
           </div>
         </motion.div>
       )}
 
-      {/* Try Asking Suggestions */}
-      <div className="space-y-2">
-        <div className="text-[0.68rem] font-bold uppercase tracking-wider text-ink-faint">
-          {t("workspace.tryAsking")}
-        </div>
-        <div className="flex flex-wrap gap-2">
-          {[
-            t("workspace.sampleQuery1"),
-            t("workspace.sampleQuery2"),
-            t("workspace.sampleQuery3"),
-            t("workspace.sampleQuery4"),
-          ].map((q) => (
-            <button
-              key={q}
-              type="button"
-              onClick={() => askByTap(q)}
-              className="rounded-full border border-line-strong bg-surface px-3.5 py-1.5 text-xs font-medium text-ink transition-colors hover:border-brand hover:bg-brand-soft/50 hover:text-brand-ink"
-            >
-              "{q}"
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {/* Active Sector Readiness Card */}
-      <div className="rounded-[var(--radius-lg)] border border-line bg-surface p-4 space-y-3">
-        <div className="flex items-center justify-between border-b border-line pb-2 text-xs">
-          <div className="flex items-center gap-2 font-bold text-brand-ink">
-            <Train className="h-4 w-4 text-brand" />
-            <span>{t("workspace.sectorReadiness")}</span>
-          </div>
-          <span className="flex items-center gap-1.5 font-mono text-[0.7rem] text-confirm font-semibold">
-            <span className="h-2 w-2 rounded-full bg-confirm animate-ping" /> {t("workspace.atomicClockSynced")}
-          </span>
-        </div>
-
-        {/* Route visualization */}
-        <div className="flex items-center justify-between gap-2 py-1 text-xs">
-          <span className="font-bold text-ink">● MMCT (Mumbai Central • Platform 1)</span>
-          <div className="flex-1 h-0.5 bg-line relative mx-2">
-            <span className="absolute -top-3 left-1/2 -translate-x-1/2 rounded bg-brand-ink px-2 py-0.5 text-[0.65rem] font-bold text-white shadow-xs">
-              🚆 12951 TEJAS RAJDHANI • {t("workspace.cabinArmed")}
-            </span>
-          </div>
-          <span className="font-bold text-ink">NDLS ● (New Delhi Junction • Platform 3)</span>
-        </div>
-
-        <div className="flex items-center justify-between text-[0.72rem] text-ink-soft border-t border-line/60 pt-2">
-          <span>✓ {t("workspace.corridorStatus")}</span>
-          <span className="font-semibold text-brand-ink">{t("workspace.tatkalExhaustion")}</span>
-        </div>
-      </div>
-
       {/* 3 Value Props Cards */}
       <div className="grid gap-3 sm:grid-cols-3">
-        <div className="rounded-[var(--radius-lg)] border border-line bg-surface p-4 space-y-2">
+        <div className="rounded-2xl border border-line bg-surface p-4 space-y-2">
           <div className="grid h-8 w-8 place-items-center rounded-lg bg-brand-soft text-brand">
             <Clock className="h-4 w-4" />
           </div>
@@ -453,11 +563,11 @@ export function CopilotWorkspace({
             {t("plan.watchBody")}
           </p>
           <div className="text-[0.68rem] font-semibold text-confirm flex items-center gap-1 pt-1">
-            <Check className="h-3.5 w-3.5" /> {t("workspace.liveServerSync")}
+            <Check className="h-3.5 w-3.5" /> Live server sync
           </div>
         </div>
 
-        <div className="rounded-[var(--radius-lg)] border border-line bg-surface p-4 space-y-2">
+        <div className="rounded-2xl border border-line bg-surface p-4 space-y-2">
           <div className="grid h-8 w-8 place-items-center rounded-lg bg-brand-soft text-brand">
             <Compass className="h-4 w-4" />
           </div>
@@ -466,11 +576,11 @@ export function CopilotWorkspace({
             {t("plan.backupBody")}
           </p>
           <div className="text-[0.68rem] font-semibold text-confirm flex items-center gap-1 pt-1">
-            <Check className="h-3.5 w-3.5" /> {t("workspace.zeroPanicRouting")}
+            <Check className="h-3.5 w-3.5" /> Zero-panic routing
           </div>
         </div>
 
-        <div className="rounded-[var(--radius-lg)] border border-line bg-surface p-4 space-y-2">
+        <div className="rounded-2xl border border-line bg-surface p-4 space-y-2">
           <div className="grid h-8 w-8 place-items-center rounded-lg bg-brand-soft text-brand">
             <ShieldCheck className="h-4 w-4" />
           </div>
@@ -479,7 +589,7 @@ export function CopilotWorkspace({
             {t("plan.controlBody")}
           </p>
           <div className="text-[0.68rem] font-semibold text-confirm flex items-center gap-1 pt-1">
-            <Check className="h-3.5 w-3.5" /> {t("workspace.biometricGated")}
+            <Check className="h-3.5 w-3.5" /> Biometric consent gated
           </div>
         </div>
       </div>
@@ -568,7 +678,7 @@ export function CopilotWorkspace({
                 {originText} → {destText}
               </span>
               <span className="rounded-full bg-brand-soft px-2.5 py-0.5 text-xs font-semibold text-brand">
-                {travelDate} · {travelClass} · {paxCount} {paxCount > 1 ? "travellers" : "traveller"}
+                {travelDate} · {travelClass} · {paxCount !== undefined ? `${paxCount} ${paxCount > 1 ? "travellers" : "traveller"}` : "Passengers required"}
               </span>
             </div>
 

@@ -16,7 +16,7 @@ export interface TravelIntent {
   date: string;
   /** e.g. "08:00" — must arrive by this local time, or null if none */
   arrivalDeadline: string | null;
-  passengers: number;
+  passengers?: number;
   preferredClass: TravelClass | "any";
   priority: Priority;
   /** How willing Manoj is to board elsewhere / split / shift time. 0–1 */
@@ -134,6 +134,8 @@ export interface StrategyOption {
   recommended: boolean;
   tatkalOpensAt: string;
   trainNumber?: string;
+  quota?: "GN" | "TQ" | "PT";
+  isDynamic?: boolean;
   /** Present for split options. */
   legs?: {
     fromCode: string;
@@ -315,6 +317,8 @@ export interface StrategySnapshot {
   arrivalDisplay: string;
   level: ConfidenceLevel;
   fare: number;
+  quota?: "GN" | "TQ" | "PT";
+  isDynamic?: boolean;
   via?: string;
 }
 
@@ -368,6 +372,7 @@ export interface Trip {
   planNotifications: PlanNotification[];
   channelPreferences?: ChannelPreferences;
   userEmail?: string;
+  premiumTatkalEnabled?: boolean;
 }
 
 export type ActivityKind =

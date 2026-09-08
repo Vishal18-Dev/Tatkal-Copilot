@@ -12,13 +12,17 @@ export type AllowedAgentAction =
   | "notify_user"
   | "open_booking_flow"
   | "evaluate_backup"
-  | "activate_backup";
+  | "activate_backup"
+  | "evaluate_strategy"
+  | "switch_to_premium_tatkal";
 
 export type AllowedAgentTool =
   | "notifyUser"
   | "openBookingFlow"
   | "activateBackupStrategy"
-  | "recordEvent";
+  | "recordEvent"
+  | "evaluateStrategy"
+  | "switchToPremiumTatkal";
 
 export interface AgentToolCallProposal {
   name: AllowedAgentTool;
@@ -55,6 +59,8 @@ export function validateAgentDecision(
     "open_booking_flow",
     "evaluate_backup",
     "activate_backup",
+    "evaluate_strategy",
+    "switch_to_premium_tatkal",
   ];
 
   const ALLOWED_TOOLS: AllowedAgentTool[] = [
@@ -62,6 +68,8 @@ export function validateAgentDecision(
     "openBookingFlow",
     "activateBackupStrategy",
     "recordEvent",
+    "evaluateStrategy",
+    "switchToPremiumTatkal",
   ];
 
   // 1. Validate action enum
@@ -134,6 +142,90 @@ export function validateAgentDecision(
       return { valid: true, reason: "Backup activation validated", code: "ok" };
     }
 
+    case "switch_to_premium_tatkal": {
+      if (trip.agentState === "confirmed") {
+        return {
+          valid: false,
+          reason: "Cannot switch to Premium Tatkal: Booking is already confirmed",
+          code: "already_completed",
+        };
+      }
+      if (trip.agentState === "booking_in_progress" || trip.agentState === "backup_attempt") {
+        return {
+          valid: false,
+          reason: "Cannot switch to Premium Tatkal: Booking is already in progress",
+          code: "already_completed",
+        };
+      }
+
+      const args = decision.toolCall?.arguments ?? {};
+      const fare = typeof args.fare === "number" ? args.fare : (typeof args.amount === "number" ? args.amount : null);
+      const availability = args.availability as string | undefined;
+      const maxFare = typeof args.maxFare === "number" ? args.maxFare : (trip as any).userConstraints?.maxFare;
+      const maxPtFare = typeof args.maxPremiumTatkalFare === "number"
+        ? args.maxPremiumTatkalFare
+        : (trip as any).userConstraints?.maxPremiumTatkalFare;
+      const excludedQuotas =
+        (trip as any).userConstraints?.excludedQuotas ||
+        (args.excludedQuotas as string[] | undefined) ||
+        (args.prohibitedQuotas as string[] | undefined);
+
+      // Check explicit user prohibition
+      if (excludedQuotas?.includes("PT")) {
+        return {
+          valid: false,
+          reason: "Action blocked: User explicitly prohibited Premium Tatkal",
+          code: "disallowed_action",
+        };
+      }
+
+      // Check unknown live data
+      if (availability === "UNKNOWN") {
+        return {
+          valid: false,
+          reason: "Action blocked: Cannot execute Premium Tatkal booking with unknown availability",
+          code: "disallowed_action",
+        };
+      }
+
+      if (fare === null || fare === undefined) {
+        return {
+          valid: false,
+          reason: "Action blocked: Cannot execute Premium Tatkal booking with unknown fare",
+          code: "disallowed_action",
+        };
+      }
+
+      // Check fare ceiling: maxFare (for any strategy)
+      if (maxFare !== undefined && fare > maxFare) {
+        return {
+          valid: false,
+          reason: `Action blocked: Premium Tatkal fare of ₹${fare} exceeds maximum fare limit of ₹${maxFare}`,
+          code: "disallowed_action",
+        };
+      }
+
+      // Check PT specific fare ceiling: maxPremiumTatkalFare
+      if (maxPtFare !== undefined && fare > maxPtFare) {
+        return {
+          valid: false,
+          reason: `Action blocked: Premium Tatkal fare of ₹${fare} exceeds Premium Tatkal limit of ₹${maxPtFare}`,
+          code: "disallowed_action",
+        };
+      }
+
+      // Check assisted mode boundary
+      if (trip.mode === "assisted" && !isUserInitiated) {
+        return {
+          valid: false,
+          reason: "Assisted mode requires explicit user authorization to switch to Premium Tatkal",
+          code: "disallowed_action",
+        };
+      }
+
+      return { valid: true, reason: "Premium Tatkal switch validated", code: "ok" };
+    }
+
     case "open_booking_flow": {
       if (trip.mode === "assisted" && !isUserInitiated) {
         return {
@@ -159,6 +251,7 @@ export function validateAgentDecision(
       return { valid: true, reason: "Booking flow validated", code: "ok" };
     }
 
+    case "evaluate_strategy":
     case "none":
     case "evaluate_backup":
     default:

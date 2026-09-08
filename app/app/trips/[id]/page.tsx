@@ -3,6 +3,7 @@
 import { use, useEffect, useRef, useState, useCallback } from "react";
 import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
+import { Step4BookScreen } from "@/features/booking-flow/step4-book-screen";
 import {
   ArrowLeft,
   FastForward,
@@ -100,10 +101,10 @@ export default function PlanMissionPage({
       </div>
     );
   }
-  return <PlanMission plan={plan} />;
+  return <Step4BookScreen trip={plan} />;
 }
 
-function PlanMission({ plan }: { plan: Trip }) {
+export function PlanMission({ plan }: { plan: Trip }) {
   const { updateTrip, logActivity, pushNotification, travellers, wallet, debitWallet, identity } = useStore();
   const { t, lang } = useLang();
   const state = plan.agentState;
@@ -848,14 +849,48 @@ function PlanMission({ plan }: { plan: Trip }) {
                 <div className="flex items-center justify-between gap-3">
                   <div className="flex items-center gap-2 text-caution font-semibold">
                     <Split className="h-5 w-5" />
-                    <h4 className="text-sm font-semibold uppercase tracking-wide">Primary Option Unavailable</h4>
+                    <h4 className="text-sm font-semibold uppercase tracking-wide">
+                      {plan.backup?.quota === "PT" ? t("premiumTatkal.backup") : "Primary Option Unavailable"}
+                    </h4>
                   </div>
                   <Chip tone="caution">Backup Ready</Chip>
                 </div>
-                <p className="mt-2 text-base font-semibold text-ink">Your backup is ready.</p>
+                <p className="mt-2 text-base font-semibold text-ink">
+                  {plan.backup?.quota === "PT"
+                    ? `Switch to ${plan.backup.trainName} · Premium Tatkal`
+                    : "Your backup is ready."}
+                </p>
                 <p className="mt-1 text-sm text-ink-soft">
                   Copilot found the prepared recovery option and is waiting for your approval.
                 </p>
+
+                {/* PT details before authorization */}
+                {plan.backup?.quota === "PT" && (
+                  <div className="mt-3 rounded-xl border border-caution/30 bg-surface/80 p-3 text-xs space-y-2">
+                    <div className="flex items-center justify-between font-semibold">
+                      <span className="flex items-center gap-1.5 text-caution">
+                        <Zap className="h-4 w-4 text-caution" />
+                        {t("premiumTatkal.title")}
+                      </span>
+                      <span className="text-sm font-bold text-ink">
+                        ₹{plan.backup.fare.toLocaleString("en-IN")}
+                      </span>
+                    </div>
+                    {plan.backup.fare > plan.primary.fare && (
+                      <p className="text-ink-soft">
+                        {t("bookingStrategy.moreThanTatkal", { diff: (plan.backup.fare - plan.primary.fare).toLocaleString("en-IN") })}
+                      </p>
+                    )}
+                    <div className="flex items-center gap-1.5 text-ink-soft">
+                      <CheckCircle2 className="h-3.5 w-3.5 text-confirm shrink-0" />
+                      <span>{t("premiumTatkal.confirmedOnly")}</span>
+                    </div>
+                    <div className="rounded-lg bg-danger-soft/60 border border-danger/20 p-2 text-[0.75rem] text-danger font-medium flex items-start gap-1.5">
+                      <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5" />
+                      <span>{t("premiumTatkal.cancellationWarning")}</span>
+                    </div>
+                  </div>
+                )}
 
                 {backupError && (
                   <div className="mt-3 rounded-lg border border-danger/30 bg-danger-soft/50 p-2.5 text-xs font-medium text-danger flex items-center gap-2">
@@ -876,7 +911,7 @@ function PlanMission({ plan }: { plan: Trip }) {
                     </>
                   ) : (
                     <>
-                      <Split className="h-5 w-5" /> Use backup · {plan.backup?.trainName}
+                      <Split className="h-5 w-5" /> {plan.backup?.quota === "PT" ? "Authorize & book Premium Tatkal" : `Use backup · ${plan.backup?.trainName}`}
                     </>
                   )}
                 </Button>
@@ -1097,14 +1132,102 @@ function PlanMission({ plan }: { plan: Trip }) {
             </Card>
 
             <Card className="p-5">
-              <h3 className="mb-3 text-sm font-semibold uppercase tracking-wide text-ink-faint">{t("mc.yourPlan")}</h3>
-              <Recap icon={<TrainFront className="h-4 w-4 text-brand" />} label={plan.primary.trainName} value={`${plan.primary.travelClass} · ${plan.primary.level}`} />
-              <Recap icon={<MapPin className="h-4 w-4 text-brand" />} label={t("mc.boardAt")} value={plan.primary.boardingStationName} />
+              <div className="mb-3 flex items-center justify-between">
+                <h3 className="text-sm font-semibold uppercase tracking-wide text-ink-faint">{t("bookingStrategy.title")}</h3>
+                <span className="rounded-full bg-brand-soft px-2.5 py-0.5 text-xs font-semibold text-brand">
+                  {plan.mode === "auto"
+                    ? (plan.backup?.quota === "PT"
+                        ? t("bookingStrategy.autoFallbackEnabled", { maxFare: (plan as any).userConstraints?.maxFare || plan.backup?.fare || 3000 })
+                        : "Permissioned · Automated fallback")
+                    : t("bookingStrategy.askBeforeSwitching")}
+                </span>
+              </div>
+
+              {/* Primary Strategy */}
+              <div className="rounded-xl border border-line bg-surface p-3.5 mb-3">
+                <div className="flex items-center justify-between mb-1.5">
+                  <div className="flex items-center gap-2">
+                    <TrainFront className="h-4 w-4 text-brand" />
+                    <span className="text-xs font-bold uppercase tracking-wider text-brand">
+                      {t("bookingStrategy.primary")} · {plan.primary.quota === "PT" ? t("premiumTatkal.title") : t("bookingStrategy.regularTatkal")}
+                    </span>
+                  </div>
+                  <span className="text-sm font-bold text-ink">₹{plan.primary.fare.toLocaleString("en-IN")}</span>
+                </div>
+                <div className="font-semibold text-ink text-base">{plan.primary.trainName}</div>
+                <div className="text-xs text-ink-soft mt-0.5 flex items-center gap-2">
+                  <span>{plan.primary.travelClass}</span>
+                  <span>•</span>
+                  <span>Board at {plan.primary.boardingStationName}</span>
+                  <span>•</span>
+                  <span className="text-confirm font-medium">Confirmed availability</span>
+                </div>
+                <div className="mt-2 text-[0.8rem] text-ink-faint border-t border-line/60 pt-2 flex items-start gap-1.5">
+                  <span className="font-semibold text-ink-soft shrink-0">{t("bookingStrategy.reason")}:</span>
+                  <span>First choice for fast transit on this corridor · verified Tatkal quota</span>
+                </div>
+              </div>
+
+              {/* Backup Strategy */}
               {plan.backup && (
-                <Recap icon={<Split className="h-4 w-4 text-caution" />} label={t("mc.backup")} value={`${plan.backup.trainName} · ${plan.backup.level}`} />
+                <div className="rounded-xl border border-caution/30 bg-caution-soft/20 p-3.5 mb-3">
+                  <div className="flex items-center justify-between mb-1.5">
+                    <div className="flex items-center gap-2">
+                      <Split className="h-4 w-4 text-caution" />
+                      <span className="text-xs font-bold uppercase tracking-wider text-caution">
+                        {t("bookingStrategy.backup")} · {plan.backup.quota === "PT" ? t("premiumTatkal.title") : t("bookingStrategy.regularTatkal")}
+                      </span>
+                    </div>
+                    <span className="text-sm font-bold text-ink">₹{plan.backup.fare.toLocaleString("en-IN")}</span>
+                  </div>
+                  <div className="font-semibold text-ink text-base">{plan.backup.trainName}</div>
+                  <div className="text-xs text-ink-soft mt-0.5 flex items-center gap-2">
+                    <span>{plan.backup.travelClass}</span>
+                    <span>•</span>
+                    <span>Board at {plan.backup.boardingStationName}</span>
+                    <span>•</span>
+                    <span className="text-confirm font-medium">Backup ready</span>
+                  </div>
+
+                  {/* Premium Tatkal specific details */}
+                  {plan.backup.quota === "PT" && (
+                    <div className="mt-2 space-y-1.5 border-t border-caution/20 pt-2 text-xs">
+                      <div className="flex items-center gap-1.5 text-caution font-medium">
+                        <Zap className="h-3.5 w-3.5 shrink-0" />
+                        <span>{t("premiumTatkal.dynamicFare")}</span>
+                      </div>
+                      {plan.backup.fare > plan.primary.fare && (
+                        <div className="text-ink-soft">
+                          {t("bookingStrategy.moreThanTatkal", { diff: (plan.backup.fare - plan.primary.fare).toLocaleString("en-IN") })}
+                        </div>
+                      )}
+                      <div className="text-ink-soft flex items-center gap-1.5">
+                        <CheckCircle2 className="h-3.5 w-3.5 text-confirm shrink-0" />
+                        <span>{t("premiumTatkal.confirmedOnly")}</span>
+                      </div>
+                      <div className="rounded-lg bg-danger-soft/40 border border-danger/20 p-2 text-[0.75rem] text-danger font-medium flex items-start gap-1.5">
+                        <AlertTriangle className="h-3.5 w-3.5 shrink-0 mt-0.5" />
+                        <span>{t("premiumTatkal.cancellationWarning")}</span>
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="mt-2 text-[0.8rem] text-ink-faint border-t border-caution/20 pt-2 flex items-start gap-1.5">
+                    <span className="font-semibold text-ink-soft shrink-0">{t("bookingStrategy.reason")}:</span>
+                    <span>
+                      {plan.backup.quota === "PT"
+                        ? "Instant confirmed recovery if regular Tatkal exhausts · Within authorized ceiling"
+                        : "High-reliability alternate departure on this corridor"}
+                    </span>
+                  </div>
+                </div>
               )}
-              <Recap icon={<Clock className="h-4 w-4 text-brand" />} label={t("mc.tatkalOpens")} value={plan.tatkalOpensAtLabel} />
-              <Recap icon={<Users className="h-4 w-4 text-brand" />} label={t("mc.travellers")} value={bookedTravellers.map((p) => p.name.split(" ")[0]).join(", ") || "—"} />
+
+              {/* Journey Details */}
+              <div className="border-t border-line pt-2">
+                <Recap icon={<Clock className="h-4 w-4 text-brand" />} label={t("mc.tatkalOpens")} value={plan.tatkalOpensAtLabel} />
+                <Recap icon={<Users className="h-4 w-4 text-brand" />} label={t("mc.travellers")} value={bookedTravellers.map((p) => p.name.split(" ")[0]).join(", ") || "—"} />
+              </div>
             </Card>
 
             {plan.planNotifications.length > 0 && (

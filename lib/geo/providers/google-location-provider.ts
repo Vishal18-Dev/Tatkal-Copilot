@@ -1,6 +1,7 @@
 import type { LocationProvider } from "./types";
 import type { GeoCoordinates, ResolvedLocation } from "../types";
 import { demoLocationProvider } from "./demo-location-provider";
+import { isInvalidPlaceCandidate } from "../place-guard";
 
 export interface GooglePlaceResult {
   formattedAddress?: string;
@@ -34,6 +35,11 @@ export class GoogleLocationProvider implements LocationProvider {
       .trim()
       .replace(/^(near|at|in|from|to)\s+/i, "");
     if (!clean) return null;
+
+    // Guard: Prevent generic travel/action nouns and phrases from resolving to commercial businesses (e.g. "trip" -> "BalmyTrip Holidays", "start my journey" -> "Happy Journey Tours")
+    if (isInvalidPlaceCandidate(clean)) {
+      return null;
+    }
 
     const cacheKey = clean.toLowerCase();
     if (this.cache.has(cacheKey)) {
@@ -72,6 +78,12 @@ export class GoogleLocationProvider implements LocationProvider {
       const city = addressParts.length >= 2 ? addressParts[addressParts.length - 3] || addressParts[addressParts.length - 2] : "Unknown";
       const name = place.displayName?.text || clean;
 
+      // Commercial travel/tour operators must never be accepted as railway localities
+      if (isInvalidPlaceCandidate(name) || /\b(tours?|holidays?|travels|travel\s+agency|resort|hotel)\b/i.test(name)) {
+        console.warn(`[google-location] Rejecting commercial business "${name}" as railway locality`);
+        return null;
+      }
+
       const resolved: ResolvedLocation = {
         rawQuery: query,
         name,
@@ -97,6 +109,9 @@ export class GoogleLocationProvider implements LocationProvider {
   /** Sync contract method — checks cache or delegates to demo location provider */
   resolvePlace(query: string): ResolvedLocation | null {
     const clean = query.trim().toLowerCase().replace(/^(near|at|in|from|to)\s+/i, "");
+    if (isInvalidPlaceCandidate(clean)) {
+      return null;
+    }
     if (this.cache.has(clean)) {
       return this.cache.get(clean)!;
     }

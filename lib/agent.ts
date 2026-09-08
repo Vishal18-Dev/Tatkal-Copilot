@@ -205,9 +205,9 @@ export function coachFor(
   }
 }
 
-import { calculateReadiness } from "./readiness";
-export { calculateReadiness } from "./readiness";
-export type { ReadinessCheck, DetailedReadiness } from "./readiness";
+import { calculateReadiness, calculateStrategyReadiness, calculateStrategyReadinessReport } from "./readiness";
+export { calculateReadiness, calculateStrategyReadiness, calculateStrategyReadinessReport } from "./readiness";
+export type { ReadinessCheck, DetailedReadiness, StrategyReadinessReport } from "./readiness";
 
 /** Readiness checklist for a plan given its agent state. */
 export interface ReadinessItem {

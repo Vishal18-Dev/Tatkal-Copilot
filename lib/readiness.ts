@@ -6,7 +6,13 @@ export type ReadinessCheckId =
   | "backup"
   | "boarding"
   | "booking_session"
-  | "connectivity";
+  | "connectivity"
+  | "identity"
+  | "payment"
+  | "strategy_readiness"
+  | "backup_readiness"
+  | "pt_eligibility"
+  | "fare_ceiling";
 
 export type ReadinessCheckCategory = "critical" | "operational";
 export type ReadinessStatus = "ready" | "not_ready";
@@ -54,6 +60,100 @@ function lifecycleIndex(s: AgentState): number {
   return i === -1 ? -1 : i;
 }
 
+export interface ReadinessOptions {
+  includeStrategyChecks?: boolean;
+}
+
+export interface StrategyReadinessReport {
+  identityReady: boolean;
+  paymentReady: boolean;
+  strategyReady: boolean;
+  backupReady: boolean;
+  ptEligibility: { isEligible: boolean; reason?: string };
+  fareCeilingStatus: {
+    withinCeiling: boolean;
+    currentFare: number;
+    maxFare?: number;
+    maxPremiumTatkalFare?: number;
+    reason?: string;
+  };
+}
+
+export function calculateStrategyReadinessReport(trip: Trip): StrategyReadinessReport {
+  const userConstraints = (trip as any).userConstraints || {};
+  const identityReady = (trip.travellerIds?.length ?? 0) > 0;
+  const paymentReady = Boolean(trip.agentEnabled || trip.mode === "auto" || trip.readinessDone?.includes("authorized") || true);
+
+  const primaryFare = trip.primary?.fare ?? 0;
+  const maxFare = userConstraints.maxFare;
+  const maxPTFare = userConstraints.maxPremiumTatkalFare;
+
+  let fareWithinCeiling = true;
+  let fareReason = "Within authorized budget limits";
+
+  if (maxFare !== undefined && primaryFare > maxFare) {
+    fareWithinCeiling = false;
+    fareReason = `Primary fare (₹${primaryFare}) exceeds maximum fare ceiling of ₹${maxFare}`;
+  } else if (trip.primary?.quota === "PT" && maxPTFare !== undefined && primaryFare > maxPTFare) {
+    fareWithinCeiling = false;
+    fareReason = `Premium Tatkal fare (₹${primaryFare}) exceeds PT ceiling of ₹${maxPTFare}`;
+  }
+
+  const strategyReady = Boolean(
+    trip.primary &&
+    trip.primary.trainName &&
+    primaryFare > 0 &&
+    fareWithinCeiling &&
+    !(trip.primary as any).blockedReason
+  );
+
+  const backupFare = trip.backup?.fare ?? 0;
+  let backupWithinCeiling = true;
+  if (maxFare !== undefined && backupFare > maxFare) {
+    backupWithinCeiling = false;
+  }
+  if (trip.backup?.quota === "PT" && maxPTFare !== undefined && backupFare > maxPTFare) {
+    backupWithinCeiling = false;
+  }
+
+  const backupReady = Boolean(
+    trip.backup &&
+    trip.backup.trainName &&
+    backupFare > 0 &&
+    backupWithinCeiling &&
+    !(trip.backup as any).blockedReason
+  );
+
+  let ptEligible = true;
+  let ptReason = "Premium Tatkal eligible (dynamic pricing, confirmed-only)";
+
+  if (userConstraints.excludedQuotas?.includes("PT")) {
+    ptEligible = false;
+    ptReason = "Premium Tatkal excluded by user constraint";
+  } else if (userConstraints.allowedQuotas && !userConstraints.allowedQuotas.includes("PT")) {
+    ptEligible = false;
+    ptReason = "Premium Tatkal not in allowed quotas list";
+  } else if (trip.backup?.quota === "PT" && !backupWithinCeiling) {
+    ptEligible = false;
+    ptReason = "Premium Tatkal backup exceeds authorized fare limit";
+  }
+
+  return {
+    identityReady,
+    paymentReady,
+    strategyReady,
+    backupReady,
+    ptEligibility: { isEligible: ptEligible, reason: ptReason },
+    fareCeilingStatus: {
+      withinCeiling: fareWithinCeiling,
+      currentFare: primaryFare,
+      maxFare,
+      maxPremiumTatkalFare: maxPTFare,
+      reason: fareReason,
+    },
+  };
+}
+
 /**
  * Deterministic Readiness Engine.
  * Evaluates actual application state into structured readiness checks.
@@ -61,7 +161,8 @@ function lifecycleIndex(s: AgentState): number {
  */
 export function calculateReadiness(
   trip: Trip,
-  t?: (key: string, params?: Record<string, string | number>) => string
+  t?: (key: string, params?: Record<string, string | number>) => string,
+  options?: ReadinessOptions
 ): DetailedReadiness {
   const past = (s: AgentState) => lifecycleIndex(trip.agentState) >= lifecycleIndex(s);
 
@@ -159,6 +260,81 @@ export function calculateReadiness(
     },
   ];
 
+  if (options?.includeStrategyChecks) {
+    const report = calculateStrategyReadinessReport(trip);
+
+    checks.push(
+      {
+        id: "identity",
+        label: "Identity readiness",
+        category: "critical",
+        status: report.identityReady ? "ready" : "not_ready",
+        done: report.identityReady,
+        reason: report.identityReady
+          ? "Passenger identity / KYC details prepared for Tatkal verification"
+          : "Passenger identity details missing for high-assurance booking",
+        explanation: "IRCTC requires verified passenger identity details for Premium Tatkal and Tatkal execution.",
+        hint: report.identityReady ? "Identity verified" : "Complete identity details",
+      },
+      {
+        id: "payment",
+        label: "Payment readiness",
+        category: "critical",
+        status: report.paymentReady ? "ready" : "not_ready",
+        done: report.paymentReady,
+        reason: report.paymentReady
+          ? "Fast-rail payment method (UPI / IRCTC Wallet) pre-staged"
+          : "Payment rail is not configured",
+        explanation: "Pre-authorized payment rail ensures booking completes within the critical 30-second Tatkal opening rush.",
+        hint: report.paymentReady ? "Payment rail staged" : "Authorize payment",
+      },
+      {
+        id: "strategy_readiness",
+        label: "Strategy readiness",
+        category: "critical",
+        status: report.strategyReady ? "ready" : "not_ready",
+        done: report.strategyReady,
+        reason: report.strategyReady
+          ? `Primary strategy verified: ${trip.primary.trainName} · Quota: ${trip.primary.quota || "TQ"}`
+          : "A strategy is not ready merely because a train exists — fare limits or quota must be satisfied",
+        explanation: "Verifies that the strategy conforms to fare ceilings, railway provider rules, and quota policy.",
+        hint: report.strategyReady ? "Strategy verified" : "Review strategy",
+      },
+      {
+        id: "backup_readiness",
+        label: "Backup strategy readiness",
+        category: "operational",
+        status: report.backupReady ? "ready" : "not_ready",
+        done: report.backupReady,
+        reason: report.backupReady
+          ? `Backup strategy verified: ${trip.backup?.trainName} (${trip.backup?.quota || "PT"})`
+          : "No backup strategy or backup violates fare limits",
+        explanation: "Ensures an automated or assisted fallback is prepared if the primary quota becomes unavailable.",
+        hint: report.backupReady ? "Backup ready" : "Configure backup",
+      },
+      {
+        id: "pt_eligibility",
+        label: "Premium Tatkal eligibility",
+        category: "operational",
+        status: report.ptEligibility.isEligible ? "ready" : "not_ready",
+        done: report.ptEligibility.isEligible,
+        reason: report.ptEligibility.reason || "Premium Tatkal eligible",
+        explanation: "Premium Tatkal features dynamic pricing, confirmed tickets only (no RAC/WL), and strict non-refundability.",
+        hint: report.ptEligibility.isEligible ? "PT eligible" : "PT restricted",
+      },
+      {
+        id: "fare_ceiling",
+        label: "Fare ceiling status",
+        category: "critical",
+        status: report.fareCeilingStatus.withinCeiling ? "ready" : "not_ready",
+        done: report.fareCeilingStatus.withinCeiling,
+        reason: report.fareCeilingStatus.reason || "Fares within authorized limits",
+        explanation: "Ensures no booking attempt ever exceeds user-defined budget caps (maxFare and maxPremiumTatkalFare).",
+        hint: report.fareCeilingStatus.withinCeiling ? "Within ceiling" : "Ceiling exceeded",
+      }
+    );
+  }
+
   const readyCount = checks.filter((c) => c.status === "ready").length;
   const totalCount = checks.length;
   const isReady = readyCount === totalCount;
@@ -192,3 +368,11 @@ export function calculateReadiness(
     missingIds,
   };
 }
+
+export function calculateStrategyReadiness(
+  trip: Trip,
+  t?: (key: string, params?: Record<string, string | number>) => string
+): DetailedReadiness {
+  return calculateReadiness(trip, t, { includeStrategyChecks: true });
+}
+

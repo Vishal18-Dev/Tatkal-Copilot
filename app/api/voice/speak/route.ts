@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { voiceProvider } from "@/lib/voice/provider";
-import { bcp47For, isVoiceLang, type VoiceLang } from "@/lib/voice/languages";
+import { bcp47For, isScriptForLanguage, isVoiceLang, type VoiceLang } from "@/lib/voice/languages";
 import { VOICE_REQUEST_TIMEOUT_MS } from "@/lib/voice/types";
 import type { Lang } from "@/lib/i18n";
 
@@ -35,7 +35,7 @@ export async function POST(req: Request) {
   }
 
   let spoken = text;
-  if (voiceLang !== "en") {
+  if (voiceLang !== "en" && !isScriptForLanguage(text, voiceLang)) {
     try {
       spoken = await voiceProvider.translate(text, bcp47);
     } catch {

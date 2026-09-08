@@ -117,7 +117,7 @@ export class RealtimeSTTClient {
   private async sendChunk(base64Audio: string): Promise<void> {
     if (!this.active) return;
     try {
-      await fetch("/api/voice/realtime-stream", {
+      const res = await fetch("/api/voice/realtime-stream", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -125,6 +125,10 @@ export class RealtimeSTTClient {
           audio: base64Audio,
         }),
       });
+      if (res.status === 410) {
+        this.active = false;
+        this.cleanup();
+      }
     } catch {
       /* best-effort transmission */
     }

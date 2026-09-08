@@ -15,6 +15,7 @@ import { useCallConversation } from "@/lib/calling/conversation";
 import { callingProvider, RealCallingProvider, type CallReason, type PlacedCall } from "@/lib/calling/provider";
 import type { CopilotContext } from "@/lib/copilot";
 import type { Trip } from "@/types";
+import { useJourney, useOptionalJourney } from "@/lib/journey";
 import { VoiceWaveform } from "@/components/voice/VoiceWaveform";
 
 function reasonFor(trip: Trip | null): CallReason {
@@ -30,7 +31,59 @@ export function CallScreen({ onClose }: { onClose: () => void }) {
   const { t, lang } = useLang();
   const router = useRouter();
   const { trips, user, wallet, identity, travellers } = useStore();
-  const activeTrip = trips.find((tr) => tr.agentState !== "confirmed") ?? trips[0] ?? null;
+  const optionalJourney = useOptionalJourney();
+
+  let activeTrip: Trip | null = null;
+  if (optionalJourney?.plan) {
+    const plan = optionalJourney.plan;
+    const primaryOpt = optionalJourney.chosenOption || plan.options[0];
+    const backupOpt = optionalJourney.recoveryOption || plan.options[1];
+    activeTrip = {
+      id: "current_plan_trip",
+      status: "upcoming",
+      from: plan.intent.from,
+      fromCode: plan.intent.fromCode,
+      to: plan.intent.to,
+      toCode: plan.intent.toCode,
+      dateLabel: "Tomorrow",
+      trainName: primaryOpt?.title || "Primary Express",
+      travelClass: (primaryOpt?.travelClass as any) || "3A",
+      travellerIds: optionalJourney.selectedPassengers.map((p) => p.id),
+      boardingStationName: primaryOpt?.boardingStationName || plan.intent.from,
+      arrivalDisplay: primaryOpt?.arrivalDisplay || "08:00 · tomorrow",
+      fare: primaryOpt?.fare || 2500,
+      mode: optionalJourney.mode || "assisted",
+      agentState: "scheduled",
+      agentEnabled: true,
+      tatkalOpensAtLabel: "10:00 AM",
+      arrivalTargetLabel: plan.intent.arrivalDeadline ? `before ${plan.intent.arrivalDeadline}` : "morning",
+      primary: {
+        optionId: primaryOpt?.id || "p1",
+        trainName: primaryOpt?.title || "Primary Express",
+        travelClass: (primaryOpt?.travelClass as any) || "3A",
+        boardingStationName: primaryOpt?.boardingStationName || plan.intent.from,
+        departureDisplay: primaryOpt?.departureDisplay || "16:00",
+        arrivalDisplay: primaryOpt?.arrivalDisplay || "08:00 · tomorrow",
+        level: primaryOpt?.level || "High",
+        fare: primaryOpt?.fare || 2500,
+      },
+      backup: backupOpt ? {
+        optionId: backupOpt.id,
+        trainName: backupOpt.title,
+        travelClass: (backupOpt.travelClass as any) || "3A",
+        boardingStationName: backupOpt.boardingStationName || plan.intent.from,
+        departureDisplay: backupOpt.departureDisplay || "16:35",
+        arrivalDisplay: backupOpt.arrivalDisplay || "08:30 · tomorrow",
+        level: backupOpt.level || "High",
+        fare: backupOpt.fare || 2500,
+      } : null,
+      readinessDone: [],
+      planNotifications: [],
+      createdAt: new Date().toISOString(),
+    };
+  } else {
+    activeTrip = trips.find((tr) => tr.agentState !== "confirmed") ?? trips[0] ?? null;
+  }
 
   // Browser geolocation retrieval for origin signal
   const [geolocation, setGeolocation] = useState<{ latitude: number; longitude: number } | undefined>();

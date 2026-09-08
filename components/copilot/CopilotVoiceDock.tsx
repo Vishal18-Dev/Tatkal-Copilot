@@ -59,19 +59,19 @@ export function CopilotVoiceDock({
   }
 
   return (
-    <div className={cn("rounded-[var(--radius-lg)] border border-line bg-surface p-4", className)}>
+    <div className={cn("rounded-[var(--radius-xl)] border border-line/60 glass-panel p-4.5 shadow-[var(--shadow-card)] hover:shadow-[var(--shadow-lift)] transition-all duration-300 relative overflow-hidden", className)}>
       <div className="mb-2.5 flex items-center gap-2">
-        <span className="grid h-7 w-7 place-items-center rounded-full bg-brand text-white">
+        <span className="grid h-7 w-7 place-items-center rounded-full bg-brand text-white shadow-xs">
           <Sparkles className="h-4 w-4" />
         </span>
         <span className="text-sm font-semibold text-ink">{t("copilot.dockTitle")}</span>
         <div className="ml-auto flex items-center gap-2">
-          <span className="hidden sm:inline-flex rounded-md border border-line bg-surface-muted px-2 py-0.5 text-[0.72rem] font-medium text-ink-soft">
+          <span className="hidden sm:inline-flex rounded-full border border-line/60 glass-subtle px-2.5 py-0.5 text-[0.72rem] font-medium text-ink-soft">
             {getContext().trip?.mode === "assisted"
               ? "🤝 Assisted · Ask before acting"
               : "⚡ Permissioned · Can act automatically"}
           </span>
-          <VoiceLangSelect className="inline-flex items-center gap-1 rounded-full border border-line bg-surface px-2 py-1 text-xs text-ink-soft focus-within:border-brand" />
+          <VoiceLangSelect className="inline-flex items-center gap-1 rounded-full border border-line/60 glass-pill px-2.5 py-1 text-xs text-ink-soft focus-within:border-brand" />
         </div>
       </div>
 
@@ -82,7 +82,7 @@ export function CopilotVoiceDock({
           role="log"
           aria-label={t("copilot.transcriptLabel")}
           aria-live="polite"
-          className="mb-3 max-h-44 space-y-2 overflow-y-auto"
+          className="mb-3 max-h-44 space-y-2 overflow-y-auto pr-1"
         >
           {turns.map((turn) => (
             <motion.div
@@ -93,10 +93,10 @@ export function CopilotVoiceDock({
             >
               <span
                 className={cn(
-                  "max-w-[88%] whitespace-pre-wrap rounded-2xl px-3 py-1.5 text-[0.88rem] leading-snug",
+                  "max-w-[88%] whitespace-pre-wrap rounded-2xl px-3.5 py-2 text-[0.88rem] leading-snug shadow-xs",
                   turn.role === "user"
                     ? "rounded-br-sm bg-brand text-white"
-                    : "rounded-bl-sm bg-surface-muted text-ink"
+                    : "rounded-bl-sm glass-subtle text-ink border border-line/40"
                 )}
               >
                 {turn.text}
@@ -119,7 +119,7 @@ export function CopilotVoiceDock({
             type="button"
             onClick={() => ask(p.question)}
             disabled={busy || listening}
-            className="rounded-full border border-line-strong bg-surface px-3 py-1.5 text-[0.8rem] font-medium text-ink transition-colors hover:border-brand hover:text-brand-ink disabled:opacity-50"
+            className="rounded-full border border-line/60 glass-pill px-3 py-1.5 text-[0.8rem] font-medium text-ink transition-all hover-lift active-press hover:border-brand/50 hover:text-brand disabled:opacity-50 cursor-pointer"
           >
             {p.label}
           </button>
@@ -128,7 +128,7 @@ export function CopilotVoiceDock({
 
       {/* Input row: type or speak */}
       <div className="mt-3 flex items-center gap-2">
-        <div className="flex flex-1 items-center gap-2 rounded-full border border-line bg-surface px-3 py-1.5 focus-within:border-brand focus-within:ring-2 focus-within:ring-brand/10">
+        <div className="flex flex-1 items-center gap-2 rounded-full border border-line/60 glass-subtle px-3.5 py-1.5 focus-within:border-brand focus-within:ring-2 focus-within:ring-brand/15 transition-all">
           <Keyboard className="h-4 w-4 shrink-0 text-ink-faint" aria-hidden="true" />
           <input
             ref={inputRef}

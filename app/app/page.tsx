@@ -66,7 +66,7 @@ export default function HomePage() {
   if (freqClass) insights.push(`${t("home.preferClass")} ${freqClass}.`);
 
   return (
-    <div className="mx-auto max-w-4xl space-y-8">
+    <div className="mx-auto max-w-4xl space-y-8 bg-radial-glow relative">
       {/* Header Greeting & Agent Status */}
       <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="flex flex-wrap items-end justify-between gap-4">
         <div>
@@ -112,7 +112,7 @@ export default function HomePage() {
             </Link>
           </div>
 
-          <Card lift className="overflow-hidden border-brand/30 bg-gradient-to-br from-surface to-brand-soft/20 p-6">
+          <Card lift className="overflow-hidden border-brand/40 bg-gradient-to-br from-surface/90 to-brand-soft/30 p-6 glass-panel backdrop-blur-xl relative">
             <div className="flex flex-col gap-5 md:flex-row md:items-center md:justify-between">
               <div className="space-y-2">
                 <div className="flex flex-wrap items-center gap-2">
@@ -276,13 +276,13 @@ function QuickAction({
   sub: string;
 }) {
   return (
-    <Link href={href} className="block h-full">
-      <Card lift className="flex h-full flex-col gap-3 p-4">
-        <span className="grid h-9 w-9 place-items-center rounded-lg bg-brand-soft text-brand">
+    <Link href={href} className="block h-full group">
+      <Card lift className="flex h-full flex-col gap-3 p-4.5 transition-all duration-200 group-hover:border-brand/40">
+        <span className="grid h-10 w-10 place-items-center rounded-xl bg-brand-soft text-brand transition-transform duration-200 group-hover:scale-105 group-active:scale-95 shadow-xs">
           {icon}
         </span>
         <div className="mt-auto">
-          <div className="text-sm font-semibold text-ink">{label}</div>
+          <div className="text-sm font-semibold text-ink group-hover:text-brand transition-colors">{label}</div>
           <div className="text-xs text-ink-faint">{sub}</div>
         </div>
       </Card>
@@ -302,8 +302,10 @@ function ReadinessChip({
   return (
     <span
       className={
-        "inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[0.72rem] font-medium " +
-        (ready ? "bg-confirm-soft text-confirm" : "bg-caution-soft text-caution")
+        "inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[0.72rem] font-semibold glass-pill transition-all " +
+        (ready
+          ? "bg-confirm-soft/80 text-confirm border-confirm/30"
+          : "bg-caution-soft/80 text-caution border-caution/30")
       }
     >
       {icon}

@@ -21,7 +21,7 @@ export function LanguageToggle() {
   const { uiLanguage, setUiLanguage, t } = useLang();
 
   return (
-    <label className="inline-flex items-center gap-1.5 rounded-full border border-line-strong bg-surface px-2.5 h-9 text-sm font-medium text-ink-soft transition-colors hover:text-ink hover:bg-surface-muted focus-within:border-brand focus-within:ring-2 focus-within:ring-brand/15">
+    <label className="inline-flex items-center gap-1.5 rounded-full border border-line/60 glass-pill px-2.5 h-9 text-sm font-medium text-ink-soft transition-all hover-lift focus-within:border-brand focus-within:ring-2 focus-within:ring-brand/15 cursor-pointer">
       <Languages className="h-4 w-4 shrink-0 text-brand" aria-hidden="true" />
       <span className="sr-only">{t("lang.aria")}</span>
       <select
