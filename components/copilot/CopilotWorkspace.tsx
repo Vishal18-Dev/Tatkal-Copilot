@@ -327,10 +327,14 @@ export function CopilotWorkspace({
           <div className="space-y-2">
             <div className="inline-flex items-center gap-1.5 rounded-full bg-[#FF6A00]/10 px-2.5 py-0.5 text-[0.72rem] font-bold text-[#FF6A00]">
               <Sparkles className="h-3 w-3" />
-              <span>{t("agent.copilot")}</span>
+              <span>Tatkal Copilot</span>
             </div>
             <h1 className="text-2xl font-extrabold tracking-tight text-brand-ink sm:text-3xl lg:text-[2.1rem] leading-[1.2]">
-              {t("workspace.title")}
+              {t("workspace.titlePrefix")}{" "}
+              <span className="bg-gradient-to-r from-[#FF6A00] via-[#FF8A00] to-[#FFA040] bg-clip-text text-transparent">
+                {t("workspace.titleHighlight")}
+              </span>
+              .
             </h1>
             <p className="text-xs sm:text-sm text-ink-soft leading-relaxed">
               {t("workspace.sub")}

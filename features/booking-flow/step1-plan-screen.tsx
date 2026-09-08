@@ -87,7 +87,11 @@ export function Step1PlanScreen() {
       {/* Main Headline */}
       <div>
         <h1 className="text-2xl font-extrabold tracking-tight text-brand-ink sm:text-3xl lg:text-[2.2rem] leading-tight">
-          “{t("step1.headline", { origin: fromName, destination: toName })}”
+          “Bilkul, Samajh gaya!{" "}
+          <span className="text-brand">
+            {fromName} se {toName} kal subah.
+          </span>
+          ”
         </h1>
         <p className="mt-1.5 text-sm sm:text-base text-ink-soft">
           {t("step1.subheadline")}
