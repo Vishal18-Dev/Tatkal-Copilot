@@ -17,6 +17,7 @@ import {
   ChevronDown,
   ChevronUp,
   ArrowRight,
+  ArrowUp,
   HelpCircle,
   Clock,
   Radio,
@@ -59,12 +60,13 @@ export function CopilotWorkspace({
   const goTo = journey?.goTo ?? (() => router.push("/app/plan"));
   const { identity, wallet } = useStore();
 
-  const [inputGoal, setInputGoal] = useState(initialGoal ?? "");
+  const [composerText, setComposerText] = useState("");
   const [showHistory, setShowHistory] = useState(false);
   const [showManual, setShowManual] = useState(false);
   const [prepActive, setPrepActive] = useState(false);
   const [continuousMode, setContinuousMode] = useState(false);
-  const inputRef = useRef<HTMLInputElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const historyContainerRef = useRef<HTMLDivElement>(null);
 
   const convo = useVoiceConversation({
     voiceLang,
@@ -152,9 +154,10 @@ export function CopilotWorkspace({
 
   function handleFormSubmit(e?: React.FormEvent) {
     e?.preventDefault();
-    const text = inputGoal.trim();
+    const text = composerText.trim();
     if (!text || busy) return;
-    setInputGoal("");
+    setComposerText("");
+    textareaRef.current?.focus();
 
     const isAffirmative = /^(?:yes|proceed|go ahead|haan|continue|confirm|sure)\b/i.test(text);
     if (isAffirmative && result?.plan && result.plan.options.length > 0) {
@@ -224,18 +227,61 @@ export function CopilotWorkspace({
 
   const activeTranscript = interimTranscript || (turns.length > 0 ? turns[turns.length - 1]?.text : "");
 
+  // Auto-scroll compact conversation history when turns or interim updates arrive
   useEffect(() => {
-    if (interimTranscript && interimTranscript.trim()) {
-      setInputGoal(interimTranscript.trim());
+    if (historyContainerRef.current) {
+      historyContainerRef.current.scrollTop = historyContainerRef.current.scrollHeight;
     }
-  }, [interimTranscript]);
+  }, [turns, interimTranscript]);
 
-  useEffect(() => {
-    const lastUserTurn = turns.filter((t) => t.role === "user").slice(-1)[0];
-    if (lastUserTurn?.text) {
-      setInputGoal(lastUserTurn.text);
+  const composerStatus = useMemo(() => {
+    if (state === "error" || errorKind) {
+      return {
+        status: "error" as const,
+        label: "Couldn't hear that. Try again.",
+        dotColor: "bg-danger",
+      };
     }
-  }, [turns]);
+    if (listening) {
+      return {
+        status: "listening" as const,
+        label: "Listening…",
+        dotColor: "bg-danger animate-ping",
+      };
+    }
+    if (state === "transcribing") {
+      return {
+        status: "transcribing" as const,
+        label: "Transcribing…",
+        dotColor: "bg-brand animate-pulse",
+      };
+    }
+    if (busy) {
+      return {
+        status: "thinking" as const,
+        label: "Aarav is thinking…",
+        dotColor: "bg-brand animate-pulse",
+      };
+    }
+    if (speaking) {
+      return {
+        status: "speaking" as const,
+        label: "Aarav is speaking…",
+        dotColor: "bg-confirm animate-pulse",
+      };
+    }
+    return {
+      status: "idle" as const,
+      label: "Type or speak to Aarav",
+      dotColor: "bg-confirm",
+    };
+  }, [state, errorKind, listening, busy, speaking]);
+
+  const placeholderText = useMemo(() => {
+    if (listening) return "Listening…";
+    if (turns.length === 0) return "Tell me where you're going…";
+    return "Ask Aarav anything about your journey…";
+  }, [listening, turns.length]);
 
   const lastAgentTurn = turns.filter((t) => t.role === "agent").slice(-1)[0];
   const agentSpeech =
@@ -295,69 +341,113 @@ export function CopilotWorkspace({
             </p>
           </div>
 
-          {/* Unified Hero Input Card */}
+          {/* Unified Hero Conversation & Input Card */}
           <div className="rounded-2xl border border-line-strong bg-surface p-4 shadow-sm transition focus-within:border-brand focus-within:ring-4 focus-within:ring-brand/10 space-y-3">
+            {/* Compact Conversation History (when turns exist) */}
+            {turns.length > 0 && (
+              <div
+                ref={historyContainerRef}
+                role="log"
+                aria-live="polite"
+                aria-label="Conversation history"
+                className="max-h-56 overflow-y-auto space-y-2.5 pr-1 mb-2 scroll-smooth border-b border-line/60 pb-3"
+              >
+                {turns.map((turn) => (
+                  <div
+                    key={turn.id}
+                    className={cn(
+                      "flex",
+                      turn.role === "user" ? "justify-end" : "justify-start"
+                    )}
+                  >
+                    <div
+                      className={cn(
+                        "max-w-[85%] rounded-2xl px-3.5 py-2 text-xs leading-relaxed shadow-2xs",
+                        turn.role === "user"
+                          ? "rounded-br-xs bg-brand text-white font-medium"
+                          : "rounded-bl-xs bg-surface-muted/90 border border-line text-ink"
+                      )}
+                    >
+                      <div className="text-[0.68rem] font-semibold opacity-75 mb-0.5">
+                        {turn.role === "user" ? "You" : "Aarav"}
+                      </div>
+                      <div className="whitespace-pre-wrap">{turn.text}</div>
+                    </div>
+                  </div>
+                ))}
+
+                {/* Live interim transcript bubble during voice speech */}
+                {listening && interimTranscript && interimTranscript.trim() && (
+                  <div className="flex justify-end">
+                    <div className="max-w-[85%] rounded-2xl rounded-br-xs bg-brand/70 text-white/90 px-3.5 py-2 text-xs italic animate-pulse">
+                      <div className="text-[0.68rem] font-semibold opacity-75 mb-0.5">
+                        You (speaking...)
+                      </div>
+                      <div>{interimTranscript.trim()}</div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
             <form onSubmit={handleFormSubmit} className="space-y-3">
-              <div className="relative flex items-start gap-3">
+              <div className="relative flex items-end gap-2 rounded-xl bg-surface-muted/40 p-1.5 border border-line/60 focus-within:border-brand/60 focus-within:ring-2 focus-within:ring-brand/10 transition">
                 <textarea
-                  rows={2}
-                  value={inputGoal}
-                  onChange={(e) => setInputGoal(e.target.value)}
+                  ref={textareaRef}
+                  rows={turns.length > 0 ? 1 : 2}
+                  value={composerText}
+                  onChange={(e) => setComposerText(e.target.value)}
                   onKeyDown={(e) => {
                     if (e.key === "Enter" && !e.shiftKey) {
                       e.preventDefault();
                       handleFormSubmit();
                     }
                   }}
-                  placeholder={
-                    listening
-                      ? 'Listening... speak naturally (e.g. "Mumbai to Delhi tomorrow morning")'
-                      : 'e.g., "Mumbai to Delhi tomorrow morning before 8 AM" or "Delhi se Varanasi 3A kal shaam"'
-                  }
-                  className="w-full resize-none bg-transparent text-sm sm:text-base text-ink placeholder:text-ink-faint focus:outline-none leading-relaxed pt-1"
+                  aria-label="Ask Aarav anything about your journey"
+                  placeholder={placeholderText}
+                  className="w-full resize-none bg-transparent px-2.5 py-1.5 text-sm sm:text-base text-ink placeholder:text-ink-faint focus:outline-none leading-relaxed"
                 />
 
-                {/* Circular Orange Mic Button */}
+                {/* Circular Mic Button */}
                 <button
                   type="button"
                   onClick={handleMicPress}
                   aria-label={listening ? "Stop listening" : "Start speaking"}
                   className={cn(
-                    "relative h-11 w-11 shrink-0 rounded-full flex items-center justify-center text-white shadow-md transition-all active:scale-95",
+                    "relative h-10 w-10 shrink-0 rounded-full flex items-center justify-center text-white shadow-xs transition-all active:scale-95",
                     listening
                       ? "bg-danger animate-pulse ring-4 ring-danger/20"
                       : speaking
                       ? "bg-confirm ring-4 ring-confirm/20"
-                      : "bg-[#FF6A00] hover:bg-[#E55F00] ring-4 ring-[#FF6A00]/20"
+                      : "bg-[#FF6A00] hover:bg-[#E55F00] ring-2 ring-[#FF6A00]/20"
                   )}
                 >
                   {listening ? (
-                    <Mic className="h-5 w-5 animate-pulse" />
+                    <Mic className="h-4 w-4 animate-pulse" />
                   ) : speaking ? (
-                    <Volume2 className="h-5 w-5 animate-bounce" />
+                    <Volume2 className="h-4 w-4 animate-bounce" />
                   ) : (
-                    <Mic className="h-5 w-5" />
+                    <Mic className="h-4 w-4" />
                   )}
+                </button>
+
+                {/* Send Button */}
+                <button
+                  type="submit"
+                  disabled={!composerText.trim() || busy}
+                  aria-label="Send message"
+                  className="h-10 w-10 shrink-0 rounded-full flex items-center justify-center bg-brand text-white shadow-xs transition-all hover:bg-brand-strong disabled:opacity-30 disabled:cursor-not-allowed active:scale-95"
+                >
+                  <ArrowUp className="h-4 w-4" />
                 </button>
               </div>
 
               {/* Sub-bar Inside Card */}
-              <div className="flex flex-wrap items-center justify-between gap-3 border-t border-line/60 pt-3 text-xs">
-                <div className="flex items-center gap-2 text-ink-soft">
-                  <span
-                    className={cn(
-                      "h-2 w-2 rounded-full",
-                      listening ? "bg-danger animate-ping" : speaking ? "bg-confirm animate-pulse" : "bg-confirm"
-                    )}
-                  />
+              <div className="flex flex-wrap items-center justify-between gap-3 pt-1 text-xs">
+                <div className="flex items-center gap-2 text-ink-soft" aria-live="polite">
+                  <span className={cn("h-2 w-2 rounded-full", composerStatus.dotColor)} />
                   <span className="font-medium text-[0.76rem]">
-                    {listening
-                      ? "Listening active · Instant voice decoding"
-                      : busy
-                      ? "Processing route with IRCTC live clock..."
-                      : speaking
-                      ? "Aarav is speaking..."
-                      : "Listening active · Instant voice decoding"}
+                    {composerStatus.label}
                   </span>
                 </div>
 
@@ -366,23 +456,14 @@ export function CopilotWorkspace({
                     type="button"
                     onClick={handleMicPress}
                     className={cn(
-                      "inline-flex items-center gap-1.5 rounded-full border px-3.5 py-1.5 text-xs font-semibold transition-colors",
+                      "inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-semibold transition-colors",
                       listening
                         ? "border-danger/40 bg-danger/10 text-danger hover:bg-danger/20"
                         : "border-brand/20 bg-brand-soft/70 text-brand hover:bg-brand-soft"
                     )}
                   >
                     <Sparkles className="h-3.5 w-3.5 text-brand" />
-                    <span>Bolkar bataiye</span>
-                  </button>
-
-                  <button
-                    type="submit"
-                    disabled={!inputGoal.trim() && !listening}
-                    className="inline-flex items-center gap-1.5 rounded-full bg-[#0B1527] px-4 py-1.5 text-xs font-semibold text-white shadow-sm transition-all hover:bg-[#15234A] disabled:opacity-40"
-                  >
-                    <span>Find best train</span>
-                    <ArrowRight className="h-3.5 w-3.5" />
+                    <span>{listening ? "Sun raha hoon..." : "Bolkar bataiye"}</span>
                   </button>
                 </div>
               </div>
@@ -405,7 +486,7 @@ export function CopilotWorkspace({
                   key={q}
                   type="button"
                   onClick={() => {
-                    setInputGoal(q);
+                    setComposerText("");
                     void sendText(q);
                   }}
                   className="rounded-full border border-line-strong bg-surface px-3 py-1 text-xs font-medium text-ink transition-colors hover:border-brand hover:bg-brand-soft/50 hover:text-brand-ink"
@@ -513,7 +594,7 @@ export function CopilotWorkspace({
                 type="text"
                 placeholder="e.g. MMCT / Mumbai"
                 defaultValue={originText || ""}
-                onChange={(e) => setInputGoal(`From ${e.target.value} to ${destText || "Delhi"}`)}
+                onChange={(e) => setComposerText(`From ${e.target.value} to ${destText || "Delhi"}`)}
                 className="mt-1 w-full rounded-lg border border-line bg-surface-muted px-3 py-1.5 text-xs text-ink focus:outline-none focus:border-brand"
               />
             </div>
@@ -523,7 +604,7 @@ export function CopilotWorkspace({
                 type="text"
                 placeholder="e.g. NDLS / Delhi"
                 defaultValue={destText || ""}
-                onChange={(e) => setInputGoal(`From ${originText || "Mumbai"} to ${e.target.value}`)}
+                onChange={(e) => setComposerText(`From ${originText || "Mumbai"} to ${e.target.value}`)}
                 className="mt-1 w-full rounded-lg border border-line bg-surface-muted px-3 py-1.5 text-xs text-ink focus:outline-none focus:border-brand"
               />
             </div>
@@ -594,53 +675,7 @@ export function CopilotWorkspace({
         </div>
       </div>
 
-      {/* 4. Compact Conversation Thread */}
-      {turns.length > 0 && (
-        <div className="rounded-[var(--radius)] border border-line bg-surface-muted/50 p-3">
-          <div className="flex items-center justify-between border-b border-line/60 pb-2">
-            <span className="text-[0.72rem] font-semibold uppercase tracking-wide text-ink-faint">
-              {t("workspace.threadTitle", { count: turns.length })}
-            </span>
-            {turns.length > 2 && (
-              <button
-                type="button"
-                onClick={() => setShowHistory((s) => !s)}
-                className="inline-flex items-center gap-1 text-xs font-medium text-brand hover:underline"
-              >
-                {showHistory ? (
-                  <>
-                    {t("workspace.hideHistory")} <ChevronUp className="h-3.5 w-3.5" />
-                  </>
-                ) : (
-                  <>
-                    {t("workspace.showEarlier", { count: turns.length - 2 })} <ChevronDown className="h-3.5 w-3.5" />
-                  </>
-                )}
-              </button>
-            )}
-          </div>
 
-          <div className="mt-2.5 space-y-2">
-            {(showHistory ? turns : turns.slice(-2)).map((turn) => (
-              <div key={turn.id} className={cn("flex", turn.role === "user" ? "justify-end" : "justify-start")}>
-                <div
-                  className={cn(
-                    "max-w-[85%] rounded-2xl px-3.5 py-2 text-xs leading-relaxed",
-                    turn.role === "user"
-                      ? "rounded-br-xs bg-brand text-white font-medium"
-                      : "rounded-bl-xs bg-surface border border-line text-ink"
-                  )}
-                >
-                  <div className="text-[0.68rem] font-semibold opacity-70 mb-0.5">
-                    {turn.role === "user" ? t("workspace.you") : t("workspace.copilotSpeaker")}
-                  </div>
-                  <div>{turn.text}</div>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
 
       {/* 5. Awaiting Clarification View */}
       {voiceState === "awaiting_clarification" && result?.responseText && (
